@@ -11,18 +11,19 @@ project-root/
   │   │   ├── layout/        # AppShell (nav + sidebar + mobile nav), PageHeader
   │   │   ├── auth/          # AuthContext, AuthProvider, RequireAuth, RequireMember, AccessPending
   │   │   ├── common/        # Status pills, stat cards, empty/loading states
-  │   │   ├── forms/         # Capture, deal, investor, contact, CSV import, claim forms; voice recorder
+  │   │   ├── forms/         # Deal, investor, contact, CSV import and claim forms
   │   │   ├── matches/       # Explainable match card
   │   │   ├── outreach/      # Manually authored outreach composer
   │   │   └── error-boundary/
-  │   ├── hooks/             # use-auth, use-workspace, use-workspace-actions, use-mobile
+  │   ├── hooks/             # use-auth, use-workspace, use-workspace-actions, use-voice-recorder, use-mobile
   │   ├── lib/               # api (Enter Cloud access), types, constants, matching rules, CSV, workspace
-  │   ├── pages/             # dashboard, deal-inbox, cases (claims, decision gaps), investors, matches, workspace, login
+  │   ├── pages/             # dashboard, deal-inbox, inbox/capture (voice), cases, investors, matches, workspace, login
   │   ├── integrations/supabase/  # Generated client and types (do not edit)
   │   ├── App.tsx            # Providers (query + auth) and router
   │   ├── router.tsx         # Route table
   │   ├── main.tsx           # Entry point
   │   └── index.css          # Design tokens and global styles
+  ├── supabase/functions/    # transcribeVoiceNote, extractDealFields backend functions
   ├── tailwind.config.ts
   └── ...
 ```

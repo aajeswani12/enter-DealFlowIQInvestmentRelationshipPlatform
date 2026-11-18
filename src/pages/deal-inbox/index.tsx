@@ -1,11 +1,11 @@
 import { Archive, ArrowUpRight, Briefcase, Inbox, Mic, PenLine, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/common/empty-state";
 import { LoadingPanel } from "@/components/common/loading-panel";
-import { CaptureStatusPill } from "@/components/common/status-pill";
-import { CaptureForm } from "@/components/forms/capture-form";
+import { CaptureStatusPill, Pill } from "@/components/common/status-pill";
 import { CaseForm } from "@/components/forms/case-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { CAPTURE_STATUS_LABEL, CAPTURE_STATUS_OPTIONS } from "@/lib/constants";
 import { formatDuration, relativeDays } from "@/lib/format";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
-import type { Capture, CaptureSource, CaptureStatus } from "@/lib/types";
+import type { Capture, CaptureStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { value: "all" | CaptureStatus; label: string }[] = [
@@ -22,27 +22,31 @@ const FILTERS: { value: "all" | CaptureStatus; label: string }[] = [
   ...CAPTURE_STATUS_OPTIONS,
 ];
 
+const TRANSCRIPTION_BADGE: Record<
+  string,
+  { label: string; tone: "neutral" | "brand" | "success" | "warning" | "danger" }
+> = {
+  completed: { label: "Transcribed", tone: "success" },
+  manual: { label: "Manual transcript", tone: "brand" },
+  unavailable: { label: "Transcript needed", tone: "warning" },
+  failed: { label: "Transcription failed", tone: "danger" },
+  processing: { label: "Transcribing", tone: "brand" },
+};
+
 const DealInbox = () => {
   const { data, isLoading } = useWorkspace();
   const workspace = data ?? EMPTY_WORKSPACE;
   const actions = useWorkspaceActions();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const captureParam = searchParams.get("capture");
-  const [formOpen, setFormOpen] = useState(false);
-  const [formSource, setFormSource] = useState<CaptureSource>("voice");
+  const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState<"all" | CaptureStatus>("all");
   const [promoteCapture, setPromoteCapture] = useState<Capture | null>(null);
 
   useEffect(() => {
-    if (!captureParam) return;
-    setFormSource(captureParam === "text" ? "text" : "voice");
-    setFormOpen(true);
-    const next = new URLSearchParams(searchParams);
-    next.delete("capture");
-    setSearchParams(next, { replace: true });
-  }, [captureParam, searchParams, setSearchParams]);
+    const legacy = searchParams.get("capture");
+    if (!legacy) return;
+    navigate(`/inbox/capture${legacy === "text" ? "?mode=paste" : ""}`, { replace: true });
+  }, [navigate, searchParams]);
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
@@ -56,11 +60,6 @@ const DealInbox = () => {
     const list = filter === "all" ? workspace.captures : workspace.captures.filter((item) => item.status === filter);
     return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [workspace.captures, filter]);
-
-  const openForm = (source: CaptureSource) => {
-    setFormSource(source);
-    setFormOpen(true);
-  };
 
   const setStatus = async (capture: Capture, status: CaptureStatus) => {
     try {
@@ -76,37 +75,40 @@ const DealInbox = () => {
       <PageHeader
         eyebrow="Intake"
         title="Deal Inbox"
-        description="Record what you heard before it disappears. Triage here, then promote the good ones into investment cases."
+        description="Record what you heard before it disappears. Review the transcript, attach it to a deal, then triage the good ones."
         actions={
           <>
-            <Button className="gap-1.5" onClick={() => openForm("voice")}>
-              <Mic className="h-4 w-4" aria-hidden="true" />
-              Record update
+            <Button asChild className="gap-1.5">
+              <Link to="/inbox/capture">
+                <Mic className="h-4 w-4" aria-hidden="true" />
+                Record voice note
+              </Link>
             </Button>
-            <Button variant="outline" className="gap-1.5" onClick={() => openForm("text")}>
-              <PenLine className="h-4 w-4" aria-hidden="true" />
-              Typed note
+            <Button asChild variant="outline" className="gap-1.5">
+              <Link to="/inbox/capture?mode=paste">
+                <PenLine className="h-4 w-4" aria-hidden="true" />
+                Paste note
+              </Link>
             </Button>
           </>
         }
       />
 
-      <button
-        type="button"
-        onClick={() => openForm("voice")}
+      <Link
+        to="/inbox/capture"
         className="flex w-full items-center gap-4 rounded-xl border border-brand/25 bg-gradient-to-br from-brand-soft via-card to-card p-4 text-left transition-shadow hover:shadow-card lg:hidden"
       >
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-sm">
           <Mic className="h-6 w-6" aria-hidden="true" />
         </span>
         <span className="min-w-0">
-          <span className="block text-[14px] font-semibold">Record a voice update</span>
+          <span className="block text-[14px] font-semibold">Record a voice note</span>
           <span className="mt-0.5 block text-[11.5px] leading-relaxed text-muted-foreground">
-            Capture the takeaway while it is fresh. Audio is stored with the record.
+            Audio and transcript stay private. Review everything before it is saved.
           </span>
         </span>
         <ArrowUpRight className="ml-auto h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
-      </button>
+      </Link>
 
       <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         {FILTERS.map((option) => {
@@ -142,13 +144,15 @@ const DealInbox = () => {
           title={filter === "all" ? "The inbox is empty" : `No ${FILTERS.find((item) => item.value === filter)?.label.toLowerCase()} captures`}
           description={
             filter === "all"
-              ? "Record a voice note after a founder call, or type a quick update. Nothing is analysed automatically."
+              ? "Record a voice note after a founder call, or paste a transcript. You review the text before anything is saved."
               : "Try another filter, or add a new capture."
           }
           action={
-            <Button size="sm" className="gap-1.5" onClick={() => openForm("voice")}>
-              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-              Record update
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to="/inbox/capture">
+                <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+                Record voice note
+              </Link>
             </Button>
           }
         />
@@ -171,6 +175,12 @@ const DealInbox = () => {
                         ? `Voice${capture.durationSeconds ? ` · ${formatDuration(capture.durationSeconds)}` : ""}`
                         : "Typed"}
                     </span>
+                    {capture.source === "voice" && TRANSCRIPTION_BADGE[capture.transcriptionStatus] ? (
+                      <Pill tone={TRANSCRIPTION_BADGE[capture.transcriptionStatus].tone}>
+                        {TRANSCRIPTION_BADGE[capture.transcriptionStatus].label}
+                      </Pill>
+                    ) : null}
+                    {capture.extractionStatus === "completed" ? <Pill tone="brand">AI fields extracted</Pill> : null}
                   </div>
                   <p className="mt-1 text-[11.5px] text-muted-foreground">
                     {[capture.founderName, capture.sector, capture.roundStage, capture.referredBy && `via ${capture.referredBy}`]
@@ -181,11 +191,16 @@ const DealInbox = () => {
                 <p className="text-[11px] text-muted-foreground">{relativeDays(capture.createdAt)}</p>
               </div>
 
-              {capture.notes ? (
-                <p className="mt-3 whitespace-pre-line text-[13px] leading-relaxed text-foreground/90">{capture.notes}</p>
-              ) : (
-                <p className="mt-3 text-[12px] italic text-muted-foreground">No typed notes on this capture.</p>
-              )}
+              <div className="mt-3">
+                <p className="label-caps">{capture.source === "voice" ? "Transcript" : "Note"}</p>
+                {capture.notes ? (
+                  <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-foreground/90">{capture.notes}</p>
+                ) : (
+                  <p className="mt-1 text-[12px] italic text-muted-foreground">
+                    No transcript stored on this capture.
+                  </p>
+                )}
+              </div>
 
               {capture.audioUrl ? (
                 <div className="mt-3">
@@ -220,7 +235,7 @@ const DealInbox = () => {
                 {capture.dealId ? (
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/cases/${capture.dealId}`)}>
                     <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
-                    Open case
+                    Open deal
                   </Button>
                 ) : (
                   <Button size="sm" className="gap-1.5" onClick={() => setPromoteCapture(capture)}>
@@ -251,7 +266,6 @@ const DealInbox = () => {
         </ul>
       )}
 
-      <CaptureForm open={formOpen} onOpenChange={setFormOpen} defaultSource={formSource} />
       <CaseForm
         open={Boolean(promoteCapture)}
         onOpenChange={(open) => {

@@ -2,6 +2,31 @@
 
 export type CaptureSource = "voice" | "text";
 export type CaptureStatus = "new" | "reviewing" | "promoted" | "archived";
+export type TranscriptionStatus =
+  | "not_requested"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "unavailable"
+  | "manual";
+export type ExtractionStatus = "not_requested" | "processing" | "completed" | "failed" | "unavailable";
+
+/** Shape returned by the structured extraction backend function. */
+export interface ExtractedDealFields {
+  company_name: string;
+  website: string;
+  one_liner: string;
+  sector: string;
+  geography: string;
+  stage: string;
+  target_raise: number | null;
+  cheque_sought: number | null;
+  thesis: string;
+  next_step: string;
+  open_questions: string[];
+  claims: { label: string; value_text: string }[];
+  confidence: "low" | "medium" | "high" | "unknown";
+}
 
 export type CaseStatus =
   | "sourcing"
@@ -55,6 +80,17 @@ export interface Capture {
   dealId: string | null;
   investorId: string | null;
   sourceDate: string;
+  clientCaptureId: string | null;
+  originalTranscript: string;
+  transcriptionStatus: TranscriptionStatus;
+  transcriptionProvider: string;
+  transcriptionModel: string;
+  transcriptionError: string;
+  extractionStatus: ExtractionStatus;
+  extractionError: string;
+  extractedFields: Partial<ExtractedDealFields> | null;
+  audioMimeType: string;
+  audioSizeBytes: number | null;
   createdAt: string;
 }
 

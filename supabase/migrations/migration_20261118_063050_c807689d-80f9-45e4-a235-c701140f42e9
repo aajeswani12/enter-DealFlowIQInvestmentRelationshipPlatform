@@ -1,0 +1,4 @@
+create policy dfi_voice_notes_update on storage.objects
+for update to authenticated
+using (bucket_id = 'voice-notes' and public.can_write_project())
+with check (bucket_id = 'voice-notes' and public.can_write_project());

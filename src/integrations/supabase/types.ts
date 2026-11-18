@@ -3853,14 +3853,22 @@ export type Database = {
       }
       sources: {
         Row: {
+          audio_mime_type: string
+          audio_size_bytes: number | null
           audio_storage_path: string | null
+          client_capture_id: string | null
           created_at: string
           deal_id: string | null
           duration_seconds: number | null
+          extracted_fields: Json
+          extraction_error: string
+          extraction_status: string
           founder_email: string
           founder_name: string
           id: string
           investor_id: string | null
+          original_transcript: string
+          processed_at: string | null
           raw_text: string
           referred_by: string
           sector_hint: string
@@ -3868,18 +3876,30 @@ export type Database = {
           source_type: string
           stage_hint: string
           title: string
+          transcription_error: string
+          transcription_model: string
+          transcription_provider: string
+          transcription_status: string
           triage_status: string
           uploaded_by: string | null
         }
         Insert: {
+          audio_mime_type?: string
+          audio_size_bytes?: number | null
           audio_storage_path?: string | null
+          client_capture_id?: string | null
           created_at?: string
           deal_id?: string | null
           duration_seconds?: number | null
+          extracted_fields?: Json
+          extraction_error?: string
+          extraction_status?: string
           founder_email?: string
           founder_name?: string
           id?: string
           investor_id?: string | null
+          original_transcript?: string
+          processed_at?: string | null
           raw_text?: string
           referred_by?: string
           sector_hint?: string
@@ -3887,18 +3907,30 @@ export type Database = {
           source_type?: string
           stage_hint?: string
           title: string
+          transcription_error?: string
+          transcription_model?: string
+          transcription_provider?: string
+          transcription_status?: string
           triage_status?: string
           uploaded_by?: string | null
         }
         Update: {
+          audio_mime_type?: string
+          audio_size_bytes?: number | null
           audio_storage_path?: string | null
+          client_capture_id?: string | null
           created_at?: string
           deal_id?: string | null
           duration_seconds?: number | null
+          extracted_fields?: Json
+          extraction_error?: string
+          extraction_status?: string
           founder_email?: string
           founder_name?: string
           id?: string
           investor_id?: string | null
+          original_transcript?: string
+          processed_at?: string | null
           raw_text?: string
           referred_by?: string
           sector_hint?: string
@@ -3906,6 +3938,10 @@ export type Database = {
           source_type?: string
           stage_hint?: string
           title?: string
+          transcription_error?: string
+          transcription_model?: string
+          transcription_provider?: string
+          transcription_status?: string
           triage_status?: string
           uploaded_by?: string | null
         }

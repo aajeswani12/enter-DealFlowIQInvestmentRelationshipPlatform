@@ -102,7 +102,7 @@ const Dashboard = () => {
         actions={
           <>
             <Button asChild className="gap-1.5">
-              <Link to="/inbox?capture=voice">
+              <Link to="/inbox/capture">
                 <Mic className="h-4 w-4" aria-hidden="true" />
                 Record update
               </Link>
@@ -366,7 +366,7 @@ const Dashboard = () => {
                 className="mt-4"
                 action={
                   <Button asChild size="sm" variant="outline" className="gap-1.5">
-                    <Link to="/inbox?capture=voice">
+                    <Link to="/inbox/capture">
                       <Mic className="h-3.5 w-3.5" aria-hidden="true" />
                       Record one
                     </Link>

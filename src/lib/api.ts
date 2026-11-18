@@ -11,6 +11,8 @@ import type {
   DealClaim,
   DealInvestorMatch,
   DecisionGap,
+  ExtractedDealFields,
+  ExtractionStatus,
   GapSeverity,
   Interaction,
   InteractionKind,
@@ -28,6 +30,7 @@ import type {
   QuestionStatus,
   RelationshipStatus,
   RelationshipStrength,
+  TranscriptionStatus,
   VerificationStatus,
   WorkspaceMember,
   MemberRole,
@@ -56,7 +59,7 @@ function fail(context: string, error: { message: string } | null): never {
 }
 
 function extensionFor(mimeType: string, fallback = "webm"): string {
-  if (mimeType.includes("mp4")) return "m4a";
+  if (mimeType.includes("mp4") || mimeType.includes("m4a")) return "m4a";
   if (mimeType.includes("ogg")) return "ogg";
   if (mimeType.includes("mpeg")) return "mp3";
   if (mimeType.includes("wav")) return "wav";
@@ -85,6 +88,17 @@ function mapCapture(row: SourceRow, audioUrl: string | null): Capture {
     dealId: row.deal_id,
     investorId: row.investor_id,
     sourceDate: row.source_date,
+    clientCaptureId: row.client_capture_id,
+    originalTranscript: row.original_transcript,
+    transcriptionStatus: row.transcription_status as TranscriptionStatus,
+    transcriptionProvider: row.transcription_provider,
+    transcriptionModel: row.transcription_model,
+    transcriptionError: row.transcription_error,
+    extractionStatus: row.extraction_status as ExtractionStatus,
+    extractionError: row.extraction_error,
+    extractedFields: (row.extracted_fields as unknown as Partial<ExtractedDealFields>) ?? null,
+    audioMimeType: row.audio_mime_type,
+    audioSizeBytes: toNumber(row.audio_size_bytes),
     createdAt: row.created_at,
   };
 }
@@ -267,10 +281,61 @@ function mapAudit(row: AuditRow): AuditEvent {
   };
 }
 
+async function readFunctionError(error: unknown): Promise<string> {
+  const candidate = error as { message?: string; context?: unknown };
+  const context = candidate.context;
+  if (context && typeof context === "object" && "json" in context) {
+    try {
+      const body = (await (context as Response).json()) as Record<string, unknown>;
+      const message = body.error ?? body.message ?? body.reason;
+      if (typeof message === "string" && message.trim()) return message;
+    } catch {
+      // fall through to the generic message
+    }
+  }
+  return candidate.message || "The backend service failed.";
+}
+
 async function currentUserId(): Promise<string> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) fail("Not signed in", error);
   return data.user.id;
+}
+
+export interface VoiceSourceInput {
+  clientCaptureId: string;
+  title: string;
+  sourceType: CaptureSource;
+  transcript: string;
+  originalTranscript: string;
+  audioPath: string | null;
+  audioMimeType: string;
+  audioSizeBytes: number | null;
+  durationSeconds: number | null;
+  sourceDate: string;
+  dealId: string | null;
+  transcriptionStatus: TranscriptionStatus;
+  transcriptionProvider: string;
+  transcriptionModel: string;
+  transcriptionError: string;
+  extractionStatus: ExtractionStatus;
+  extractionError: string;
+  extractedFields: Partial<ExtractedDealFields> | null;
+  processedAt: string | null;
+}
+
+export interface TranscriptionResponse {
+  configured: boolean;
+  transcript?: string;
+  provider?: string;
+  model?: string;
+  reason?: string;
+}
+
+export interface ExtractionResponse {
+  configured: boolean;
+  fields?: Partial<ExtractedDealFields>;
+  reason?: string;
 }
 
 export interface CaptureInput {
@@ -481,6 +546,107 @@ export const api = {
       members: (members.data ?? []).map(mapMember),
       audit: (audit.data ?? []).map(mapAudit),
     };
+  },
+
+  async uploadVoiceAudio(
+    blob: Blob,
+    clientCaptureId: string,
+    mimeType: string,
+    fileName?: string,
+  ): Promise<string> {
+    const userId = await currentUserId();
+    const extension = mimeType
+      ? extensionFor(mimeType, fileName?.split(".").pop() || "webm")
+      : fileName?.split(".").pop()?.toLowerCase() || "webm";
+    const path = `${userId}/${clientCaptureId}.${extension}`;
+    const { error } = await supabase.storage.from(VOICE_BUCKET).upload(path, blob, {
+      contentType: mimeType || "audio/webm",
+      upsert: true,
+    });
+    if (error) fail("Could not upload the audio", error);
+    return path;
+  },
+
+  async deleteVoiceAudio(path: string): Promise<void> {
+    await supabase.storage.from(VOICE_BUCKET).remove([path]);
+  },
+
+  async transcribeVoiceNote(audioPath: string, mimeType: string): Promise<TranscriptionResponse> {
+    const { data, error } = await supabase.functions.invoke("transcribeVoiceNote", {
+      body: { audioPath, mimeType },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { configured: false, reason: "The transcription service returned no response." }) as TranscriptionResponse;
+  },
+
+  async extractDealFields(transcript: string): Promise<ExtractionResponse> {
+    const { data, error } = await supabase.functions.invoke("extractDealFields", {
+      body: { transcript },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { configured: false, reason: "The extraction service returned no response." }) as ExtractionResponse;
+  },
+
+  async upsertVoiceSource(input: VoiceSourceInput): Promise<{ id: string; dealId: string | null }> {
+    const userId = await currentUserId();
+    const { data, error } = await supabase
+      .from("sources")
+      .upsert(
+        {
+          client_capture_id: input.clientCaptureId,
+          title: input.title.slice(0, 200),
+          source_type: input.sourceType,
+          raw_text: input.transcript,
+          original_transcript: input.originalTranscript,
+          audio_storage_path: input.audioPath,
+          audio_mime_type: input.audioMimeType,
+          audio_size_bytes: input.audioSizeBytes,
+          duration_seconds: input.durationSeconds,
+          source_date: input.sourceDate,
+          triage_status: input.dealId ? "promoted" : "new",
+          deal_id: input.dealId,
+          uploaded_by: userId,
+          transcription_status: input.transcriptionStatus,
+          transcription_provider: input.transcriptionProvider,
+          transcription_model: input.transcriptionModel,
+          transcription_error: input.transcriptionError,
+          extraction_status: input.extractionStatus,
+          extraction_error: input.extractionError,
+          extracted_fields: (input.extractedFields ?? {}) as unknown as Database["public"]["Tables"]["sources"]["Insert"]["extracted_fields"],
+          processed_at: input.processedAt,
+        },
+        { onConflict: "client_capture_id" },
+      )
+      .select("id, deal_id")
+      .single();
+    if (error) fail("Could not save this capture", error);
+    return { id: data.id, dealId: data.deal_id };
+  },
+
+  async createDealFromCapture(input: {
+    clientCaptureId: string;
+    companyName: string;
+    fields: Partial<ExtractedDealFields>;
+  }): Promise<{ dealId: string; created: boolean }> {
+    const userId = await currentUserId();
+    const { error } = await supabase.from("deals").insert({
+      id: input.clientCaptureId,
+      company_name: input.companyName,
+      website: input.fields.website ?? "",
+      summary: input.fields.one_liner ?? "",
+      sector: input.fields.sector ?? "",
+      geography: input.fields.geography ?? "",
+      stage: input.fields.stage ?? "",
+      status: "sourcing",
+      target_raise: input.fields.target_raise ?? null,
+      cheque_sought: input.fields.cheque_sought ?? null,
+      thesis: input.fields.thesis ?? "",
+      next_step: input.fields.next_step ?? "",
+      owner_user_id: userId,
+      created_by: userId,
+    });
+    if (error && error.code !== "23505") fail("Could not create the deal", error);
+    return { dealId: input.clientCaptureId, created: !error };
   },
 
   async createCapture(input: CaptureInput): Promise<Capture> {

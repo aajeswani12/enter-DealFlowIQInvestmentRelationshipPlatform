@@ -156,7 +156,7 @@ export function AppShell() {
             asChild
             className="h-9 w-full justify-start gap-2 rounded-lg bg-sidebar-primary text-[13px] font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
           >
-            <Link to="/inbox?capture=voice">
+            <Link to="/inbox/capture">
               <Mic className="h-4 w-4" aria-hidden="true" />
               Record update
             </Link>
@@ -206,7 +206,7 @@ export function AppShell() {
             <Wordmark />
             <div className="flex items-center gap-1">
               <Button asChild variant="ghost" size="icon" className="h-9 w-9">
-                <Link to="/inbox?capture=voice" aria-label="Record an update">
+                <Link to="/inbox/capture" aria-label="Record an update">
                   <Mic className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
@@ -270,7 +270,7 @@ export function AppShell() {
                 asChild
                 className="h-10 w-full justify-start gap-2 rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
               >
-                <Link to="/inbox?capture=voice" onClick={() => setMenuOpen(false)}>
+                <Link to="/inbox/capture" onClick={() => setMenuOpen(false)}>
                   <Mic className="h-4 w-4" aria-hidden="true" />
                   Record update
                 </Link>

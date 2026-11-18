@@ -5,6 +5,7 @@ import Cases from "./pages/cases";
 import CaseDetail from "./pages/cases/detail";
 import Dashboard from "./pages/dashboard";
 import DealInbox from "./pages/deal-inbox";
+import VoiceCapture from "./pages/inbox/capture";
 import Investors from "./pages/investors";
 import InvestorDetail from "./pages/investors/detail";
 import Login from "./pages/login";
@@ -30,6 +31,7 @@ export const routers = [
     children: [
       { index: true, name: "dashboard", element: <Dashboard /> },
       { path: "inbox", name: "deal-inbox", element: <DealInbox /> },
+      { path: "inbox/capture", name: "voice-capture", element: <VoiceCapture /> },
       { path: "cases", name: "cases", element: <Cases /> },
       { path: "cases/:id", name: "case-detail", element: <CaseDetail /> },
       { path: "investors", name: "investors", element: <Investors /> },
