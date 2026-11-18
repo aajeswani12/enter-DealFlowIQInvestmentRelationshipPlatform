@@ -13,7 +13,24 @@ export interface RecordedClip {
   url: string;
 }
 
+export type RecorderErrorKind =
+  | "permission"
+  | "no_device"
+  | "busy"
+  | "unsupported"
+  | "insecure"
+  | "empty"
+  | "constraints"
+  | "unknown";
+
+export type MicrophonePermission = "granted" | "denied" | "prompt" | "unknown";
+
 type RecorderStatus = "idle" | "requesting" | "recording" | "stopping" | "error";
+
+interface PolicyDocument extends Document {
+  permissionsPolicy?: { allowsFeature: (feature: string) => boolean };
+  featurePolicy?: { allowsFeature: (feature: string) => boolean };
+}
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
@@ -22,29 +39,79 @@ function pickMimeType(): string | undefined {
   return MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type));
 }
 
-function permissionMessage(error: unknown): string {
-  const name = error instanceof DOMException ? error.name : "";
-  if (name === "NotAllowedError" || name === "SecurityError") {
-    return "Microphone access was blocked. Allow the microphone in your browser settings, or upload an audio file or paste a transcript instead.";
+function describeMicrophoneError(
+  caught: unknown,
+  context: { embedded: boolean; policyBlocked: boolean },
+): { kind: RecorderErrorKind; message: string } {
+  const name = caught instanceof DOMException ? caught.name : "";
+  const embeddedHint = context.embedded
+    ? "This embedded preview blocks the microphone. Open DealFlow IQ in its own tab to record; uploading audio or pasting a transcript also works here."
+    : "Allow the microphone from the browser's site controls (the microphone icon in the address bar), then tap Try microphone again. If the browser still remembers the block, reload the page.";
+
+  if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
+    return {
+      kind: "permission",
+      message:
+        context.policyBlocked && !context.embedded
+          ? "This page's permissions policy blocks the microphone. Open DealFlow IQ in its own tab and allow microphone access there."
+          : `Microphone access is blocked. ${embeddedHint}`,
+    };
   }
   if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-    return "No microphone was found on this device. Upload an audio file or paste a transcript instead.";
+    return {
+      kind: "no_device",
+      message: "No microphone was found on this device. Connect a microphone, or upload an audio file or paste a transcript instead.",
+    };
   }
   if (name === "NotReadableError" || name === "TrackStartError") {
-    return "The microphone is already in use by another app. Close it and try again, or use the fallbacks.";
+    return {
+      kind: "busy",
+      message:
+        "The microphone is already in use by another app or tab. Close it and tap Try microphone again, or use the upload and paste fallbacks.",
+    };
   }
-  return "Could not start recording. Check your microphone, or use the upload or paste fallback.";
+  if (name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError") {
+    return {
+      kind: "constraints",
+      message: "Your microphone rejected the requested audio settings. Try again, or use the upload and paste fallbacks.",
+    };
+  }
+  if (name === "AbortError") {
+    return {
+      kind: "unknown",
+      message: "The recording was interrupted before it started. Tap Try microphone again.",
+    };
+  }
+  if (name === "TypeError") {
+    return {
+      kind: "insecure",
+      message:
+        "The microphone is unavailable here. Recording needs HTTPS and a browser with MediaRecorder support; use the upload or paste fallback.",
+    };
+  }
+  return {
+    kind: "unknown",
+    message: "Could not start recording. Check your microphone, then tap Try microphone again, or use the upload or paste fallback.",
+  };
 }
 
 /**
  * MediaRecorder wrapper. Recording requires an explicit getUserMedia permission
  * request, which happens only when start() is called from a user action.
+ *
+ * The embedded preview runs in a cross-origin frame. Browsers commonly deny
+ * microphone access there even when the top-level site has permission, so the
+ * hook exposes frame/policy state for the UI to offer a standalone tab.
  */
 export function useVoiceRecorder() {
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<RecorderErrorKind | null>(null);
   const [clip, setClip] = useState<RecordedClip | null>(null);
+  const [permission, setPermission] = useState<MicrophonePermission>("unknown");
+  const [policyBlocked, setPolicyBlocked] = useState(false);
+  const [embedded] = useState(() => typeof window !== "undefined" && window.self !== window.top);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -54,6 +121,7 @@ export function useVoiceRecorder() {
   const discardRef = useRef(false);
   const clipUrlRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  const errorKindRef = useRef<RecorderErrorKind | null>(null);
 
   const supported =
     typeof navigator !== "undefined" &&
@@ -79,6 +147,63 @@ export function useVoiceRecorder() {
     }
   }, []);
 
+  const setRecorderError = useCallback((kind: RecorderErrorKind, message: string) => {
+    errorKindRef.current = kind;
+    setErrorKind(kind);
+    setError(message);
+    setStatus("error");
+  }, []);
+
+  const clearRecorderError = useCallback(() => {
+    errorKindRef.current = null;
+    setErrorKind(null);
+    setError(null);
+    setStatus((current) => (current === "error" ? "idle" : current));
+  }, []);
+
+  // Detect whether the frame's permissions policy allows microphone use, and
+  // track the browser permission so the UI can explain and re-offer access.
+  useEffect(() => {
+    const doc = document as PolicyDocument;
+    const policy = doc.permissionsPolicy ?? doc.featurePolicy;
+    if (policy?.allowsFeature) {
+      try {
+        setPolicyBlocked(policy.allowsFeature("microphone") === false);
+      } catch {
+        setPolicyBlocked(false);
+      }
+    }
+
+    let permissionStatus: PermissionStatus | null = null;
+    let active = true;
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "microphone" as PermissionName })
+        .then((status) => {
+          if (!active) return;
+          permissionStatus = status;
+          setPermission(status.state as MicrophonePermission);
+          status.onchange = () => {
+            setPermission(status.state as MicrophonePermission);
+            if (status.state === "granted" && errorKindRef.current === "permission") {
+              errorKindRef.current = null;
+              setErrorKind(null);
+              setError(null);
+              setStatus("idle");
+            }
+          };
+        })
+        .catch(() => {
+          // Permissions API support for microphone is not universal.
+        });
+    }
+
+    return () => {
+      active = false;
+      if (permissionStatus) permissionStatus.onchange = null;
+    };
+  }, []);
+
   const stop = useCallback(async (): Promise<void> => {
     const recorder = recorderRef.current;
     clearTimer();
@@ -95,24 +220,43 @@ export function useVoiceRecorder() {
 
   const start = useCallback(async (): Promise<void> => {
     if (!supported) {
-      setStatus("error");
-      setError("This browser cannot record audio. Use the upload or paste fallback instead.");
+      setRecorderError("unsupported", "This browser cannot record audio. Use the upload or paste fallback instead.");
+      return;
+    }
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setRecorderError(
+        "insecure",
+        "Recording requires HTTPS. Open the app over a secure connection, or upload an audio file or paste a transcript.",
+      );
       return;
     }
     if (status === "requesting" || status === "recording" || status === "stopping") return;
 
     revokeClipUrl();
+    errorKindRef.current = null;
+    setErrorKind(null);
+    setError(null);
     if (mountedRef.current) {
       setClip(null);
-      setError(null);
       setDuration(0);
       setStatus("requesting");
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+      } catch (first) {
+        const name = first instanceof DOMException ? first.name : "";
+        if (name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError") {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } else {
+          throw first;
+        }
+      }
+
       if (!mountedRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -132,8 +276,7 @@ export function useVoiceRecorder() {
         clearTimer();
         releaseStream();
         if (!mountedRef.current) return;
-        setStatus("error");
-        setError("Recording stopped unexpectedly. Try again or use the fallback options.");
+        setRecorderError("unknown", "Recording stopped unexpectedly. Try again or use the fallback options.");
       };
 
       recorder.onstop = () => {
@@ -153,8 +296,7 @@ export function useVoiceRecorder() {
         chunksRef.current = [];
 
         if (blob.size < 1024) {
-          setStatus("error");
-          setError("That recording was empty. Hold the record button a little longer and try again.");
+          setRecorderError("empty", "That recording was empty. Hold the record button a little longer and try again.");
           setDuration(0);
           return;
         }
@@ -191,10 +333,28 @@ export function useVoiceRecorder() {
     } catch (caught) {
       releaseStream();
       if (!mountedRef.current) return;
-      setStatus("error");
-      setError(permissionMessage(caught));
+      const described = describeMicrophoneError(caught, { embedded, policyBlocked });
+      const name = caught instanceof DOMException ? caught.name : "unknown";
+      console.warn("[voice] microphone start failed", {
+        name,
+        embedded,
+        policyBlocked,
+        permission,
+      });
+      setRecorderError(described.kind, described.message);
     }
-  }, [clearTimer, releaseStream, revokeClipUrl, status, stop, supported]);
+  }, [
+    clearTimer,
+    embedded,
+    permission,
+    policyBlocked,
+    releaseStream,
+    revokeClipUrl,
+    setRecorderError,
+    status,
+    stop,
+    supported,
+  ]);
 
   const cancel = useCallback(() => {
     clearTimer();
@@ -205,10 +365,12 @@ export function useVoiceRecorder() {
     }
     releaseStream();
     revokeClipUrl();
+    errorKindRef.current = null;
     if (mountedRef.current) {
       setClip(null);
       setDuration(0);
       setError(null);
+      setErrorKind(null);
       setStatus("idle");
     }
   }, [clearTimer, releaseStream, revokeClipUrl]);
@@ -243,11 +405,16 @@ export function useVoiceRecorder() {
     status,
     supported,
     error,
+    errorKind,
+    permission,
+    embedded,
+    policyBlocked,
     duration,
     clip,
     start,
     stop,
     cancel,
     reset,
+    clearError: clearRecorderError,
   };
 }

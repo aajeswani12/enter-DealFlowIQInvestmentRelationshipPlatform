@@ -3,6 +3,7 @@ import {
   CircleAlert,
   CircleCheck,
   Clipboard,
+  ExternalLink,
   FileAudio,
   Loader2,
   Mic,
@@ -708,6 +709,27 @@ const VoiceCapture = () => {
               <Pill tone={pill.tone}>{pill.label}</Pill>
             </div>
 
+            {recorder.embedded ? (
+              <div className="mt-4 flex flex-col gap-2 rounded-lg border border-brand/25 bg-brand-soft/50 px-3.5 py-2.5 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-2">
+                  <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-strong" aria-hidden="true" />
+                  <div>
+                    <p className="text-[11.5px] font-semibold text-brand-strong">Recording in the embedded preview</p>
+                    <p className="mt-0.5 text-[10.5px] leading-relaxed text-brand-strong/80">
+                      Browsers often block the microphone inside this preview even after you allow it. Open DealFlow IQ in
+                      its own tab to record; audio upload and paste work here.
+                    </p>
+                  </div>
+                </div>
+                <Button asChild variant="outline" size="sm" className="shrink-0 gap-1.5 border-brand/30 bg-card">
+                  <a href={window.location.href} target="_blank" rel="noopener noreferrer">
+                    Open in new tab
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  </a>
+                </Button>
+              </div>
+            ) : null}
+
             {recorder.status === "stopping" ? (
               <div className="mt-5 flex flex-col items-center gap-3 rounded-xl border border-border bg-secondary/30 px-4 py-12 text-center">
                 <Loader2 className="h-6 w-6 animate-spin text-brand" aria-hidden="true" />
@@ -787,7 +809,7 @@ const VoiceCapture = () => {
                 <button
                   type="button"
                   onClick={handleRecord}
-                  disabled={saving || processing || !recorder.supported}
+                  disabled={saving || processing || !recorder.supported || recorder.policyBlocked}
                   aria-label="Record voice note"
                   className="group flex h-28 w-28 flex-col items-center justify-center gap-1.5 rounded-full bg-brand text-brand-foreground shadow-lift transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 disabled:opacity-50"
                 >
@@ -799,6 +821,29 @@ const VoiceCapture = () => {
                   <p className="mt-0.5 text-[11.5px] text-muted-foreground">
                     Your browser will ask for microphone permission. Audio stays private.
                   </p>
+                  {recorder.permission !== "unknown" ? (
+                    <p
+                      className={cn(
+                        "mt-1.5 text-[10.5px] font-medium",
+                        recorder.permission === "granted"
+                          ? "text-success"
+                          : recorder.permission === "denied"
+                            ? "text-warning"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {recorder.permission === "granted"
+                        ? "Microphone allowed in this browser"
+                        : recorder.permission === "denied"
+                          ? "Microphone blocked in this browser"
+                          : "Microphone permission will be requested"}
+                    </p>
+                  ) : null}
+                  {recorder.policyBlocked ? (
+                    <p className="mt-1.5 text-[10.5px] leading-relaxed text-warning">
+                      This frame's permissions policy blocks the microphone. Open the page in its own tab to record.
+                    </p>
+                  ) : null}
                 </div>
                 {!recorder.supported ? (
                   <p className="rounded-md border border-warning/25 bg-warning-soft px-3 py-2 text-center text-[11px] leading-relaxed text-warning">
@@ -840,10 +885,49 @@ const VoiceCapture = () => {
             />
 
             {recorder.error ? (
-              <p role="alert" className="mt-4 flex items-start gap-2 rounded-md border border-warning/25 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-warning">
-                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {recorder.error}
-              </p>
+              <div role="alert" className="mt-4 rounded-md border border-warning/25 bg-warning-soft px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
+                  <p className="text-[11px] leading-relaxed text-warning">{recorder.error}</p>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5 pl-5">
+                  {recorder.errorKind !== "unsupported" &&
+                  recorder.errorKind !== "insecure" &&
+                  !recorder.policyBlocked ? (
+                    <Button variant="outline" size="sm" className="h-7 gap-1.5" onClick={handleRecord}>
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                      Try microphone again
+                    </Button>
+                  ) : null}
+                  {recorder.embedded ? (
+                    <Button asChild variant="outline" size="sm" className="h-7 gap-1.5">
+                      <a href={window.location.href} target="_blank" rel="noopener noreferrer">
+                        Open in new tab
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                      </a>
+                    </Button>
+                  ) : null}
+                  {recorder.errorKind === "permission" && !recorder.embedded ? (
+                    <Button variant="ghost" size="sm" className="h-7" onClick={() => window.location.reload()}>
+                      Reload page
+                    </Button>
+                  ) : null}
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5" onClick={handleUploadClick}>
+                    <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                    Upload audio
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5" onClick={() => setPasteOpen(true)}>
+                    <Clipboard className="h-3.5 w-3.5" aria-hidden="true" />
+                    Paste instead
+                  </Button>
+                </div>
+                {recorder.errorKind === "permission" ? (
+                  <p className="mt-1.5 pl-5 text-[10px] leading-relaxed text-warning/80">
+                    If you just allowed the microphone, try again first. Some browsers keep a remembered block until the
+                    page is reloaded.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
 
             {audioError ? (
