@@ -12,7 +12,7 @@ type Mode = "signin" | "signup";
 
 const PILLARS = [
   { icon: Mic, title: "Voice-first capture", body: "Record the takeaway after a meeting; the audio stays with the record." },
-  { icon: Briefcase, title: "Persistent case files", body: "Thesis, evidence and open questions in one place, not in a chat thread." },
+  { icon: Briefcase, title: "Persistent case files", body: "Thesis, sourced claims and decision gaps in one file, not a chat thread." },
   { icon: Waypoints, title: "Explainable matching", body: "Six deterministic rules over preferences your team entered by hand." },
 ];
 
@@ -146,7 +146,7 @@ const Login = () => {
           <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
             {mode === "signin"
               ? "Use the email address your firm recorded for you."
-              : "Accounts are for the Talok Capital investment team. You can add records straight away."}
+              : "Accounts are for the Talok Capital investment team. A partner still has to grant workspace access."}
           </p>
 
           <div className="mt-6 grid grid-cols-2 gap-1 rounded-lg border border-border bg-secondary/50 p-1">
@@ -223,8 +223,8 @@ const Login = () => {
           </form>
 
           <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
-            Records are visible to signed-in Talok Capital team members. Audio and documents are stored in the firm's
-            private workspace, not on the public web.
+            Records are visible only to active workspace members. Audio and documents are stored in the firm's private
+            workspace, not on the public web.
           </p>
         </div>
       </main>

@@ -12,54 +12,82 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import {
   GEOGRAPHIES,
+  INVESTOR_STATUS_OPTIONS,
   INVESTOR_TYPE_OPTIONS,
+  OUTREACH_PERMISSION_OPTIONS,
   RELATIONSHIP_OPTIONS,
+  RELATIONSHIP_STRENGTH_OPTIONS,
   ROUND_STAGES,
   SECTORS,
 } from "@/lib/constants";
 import { fromDateInputValue, toDateInputValue } from "@/lib/format";
-import type { InvestmentCase, Investor, InvestorType, RelationshipStatus } from "@/lib/types";
+import { primaryContact } from "@/lib/investors";
+import type {
+  InvestmentCase,
+  Investor,
+  InvestorStatus,
+  InvestorType,
+  OutreachPermission,
+  RelationshipStatus,
+  RelationshipStrength,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface InvestorFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial?: Investor | null;
-  prefill?: { caseItem?: InvestmentCase; firmName?: string; contactName?: string };
+  prefill?: { caseItem?: InvestmentCase };
 }
 
 interface FormState {
-  firmName: string;
-  contactName: string;
-  email: string;
+  name: string;
   investorType: InvestorType;
+  status: InvestorStatus;
   relationship: RelationshipStatus;
+  thesis: string;
   stages: string[];
   sectors: string[];
   geographies: string[];
   checkMin: string;
   checkMax: string;
+  currency: string;
   leadsRounds: boolean;
   notes: string;
   nextStep: string;
   nextStepDue: string;
+  contactId: string;
+  contactName: string;
+  contactTitle: string;
+  contactEmail: string;
+  relationshipOwner: string;
+  relationshipStrength: RelationshipStrength;
+  outreachPermissionStatus: OutreachPermission;
 }
 
 const BLANK: FormState = {
-  firmName: "",
-  contactName: "",
-  email: "",
+  name: "",
   investorType: "vc",
+  status: "active",
   relationship: "new",
+  thesis: "",
   stages: [],
   sectors: [],
   geographies: [],
   checkMin: "",
   checkMax: "",
+  currency: "USD",
   leadsRounds: false,
   notes: "",
   nextStep: "",
   nextStepDue: "",
+  contactId: "",
+  contactName: "",
+  contactTitle: "",
+  contactEmail: "",
+  relationshipOwner: "",
+  relationshipStrength: "unknown",
+  outreachPermissionStatus: "unknown",
 };
 
 const numberOrNull = (value: string): number | null => {
@@ -73,39 +101,46 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
   const isMobile = useIsMobile();
   const actions = useWorkspaceActions();
   const [fields, setFields] = useState<FormState>(BLANK);
-  const [nameError, setNameError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const isEdit = Boolean(initial);
 
   useEffect(() => {
     if (!open) return;
     if (initial) {
+      const contact = primaryContact(initial);
       setFields({
-        firmName: initial.firmName,
-        contactName: initial.contactName,
-        email: initial.email,
+        name: initial.name,
         investorType: initial.investorType,
+        status: initial.status,
         relationship: initial.relationship,
+        thesis: initial.thesis,
         stages: initial.stages,
         sectors: initial.sectors,
         geographies: initial.geographies,
         checkMin: initial.checkMin?.toString() ?? "",
         checkMax: initial.checkMax?.toString() ?? "",
+        currency: initial.currency,
         leadsRounds: initial.leadsRounds,
         notes: initial.notes,
         nextStep: initial.nextStep,
         nextStepDue: toDateInputValue(initial.nextStepDue),
+        contactId: contact?.id ?? "",
+        contactName: contact?.contactName ?? "",
+        contactTitle: contact?.title ?? "",
+        contactEmail: contact?.email ?? "",
+        relationshipOwner: contact?.relationshipOwner ?? "",
+        relationshipStrength: contact?.relationshipStrength ?? "unknown",
+        outreachPermissionStatus: contact?.outreachPermissionStatus ?? "unknown",
       });
     } else {
       setFields({
         ...BLANK,
-        firmName: prefill?.firmName ?? "",
-        contactName: prefill?.contactName ?? "",
         sectors: prefill?.caseItem?.sector ? [prefill.caseItem.sector] : [],
         geographies: prefill?.caseItem?.geography ? [prefill.caseItem.geography] : [],
         stages: prefill?.caseItem?.roundStage ? [prefill.caseItem.roundStage] : [],
       });
     }
-    setNameError("");
+    setErrors({});
   }, [open, initial, prefill]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -113,21 +148,31 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!fields.firmName.trim()) {
-      setNameError("Add the investor or firm name.");
+    const nextErrors: Record<string, string> = {};
+    if (!fields.name.trim()) nextErrors.name = "Add the investor or firm name.";
+
+    const min = numberOrNull(fields.checkMin);
+    const max = numberOrNull(fields.checkMax);
+    if (min !== null && max !== null && min > max) nextErrors.checkMax = "Maximum must be at least the minimum.";
+    if (fields.contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fields.contactEmail.trim())) {
+      nextErrors.contactEmail = "Use a valid email address.";
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
       return;
     }
 
     const payload = {
-      firmName: fields.firmName.trim(),
-      contactName: fields.contactName.trim(),
-      email: fields.email.trim(),
+      name: fields.name.trim(),
       investorType: fields.investorType,
+      thesis: fields.thesis.trim(),
       stages: fields.stages,
       sectors: fields.sectors,
       geographies: fields.geographies,
-      checkMin: numberOrNull(fields.checkMin),
-      checkMax: numberOrNull(fields.checkMax),
+      checkMin: min,
+      checkMax: max,
+      currency: (fields.currency || "USD").toUpperCase(),
+      status: fields.status,
       leadsRounds: fields.leadsRounds,
       relationship: fields.relationship,
       notes: fields.notes.trim(),
@@ -135,17 +180,36 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
       nextStepDue: fromDateInputValue(fields.nextStepDue),
     };
 
+    const hasContact =
+      Boolean(fields.contactId) ||
+      Boolean(fields.contactName.trim()) ||
+      Boolean(fields.contactEmail.trim()) ||
+      Boolean(fields.contactTitle.trim());
+
+    const contact = hasContact
+      ? {
+          id: fields.contactId || undefined,
+          contactName: fields.contactName.trim(),
+          title: fields.contactTitle.trim(),
+          email: fields.contactEmail.trim().toLowerCase(),
+          relationshipOwner: fields.relationshipOwner.trim(),
+          relationshipStrength: fields.relationshipStrength,
+          outreachPermissionStatus: fields.outreachPermissionStatus,
+          isPrimary: true,
+        }
+      : null;
+
     try {
       if (initial) {
-        await actions.updateInvestor.mutateAsync({ id: initial.id, patch: payload });
+        await actions.updateInvestor.mutateAsync({ id: initial.id, patch: payload, contact });
         toast.success("Investor record updated");
       } else {
-        await actions.createInvestor.mutateAsync(payload);
+        await actions.createInvestor.mutateAsync({ ...payload, contact });
         toast.success("Investor added to the network");
       }
       onOpenChange(false);
-    } catch {
-      toast.error("Could not save this investor. Please try again.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save this investor.");
     }
   };
 
@@ -165,44 +229,26 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
             {isEdit ? "Edit investor record" : "Add an investor"}
           </SheetTitle>
           <SheetDescription className="text-[13px] leading-relaxed">
-            Preferences are entered by hand and drive the matching rules directly. Nothing is inferred or scraped.
+            Preferences are entered by hand and drive the matching rules directly. Contacts are separate records with
+            their own outreach permission.
           </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-7 overflow-y-auto px-5 py-5">
-            <FormSection title="Who they are">
+            <FormSection title="Investor">
               <FormGrid>
-                <Field label="Firm or investor name" htmlFor="investor-firm" hint={nameError} className="sm:col-span-2">
+                <Field label="Firm or investor name" htmlFor="investor-name" hint={errors.name} className="sm:col-span-2">
                   <Input
-                    id="investor-firm"
-                    value={fields.firmName}
+                    id="investor-name"
+                    value={fields.name}
                     onChange={(event) => {
-                      set("firmName", event.target.value);
-                      setNameError("");
+                      set("name", event.target.value);
+                      setErrors((current) => ({ ...current, name: "" }));
                     }}
-                    placeholder="e.g. Tanjong Ventures"
+                    placeholder="e.g. Blue Harbor Partners"
                     className="bg-card"
-                    aria-invalid={Boolean(nameError)}
-                  />
-                </Field>
-                <Field label="Primary contact" htmlFor="investor-contact" optional>
-                  <Input
-                    id="investor-contact"
-                    value={fields.contactName}
-                    onChange={(event) => set("contactName", event.target.value)}
-                    placeholder="Full name"
-                    className="bg-card"
-                  />
-                </Field>
-                <Field label="Email" htmlFor="investor-email" optional>
-                  <Input
-                    id="investor-email"
-                    type="email"
-                    value={fields.email}
-                    onChange={(event) => set("email", event.target.value)}
-                    placeholder="name@fund.com"
-                    className="bg-card"
+                    aria-invalid={Boolean(errors.name)}
                   />
                 </Field>
                 <Field label="Investor type" htmlFor="investor-type">
@@ -213,12 +259,22 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
                     options={INVESTOR_TYPE_OPTIONS}
                   />
                 </Field>
-                <Field label="Relationship" htmlFor="investor-relationship" hint="Used as one matching signal.">
+                <Field label="Status" htmlFor="investor-status">
                   <SelectField
-                    id="investor-relationship"
-                    value={fields.relationship}
-                    onChange={(value) => set("relationship", value as RelationshipStatus)}
-                    options={RELATIONSHIP_OPTIONS}
+                    id="investor-status"
+                    value={fields.status}
+                    onChange={(value) => set("status", value as InvestorStatus)}
+                    options={INVESTOR_STATUS_OPTIONS}
+                  />
+                </Field>
+                <Field label="Thesis" htmlFor="investor-thesis" optional className="sm:col-span-2">
+                  <Textarea
+                    id="investor-thesis"
+                    rows={3}
+                    value={fields.thesis}
+                    onChange={(event) => set("thesis", event.target.value)}
+                    placeholder="What this investor believes, in their words."
+                    className="bg-card"
                   />
                 </Field>
               </FormGrid>
@@ -240,13 +296,13 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
                   onChange={(next) => set("sectors", next)}
                 />
                 <ChipGroup
-                  label="Geographies"
+                  label="Geography"
                   options={GEOGRAPHIES}
                   selected={fields.geographies}
                   onChange={(next) => set("geographies", next)}
                 />
                 <FormGrid>
-                  <Field label="Cheque size — minimum (USD)" htmlFor="investor-min">
+                  <Field label="Minimum cheque" htmlFor="investor-min">
                     <Input
                       id="investor-min"
                       inputMode="numeric"
@@ -256,14 +312,35 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
                       className="bg-card"
                     />
                   </Field>
-                  <Field label="Cheque size — maximum (USD)" htmlFor="investor-max">
+                  <Field label="Maximum cheque" htmlFor="investor-max" hint={errors.checkMax}>
                     <Input
                       id="investor-max"
                       inputMode="numeric"
                       value={fields.checkMax}
-                      onChange={(event) => set("checkMax", event.target.value)}
+                      onChange={(event) => {
+                        set("checkMax", event.target.value);
+                        setErrors((current) => ({ ...current, checkMax: "" }));
+                      }}
                       placeholder="6000000"
                       className="bg-card"
+                      aria-invalid={Boolean(errors.checkMax)}
+                    />
+                  </Field>
+                  <Field label="Currency" htmlFor="investor-currency">
+                    <Input
+                      id="investor-currency"
+                      value={fields.currency}
+                      onChange={(event) => set("currency", event.target.value.toUpperCase().slice(0, 3))}
+                      placeholder="USD"
+                      className="bg-card uppercase"
+                    />
+                  </Field>
+                  <Field label="Relationship rollup" htmlFor="investor-relationship" hint="Used by the relationship rule.">
+                    <SelectField
+                      id="investor-relationship"
+                      value={fields.relationship}
+                      onChange={(value) => set("relationship", value as RelationshipStatus)}
+                      options={RELATIONSHIP_OPTIONS}
                     />
                   </Field>
                 </FormGrid>
@@ -279,6 +356,71 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
                   />
                 </div>
               </div>
+            </FormSection>
+
+            <FormSection
+              title="Primary contact"
+              description="Optional. Names and emails are never generated for you."
+            >
+              <FormGrid>
+                <Field label="Contact name" htmlFor="contact-name" optional>
+                  <Input
+                    id="contact-name"
+                    value={fields.contactName}
+                    onChange={(event) => set("contactName", event.target.value)}
+                    placeholder="As recorded"
+                    className="bg-card"
+                  />
+                </Field>
+                <Field label="Title" htmlFor="contact-title" optional>
+                  <Input
+                    id="contact-title"
+                    value={fields.contactTitle}
+                    onChange={(event) => set("contactTitle", event.target.value)}
+                    placeholder="e.g. Partner"
+                    className="bg-card"
+                  />
+                </Field>
+                <Field label="Email" htmlFor="contact-email" optional hint={errors.contactEmail}>
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    value={fields.contactEmail}
+                    onChange={(event) => {
+                      set("contactEmail", event.target.value);
+                      setErrors((current) => ({ ...current, contactEmail: "" }));
+                    }}
+                    placeholder="name@fund.com"
+                    className="bg-card"
+                    aria-invalid={Boolean(errors.contactEmail)}
+                  />
+                </Field>
+                <Field label="Relationship owner" htmlFor="contact-owner" optional hint="Partner who owns the relationship.">
+                  <Input
+                    id="contact-owner"
+                    value={fields.relationshipOwner}
+                    onChange={(event) => set("relationshipOwner", event.target.value)}
+                    placeholder="e.g. Priya Raman"
+                    className="bg-card"
+                  />
+                </Field>
+                <Field label="Relationship strength" htmlFor="contact-strength">
+                  <SelectField
+                    id="contact-strength"
+                    value={fields.relationshipStrength}
+                    onChange={(value) => set("relationshipStrength", value as RelationshipStrength)}
+                    options={RELATIONSHIP_STRENGTH_OPTIONS}
+                  />
+                </Field>
+                <Field label="Outreach permission" htmlFor="contact-permission">
+                  <SelectField
+                    id="contact-permission"
+                    value={fields.outreachPermissionStatus}
+                    onChange={(value) => set("outreachPermissionStatus", value as OutreachPermission)}
+                    options={OUTREACH_PERMISSION_OPTIONS}
+                  />
+                </Field>
+              </FormGrid>
             </FormSection>
 
             <FormSection title="Relationship notes">

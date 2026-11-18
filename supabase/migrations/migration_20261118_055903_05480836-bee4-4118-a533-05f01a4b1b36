@@ -1,0 +1,33 @@
+-- Align the preserved interaction log with the deal vocabulary.
+alter table public.investor_interactions rename column case_id to deal_id;
+alter table public.investor_interactions alter column created_by drop not null;
+
+-- Members may see the team roster; only admins may change it.
+drop policy if exists workspace_members_select on public.workspace_members;
+create policy workspace_members_select on public.workspace_members
+for select to authenticated
+using (public.is_project_member() or user_id = auth.uid());
+
+-- Keep updated_at honest regardless of client behaviour.
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger deals_touch before update on public.deals for each row execute function public.touch_updated_at();
+create trigger investors_touch before update on public.investors for each row execute function public.touch_updated_at();
+create trigger investor_contacts_touch before update on public.investor_contacts for each row execute function public.touch_updated_at();
+create trigger deal_claims_touch before update on public.deal_claims for each row execute function public.touch_updated_at();
+create trigger decision_gaps_touch before update on public.decision_gaps for each row execute function public.touch_updated_at();
+create trigger deal_investor_matches_touch before update on public.deal_investor_matches for each row execute function public.touch_updated_at();
+create trigger outreach_actions_touch before update on public.outreach_actions for each row execute function public.touch_updated_at();
+
+-- Trigger functions must never be callable through the API.
+revoke all on function public.record_audit_event() from public;
+revoke all on function public.guard_workspace_member_update() from public;
+revoke all on function public.touch_updated_at() from public;

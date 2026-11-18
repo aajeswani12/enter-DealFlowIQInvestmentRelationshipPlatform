@@ -32,7 +32,7 @@ const Dashboard = () => {
   const [caseFormOpen, setCaseFormOpen] = useState(false);
 
   const activeCases = workspace.cases.filter((item) => ACTIVE_CASE_STATUSES.includes(item.status));
-  const openQuestions = workspace.questions.filter((item) => item.status === "open");
+  const openGaps = workspace.gaps.filter((item) => item.status === "open");
   const pendingOutreach = workspace.outreach.filter((item) => item.status === "draft");
 
   const nextSteps = useMemo(() => {
@@ -44,13 +44,13 @@ const Dashboard = () => {
         step: item.nextStep,
         due: item.nextStepDue as string,
         to: `/cases/${item.id}`,
-        kind: "Case",
+        kind: "Deal",
       }));
     const investorSteps = workspace.investors
       .filter((item) => item.nextStep && item.nextStepDue)
       .map((item) => ({
         id: `inv-${item.id}`,
-        name: item.firmName,
+        name: item.name,
         step: item.nextStep,
         due: item.nextStepDue as string,
         to: `/investors/${item.id}`,
@@ -75,13 +75,13 @@ const Dashboard = () => {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3);
 
-  const questionsWithCase = openQuestions
+  const gapsWithCase = openGaps
     .slice()
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3)
-    .map((question) => ({
-      ...question,
-      company: workspace.cases.find((item) => item.id === question.caseId)?.companyName ?? "Unlinked case",
+    .map((gap) => ({
+      ...gap,
+      company: workspace.cases.find((item) => item.id === gap.dealId)?.companyName ?? "Unlinked deal",
     }));
 
   const emptyWorkspace =
@@ -127,9 +127,9 @@ const Dashboard = () => {
             to="/cases"
           />
           <StatCard
-            label="Open questions"
-            value={openQuestions.length}
-            hint="Unanswered diligence questions across every case."
+            label="Open decision gaps"
+            value={openGaps.length}
+            hint="Unresolved gaps recorded across every deal file."
             icon={CircleHelp}
             to="/cases"
           />
@@ -318,19 +318,19 @@ const Dashboard = () => {
             )}
 
             <div className="mt-4 border-t border-border pt-3">
-              <p className="label-caps">Outstanding questions</p>
-              {questionsWithCase.length === 0 ? (
-                <p className="mt-2 text-[12px] text-muted-foreground">No open questions on any case.</p>
+              <p className="label-caps">Outstanding decision gaps</p>
+              {gapsWithCase.length === 0 ? (
+                <p className="mt-2 text-[12px] text-muted-foreground">No open decision gaps on any deal.</p>
               ) : (
                 <ul className="mt-2 space-y-2">
-                  {questionsWithCase.map((question) => (
-                    <li key={question.id}>
-                      <Link to={`/cases/${question.caseId}`} className="group block">
+                  {gapsWithCase.map((gap) => (
+                    <li key={gap.id}>
+                      <Link to={`/cases/${gap.dealId}`} className="group block">
                         <p className="line-clamp-2 text-[12px] leading-relaxed text-foreground group-hover:text-brand-strong">
-                          {question.question}
+                          {gap.question}
                         </p>
                         <p className="mt-0.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                          {question.company}
+                          {gap.company}
                         </p>
                       </Link>
                     </li>
@@ -450,6 +450,7 @@ const Dashboard = () => {
                           </p>
                           <p className="truncate text-[11.5px] text-muted-foreground">
                             {item.roundStage || "Round not set"} · {item.sector || "Sector not set"}
+                            {item.isSynthetic ? " · Synthetic sample" : ""}
                           </p>
                         </div>
                         <span className="shrink-0 text-[11px] font-medium text-muted-foreground">

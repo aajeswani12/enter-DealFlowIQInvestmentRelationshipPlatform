@@ -1,12 +1,19 @@
 import type {
   CaseStatus,
   CaptureStatus,
-  EvidenceKind,
+  ClaimType,
+  GapSeverity,
   InteractionKind,
+  InvestorStatus,
   InvestorType,
+  MemberRole,
   OutreachChannel,
+  OutreachPermission,
   OutreachStatus,
+  QuestionStatus,
   RelationshipStatus,
+  RelationshipStrength,
+  VerificationStatus,
 } from "./types";
 
 export const ROUND_STAGES = ["Pre-seed", "Seed", "Series A", "Series B", "Growth"] as const;
@@ -42,12 +49,7 @@ export const CASE_STATUS_OPTIONS: { value: CaseStatus; label: string }[] = [
   { value: "passed", label: "Passed" },
 ];
 
-export const ACTIVE_CASE_STATUSES: CaseStatus[] = [
-  "sourcing",
-  "diligence",
-  "ic_review",
-  "term_sheet",
-];
+export const ACTIVE_CASE_STATUSES: CaseStatus[] = ["sourcing", "diligence", "ic_review", "term_sheet"];
 
 export const CAPTURE_STATUS_OPTIONS: { value: CaptureStatus; label: string }[] = [
   { value: "new", label: "New" },
@@ -63,6 +65,13 @@ export const INVESTOR_TYPE_OPTIONS: { value: InvestorType; label: string }[] = [
   { value: "corporate", label: "Corporate VC" },
 ];
 
+export const INVESTOR_STATUS_OPTIONS: { value: InvestorStatus; label: string }[] = [
+  { value: "active", label: "Active" },
+  { value: "prospect", label: "Prospect" },
+  { value: "watchlist", label: "Watchlist" },
+  { value: "archived", label: "Archived" },
+];
+
 export const RELATIONSHIP_OPTIONS: { value: RelationshipStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "warm", label: "Warm" },
@@ -70,11 +79,38 @@ export const RELATIONSHIP_OPTIONS: { value: RelationshipStatus; label: string }[
   { value: "dormant", label: "Dormant" },
 ];
 
-export const EVIDENCE_KIND_OPTIONS: { value: EvidenceKind; label: string }[] = [
+export const RELATIONSHIP_STRENGTH_OPTIONS: { value: RelationshipStrength; label: string }[] = [
+  { value: "unknown", label: "Unknown" },
+  { value: "weak", label: "Weak" },
+  { value: "warm", label: "Warm" },
+  { value: "strong", label: "Strong" },
+];
+
+export const OUTREACH_PERMISSION_OPTIONS: { value: OutreachPermission; label: string }[] = [
+  { value: "unknown", label: "Unknown" },
+  { value: "permitted", label: "Permitted" },
+  { value: "requires_intro", label: "Requires intro" },
+  { value: "do_not_contact", label: "Do not contact" },
+];
+
+export const CLAIM_TYPE_OPTIONS: { value: ClaimType; label: string }[] = [
   { value: "metric", label: "Metric" },
   { value: "document", label: "Document" },
   { value: "call_note", label: "Call note" },
   { value: "reference", label: "Reference" },
+];
+
+export const VERIFICATION_OPTIONS: { value: VerificationStatus; label: string }[] = [
+  { value: "unverified", label: "Unverified" },
+  { value: "corroborated", label: "Corroborated" },
+  { value: "disputed", label: "Disputed" },
+];
+
+export const SEVERITY_OPTIONS: { value: GapSeverity; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "critical", label: "Critical" },
 ];
 
 export const INTERACTION_KIND_OPTIONS: { value: InteractionKind; label: string }[] = [
@@ -95,6 +131,13 @@ export const OUTREACH_STATUS_OPTIONS: { value: OutreachStatus; label: string }[]
   { value: "draft", label: "Draft" },
   { value: "approved", label: "Approved" },
   { value: "sent", label: "Sent" },
+];
+
+export const MEMBER_ROLE_OPTIONS: { value: MemberRole; label: string }[] = [
+  { value: "owner", label: "Owner" },
+  { value: "partner", label: "Partner" },
+  { value: "analyst", label: "Analyst" },
+  { value: "viewer", label: "Viewer" },
 ];
 
 export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
@@ -120,6 +163,13 @@ export const INVESTOR_TYPE_LABEL: Record<InvestorType, string> = {
   corporate: "Corporate VC",
 };
 
+export const INVESTOR_STATUS_LABEL: Record<InvestorStatus, string> = {
+  active: "Active",
+  prospect: "Prospect",
+  watchlist: "Watchlist",
+  archived: "Archived",
+};
+
 export const RELATIONSHIP_LABEL: Record<RelationshipStatus, string> = {
   new: "New",
   warm: "Warm",
@@ -127,11 +177,43 @@ export const RELATIONSHIP_LABEL: Record<RelationshipStatus, string> = {
   dormant: "Dormant",
 };
 
-export const EVIDENCE_KIND_LABEL: Record<EvidenceKind, string> = {
+export const RELATIONSHIP_STRENGTH_LABEL: Record<RelationshipStrength, string> = {
+  unknown: "Unknown",
+  weak: "Weak",
+  warm: "Warm",
+  strong: "Strong",
+};
+
+export const OUTREACH_PERMISSION_LABEL: Record<OutreachPermission, string> = {
+  unknown: "Unknown",
+  permitted: "Permitted",
+  requires_intro: "Requires intro",
+  do_not_contact: "Do not contact",
+};
+
+export const CLAIM_TYPE_LABEL: Record<ClaimType, string> = {
   metric: "Metric",
   document: "Document",
   call_note: "Call note",
   reference: "Reference",
+};
+
+export const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
+  unverified: "Unverified",
+  corroborated: "Corroborated",
+  disputed: "Disputed",
+};
+
+export const SEVERITY_LABEL: Record<GapSeverity, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical",
+};
+
+export const QUESTION_STATUS_LABEL: Record<QuestionStatus, string> = {
+  open: "Open",
+  answered: "Answered",
 };
 
 export const INTERACTION_KIND_LABEL: Record<InteractionKind, string> = {
@@ -152,4 +234,11 @@ export const OUTREACH_CHANNEL_LABEL: Record<OutreachChannel, string> = {
   email: "Email",
   linkedin: "LinkedIn",
   intro: "Warm intro",
+};
+
+export const MEMBER_ROLE_LABEL: Record<MemberRole, string> = {
+  owner: "Owner",
+  partner: "Partner",
+  analyst: "Analyst",
+  viewer: "Viewer",
 };

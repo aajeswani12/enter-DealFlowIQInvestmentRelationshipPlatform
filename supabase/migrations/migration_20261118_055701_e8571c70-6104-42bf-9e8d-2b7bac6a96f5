@@ -1,0 +1,136 @@
+-- Canonical DealFlow IQ schema. Existing rows are preserved through renames.
+alter table public.investment_cases rename to deals;
+alter table public.deal_inbox_items rename to sources;
+alter table public.case_evidence rename to deal_claims;
+alter table public.case_questions rename to decision_gaps;
+alter table public.outreach_messages rename to outreach_actions;
+
+-- Deals
+alter table public.deals rename column one_liner to summary;
+alter table public.deals rename column round_stage to stage;
+alter table public.deals rename column raise_amount to target_raise;
+alter table public.deals add column website text not null default '';
+alter table public.deals add column owner_user_id uuid;
+alter table public.deals add column is_synthetic boolean not null default false;
+alter table public.deals alter column created_by drop not null;
+alter table public.deals drop constraint investment_cases_capture_fk;
+alter table public.deals drop column capture_id;
+
+-- Sources (raw voice notes, typed notes, documents)
+alter table public.sources rename column company_name to title;
+alter table public.sources rename column sector to sector_hint;
+alter table public.sources rename column round_stage to stage_hint;
+alter table public.sources rename column source to source_type;
+alter table public.sources rename column notes to raw_text;
+alter table public.sources rename column audio_path to audio_storage_path;
+alter table public.sources rename column status to triage_status;
+alter table public.sources rename column case_id to deal_id;
+alter table public.sources rename column created_by to uploaded_by;
+alter table public.sources add column source_date timestamptz not null default now();
+alter table public.sources add column investor_id uuid references public.investors(id) on delete set null;
+alter table public.sources drop column audio_url;
+alter table public.sources alter column uploaded_by drop not null;
+update public.sources set source_date = created_at;
+
+-- Deal claims
+alter table public.deal_claims rename column case_id to deal_id;
+alter table public.deal_claims rename column kind to claim_type;
+alter table public.deal_claims rename column title to label;
+alter table public.deal_claims rename column detail to supporting_excerpt;
+alter table public.deal_claims add column value_text text not null default '';
+alter table public.deal_claims add column normalized_value numeric;
+alter table public.deal_claims add column currency text not null default 'USD';
+alter table public.deal_claims add column reporting_period text not null default '';
+alter table public.deal_claims add column verification_status text not null default 'unverified' check (verification_status in ('unverified','corroborated','disputed'));
+alter table public.deal_claims add column source_id uuid references public.sources(id) on delete set null;
+alter table public.deal_claims add column updated_at timestamptz not null default now();
+alter table public.deal_claims alter column created_by drop not null;
+
+-- Decision gaps
+alter table public.decision_gaps rename column case_id to deal_id;
+alter table public.decision_gaps add column severity text not null default 'medium' check (severity in ('low','medium','high','critical'));
+alter table public.decision_gaps add column blocking_decision boolean not null default false;
+alter table public.decision_gaps add column due_date timestamptz;
+alter table public.decision_gaps add column updated_at timestamptz not null default now();
+alter table public.decision_gaps alter column created_by drop not null;
+
+-- Investors
+alter table public.investors rename column firm_name to name;
+alter table public.investors rename column check_min to minimum_check;
+alter table public.investors rename column check_max to maximum_check;
+alter table public.investors rename column geographies to geography;
+alter table public.investors add column thesis text not null default '';
+alter table public.investors add column currency text not null default 'USD';
+alter table public.investors add column status text not null default 'active' check (status in ('active','prospect','watchlist','archived'));
+alter table public.investors add column is_synthetic boolean not null default false;
+alter table public.investors add column updated_at timestamptz not null default now();
+alter table public.investors alter column created_by drop not null;
+
+-- Investor contacts
+create table public.investor_contacts (
+  id uuid primary key default gen_random_uuid(),
+  investor_id uuid not null references public.investors(id) on delete cascade,
+  contact_name text not null default '',
+  title text not null default '',
+  email text,
+  relationship_owner text not null default '',
+  relationship_strength text not null default 'unknown' check (relationship_strength in ('unknown','weak','warm','strong')),
+  last_interaction_at timestamptz,
+  outreach_permission_status text not null default 'unknown' check (outreach_permission_status in ('unknown','permitted','requires_intro','do_not_contact')),
+  is_primary boolean not null default false,
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index investor_contacts_primary_key on public.investor_contacts (investor_id) where is_primary;
+create index investor_contacts_investor_idx on public.investor_contacts (investor_id);
+
+insert into public.investor_contacts (investor_id, contact_name, email, is_primary, created_by)
+select id, contact_name, nullif(email, ''), true, created_by
+from public.investors
+where contact_name <> '' or email <> '';
+
+alter table public.investors drop column contact_name;
+alter table public.investors drop column email;
+
+-- Outreach actions
+alter table public.outreach_actions rename column case_id to deal_id;
+alter table public.outreach_actions rename column subject to draft_subject;
+alter table public.outreach_actions rename column body to draft_body;
+alter table public.outreach_actions add column contact_id uuid references public.investor_contacts(id) on delete set null;
+alter table public.outreach_actions add column owner_user_id uuid;
+alter table public.outreach_actions add column next_followup_at timestamptz;
+alter table public.outreach_actions add column updated_at timestamptz not null default now();
+alter table public.outreach_actions alter column created_by drop not null;
+update public.outreach_actions set owner_user_id = created_by;
+
+-- Persisted match decisions
+create table public.deal_investor_matches (
+  id uuid primary key default gen_random_uuid(),
+  deal_id uuid not null references public.deals(id) on delete cascade,
+  investor_id uuid not null references public.investors(id) on delete cascade,
+  fit_score numeric not null default 0 check (fit_score >= 0 and fit_score <= 100),
+  score_breakdown jsonb not null default '{}'::jsonb,
+  fit_explanation text not null default '',
+  missing_information jsonb not null default '[]'::jsonb,
+  match_status text not null default 'suggested' check (match_status in ('suggested','shortlisted','outreach_drafted','approved','contacted','declined')),
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (deal_id, investor_id)
+);
+
+create index deal_investor_matches_deal_idx on public.deal_investor_matches (deal_id);
+create index deal_investor_matches_investor_idx on public.deal_investor_matches (investor_id);
+
+-- Ownership references and supporting indexes
+alter table public.deals add constraint deals_owner_user_fk foreign key (owner_user_id) references public.workspace_members(user_id) on delete set null;
+alter table public.outreach_actions add constraint outreach_actions_owner_user_fk foreign key (owner_user_id) references public.workspace_members(user_id) on delete set null;
+
+create index deals_stage_idx on public.deals (stage);
+create index deals_status_idx on public.deals (status);
+create index decision_gaps_deal_idx on public.decision_gaps (deal_id);
+create index sources_deal_idx on public.sources (deal_id);
+create index sources_investor_idx on public.sources (investor_id);
+create index outreach_actions_contact_idx on public.outreach_actions (contact_id);

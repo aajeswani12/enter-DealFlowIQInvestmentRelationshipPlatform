@@ -1,10 +1,11 @@
 import type { InvestmentCase, Investor, MatchResult, MatchRule, RelationshipStatus } from "./types";
 import { formatCurrency, formatCurrencyRange } from "./format";
+import { primaryContact } from "./investors";
 
 /**
- * Deterministic, explainable matching between a stored investment case and a
- * manually maintained investor record. No model inference: every point comes
- * from a field a human entered, and each rule is surfaced in the UI.
+ * Deterministic, explainable matching between a stored deal and a manually
+ * maintained investor record. No model inference: every point comes from a
+ * field a human entered, and each rule is surfaced in the UI.
  */
 export const MATCH_WEIGHTS = {
   stage: 28,
@@ -37,14 +38,7 @@ function stageRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
   const label = "Stage fit";
 
   if (preferred.length === 0) {
-    return {
-      key: "stage",
-      label,
-      points: 0,
-      maxPoints,
-      outcome: "fail",
-      detail: "No stage preference recorded for this investor.",
-    };
+    return { key: "stage", label, points: 0, maxPoints, outcome: "fail", detail: "No stage preference recorded for this investor." };
   }
 
   if (preferred.includes(caseItem.roundStage)) {
@@ -62,11 +56,10 @@ function stageRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
   const adjacent = preferred.some((stage) => Math.abs(STAGE_ORDER.indexOf(stage) - caseIndex) === 1);
 
   if (adjacent) {
-    const points = Math.round(maxPoints * 0.4);
     return {
       key: "stage",
       label,
-      points,
+      points: Math.round(maxPoints * 0.4),
       maxPoints,
       outcome: "partial",
       detail: `Prefers ${preferred.join(", ")} — adjacent to ${caseItem.roundStage}.`,
@@ -79,7 +72,7 @@ function stageRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
     points: 0,
     maxPoints,
     outcome: "fail",
-    detail: `Prefers ${preferred.join(", ")}; this case is ${caseItem.roundStage}.`,
+    detail: `Prefers ${preferred.join(", ")}; this deal is ${caseItem.roundStage}.`,
   };
 }
 
@@ -88,14 +81,7 @@ function sectorRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
   const label = "Sector fit";
 
   if (!caseItem.sector) {
-    return {
-      key: "sector",
-      label,
-      points: 0,
-      maxPoints,
-      outcome: "fail",
-      detail: "No sector recorded on the case.",
-    };
+    return { key: "sector", label, points: 0, maxPoints, outcome: "fail", detail: "No sector recorded on the deal." };
   }
 
   if (investor.sectors.includes(caseItem.sector)) {
@@ -126,36 +112,15 @@ function geographyRule(caseItem: InvestmentCase, investor: Investor): MatchRule 
   const label = "Geography";
 
   if (investor.geographies.length === 0) {
-    return {
-      key: "geography",
-      label,
-      points: 0,
-      maxPoints,
-      outcome: "fail",
-      detail: "No geography preference recorded for this investor.",
-    };
+    return { key: "geography", label, points: 0, maxPoints, outcome: "fail", detail: "No geography preference recorded for this investor." };
   }
 
   if (investor.geographies.includes("Global")) {
-    return {
-      key: "geography",
-      label,
-      points: maxPoints,
-      maxPoints,
-      outcome: "pass",
-      detail: "Invests globally, so this geography is in scope.",
-    };
+    return { key: "geography", label, points: maxPoints, maxPoints, outcome: "pass", detail: "Invests globally, so this geography is in scope." };
   }
 
   if (investor.geographies.includes(caseItem.geography)) {
-    return {
-      key: "geography",
-      label,
-      points: maxPoints,
-      maxPoints,
-      outcome: "pass",
-      detail: `Covers ${caseItem.geography}.`,
-    };
+    return { key: "geography", label, points: maxPoints, maxPoints, outcome: "pass", detail: `Covers ${caseItem.geography}.` };
   }
 
   return {
@@ -164,7 +129,7 @@ function geographyRule(caseItem: InvestmentCase, investor: Investor): MatchRule 
     points: 0,
     maxPoints,
     outcome: "fail",
-    detail: `Focus is ${investor.geographies.join(", ")}; case is in ${caseItem.geography}.`,
+    detail: `Focus is ${investor.geographies.join(", ")}; deal is in ${caseItem.geography}.`,
   };
 }
 
@@ -180,7 +145,7 @@ function chequeRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
       points: 0,
       maxPoints,
       outcome: "fail",
-      detail: "Record the cheque sought on the case to evaluate size fit.",
+      detail: "Record the cheque sought on the deal to evaluate size fit.",
     };
   }
 
@@ -191,7 +156,7 @@ function chequeRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
       points: 0,
       maxPoints,
       outcome: "fail",
-      detail: `No cheque range recorded; case seeks ${formatCurrency(sought)}.`,
+      detail: `No cheque range recorded; deal seeks ${formatCurrency(sought)}.`,
     };
   }
 
@@ -205,22 +170,19 @@ function chequeRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
       points: maxPoints,
       maxPoints,
       outcome: "pass",
-      detail: `Writes ${formatCurrencyRange(investor.checkMin, investor.checkMax)}; case seeks ${formatCurrency(sought)}.`,
+      detail: `Writes ${formatCurrencyRange(investor.checkMin, investor.checkMax, investor.currency)}; deal seeks ${formatCurrency(sought)}.`,
     };
   }
 
   const distance = sought < min ? min - sought : sought - max;
-  const tolerance = sought * 0.25;
-
-  if (distance <= tolerance) {
-    const points = Math.round(maxPoints * 0.5);
+  if (distance <= sought * 0.25) {
     return {
       key: "cheque",
       label,
-      points,
+      points: Math.round(maxPoints * 0.5),
       maxPoints,
       outcome: "partial",
-      detail: `Writes ${formatCurrencyRange(investor.checkMin, investor.checkMax)}; case seeks ${formatCurrency(sought)} — close but outside range.`,
+      detail: `Writes ${formatCurrencyRange(investor.checkMin, investor.checkMax, investor.currency)}; deal seeks ${formatCurrency(sought)} — close but outside range.`,
     };
   }
 
@@ -230,7 +192,7 @@ function chequeRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
     points: 0,
     maxPoints,
     outcome: "fail",
-    detail: `Writes ${formatCurrencyRange(investor.checkMin, investor.checkMax)}; case seeks ${formatCurrency(sought)}.`,
+    detail: `Writes ${formatCurrencyRange(investor.checkMin, investor.checkMax, investor.currency)}; deal seeks ${formatCurrency(sought)}.`,
   };
 }
 
@@ -239,25 +201,11 @@ function leadRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
   const label = "Lead capacity";
 
   if (!caseItem.leadRequired) {
-    return {
-      key: "lead",
-      label,
-      points: maxPoints,
-      maxPoints,
-      outcome: "pass",
-      detail: "This round does not require a lead investor.",
-    };
+    return { key: "lead", label, points: maxPoints, maxPoints, outcome: "pass", detail: "This round does not require a lead investor." };
   }
 
   if (investor.leadsRounds) {
-    return {
-      key: "lead",
-      label,
-      points: maxPoints,
-      maxPoints,
-      outcome: "pass",
-      detail: "Recorded as willing to lead rounds.",
-    };
+    return { key: "lead", label, points: maxPoints, maxPoints, outcome: "pass", detail: "Recorded as willing to lead rounds." };
   }
 
   return {
@@ -273,6 +221,7 @@ function leadRule(caseItem: InvestmentCase, investor: Investor): MatchRule {
 function relationshipRule(investor: Investor): MatchRule {
   const maxPoints = MATCH_WEIGHTS.relationship;
   const points = RELATIONSHIP_POINTS[investor.relationship];
+  const contact = primaryContact(investor);
 
   return {
     key: "relationship",
@@ -280,7 +229,9 @@ function relationshipRule(investor: Investor): MatchRule {
     points,
     maxPoints,
     outcome: points === maxPoints ? "pass" : points > 0 ? "partial" : "fail",
-    detail: RELATIONSHIP_DETAIL[investor.relationship],
+    detail: contact
+      ? `${RELATIONSHIP_DETAIL[investor.relationship]} Primary contact strength: ${contact.relationshipStrength}.`
+      : RELATIONSHIP_DETAIL[investor.relationship],
   };
 }
 
@@ -297,20 +248,13 @@ export function scoreMatch(caseItem: InvestmentCase, investor: Investor): MatchR
   const score = rules.reduce((total, rule) => total + rule.points, 0);
   const tier: MatchResult["tier"] = score >= 75 ? "strong" : score >= 50 ? "considered" : "weak";
 
-  return {
-    investor,
-    caseId: caseItem.id,
-    score,
-    tier,
-    rules,
-    gaps: rules.filter((rule) => rule.outcome !== "pass").map((rule) => rule.label),
-  };
+  return { investor, dealId: caseItem.id, score, tier, rules, gaps: rules.filter((rule) => rule.outcome !== "pass").map((rule) => rule.label) };
 }
 
 export function rankMatches(caseItem: InvestmentCase, investors: Investor[]): MatchResult[] {
   return investors
     .map((investor) => scoreMatch(caseItem, investor))
-    .sort((a, b) => b.score - a.score || a.investor.firmName.localeCompare(b.investor.firmName));
+    .sort((a, b) => b.score - a.score || a.investor.name.localeCompare(b.investor.name));
 }
 
 export const MATCH_TIER_LABEL: Record<MatchResult["tier"], string> = {

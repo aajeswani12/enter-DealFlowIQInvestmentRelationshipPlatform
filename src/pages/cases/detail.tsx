@@ -1,9 +1,9 @@
-import { ArrowRight, Briefcase, CalendarClock, Pencil, Waypoints } from "lucide-react";
+import { ArrowRight, Briefcase, CalendarClock, ExternalLink, Pencil, Waypoints } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { LoadingPanel } from "@/components/common/loading-panel";
-import { CaseStatusPill } from "@/components/common/status-pill";
+import { CaseStatusPill, Pill } from "@/components/common/status-pill";
 import { CaseForm } from "@/components/forms/case-form";
 import { SelectField } from "@/components/forms/select-field";
 import { PageHeader } from "@/components/layout/page-header";
@@ -12,17 +12,19 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { CASE_STATUS_LABEL, CASE_STATUS_OPTIONS } from "@/lib/constants";
 import { dueLabel, formatCurrency, formatDate, isOverdue } from "@/lib/format";
+import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import type { CaseStatus } from "@/lib/types";
-import { EvidenceSection } from "./evidence-section";
-import { QuestionsSection } from "./questions-section";
+import { ClaimsSection } from "./claims-section";
+import { DecisionGapsSection } from "./gaps-section";
 
 const CaseDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = useWorkspace();
+  const workspace = data ?? EMPTY_WORKSPACE;
   const actions = useWorkspaceActions();
   const [editOpen, setEditOpen] = useState(false);
 
-  const caseItem = data?.cases.find((item) => item.id === id);
+  const caseItem = workspace.cases.find((item) => item.id === id);
 
   if (isLoading) {
     return (
@@ -37,8 +39,8 @@ const CaseDetail = () => {
       <div className="page-enter">
         <PageHeader
           eyebrow="Investment cases"
-          title="Case not found"
-          description="This case is not in the workspace. It may have been opened from a stale link."
+          title="Deal not found"
+          description="This deal is not in the workspace. It may have been opened from a stale link."
           actions={
             <Button asChild variant="outline">
               <Link to="/cases">Back to cases</Link>
@@ -49,16 +51,17 @@ const CaseDetail = () => {
     );
   }
 
-  const evidence = (data?.evidence ?? []).filter((item) => item.caseId === caseItem.id);
-  const questions = (data?.questions ?? []).filter((item) => item.caseId === caseItem.id);
-  const capture = data?.captures.find((item) => item.id === caseItem.captureId);
+  const claims = workspace.claims.filter((item) => item.dealId === caseItem.id);
+  const gaps = workspace.gaps.filter((item) => item.dealId === caseItem.id);
+  const source = workspace.captures.find((item) => item.dealId === caseItem.id);
+  const openGaps = gaps.filter((item) => item.status === "open");
 
   const handleStatus = async (status: string) => {
     try {
       await actions.updateCase.mutateAsync({ id: caseItem.id, patch: { status: status as CaseStatus } });
-      toast.success(`Case moved to ${CASE_STATUS_LABEL[status as CaseStatus]}`);
+      toast.success(`Deal moved to ${CASE_STATUS_LABEL[status as CaseStatus]}`);
     } catch {
-      toast.error("Could not update the case status.");
+      toast.error("Could not update the deal status.");
     }
   };
 
@@ -67,7 +70,7 @@ const CaseDetail = () => {
       <PageHeader
         eyebrow={`${caseItem.roundStage || "Round not set"} · ${caseItem.sector || "Sector not set"}`}
         title={caseItem.companyName}
-        description={caseItem.oneLiner || "No one-liner recorded yet."}
+        description={caseItem.summary || "No summary recorded yet."}
         backTo={{ to: "/cases", label: "Investment Cases" }}
         actions={
           <>
@@ -76,7 +79,7 @@ const CaseDetail = () => {
                 value={caseItem.status}
                 onChange={handleStatus}
                 options={CASE_STATUS_OPTIONS}
-                ariaLabel="Case status"
+                ariaLabel="Deal status"
               />
             </div>
             <Button variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}>
@@ -95,10 +98,22 @@ const CaseDetail = () => {
 
       <div className="flex flex-wrap items-center gap-2">
         <CaseStatusPill status={caseItem.status} label={CASE_STATUS_LABEL[caseItem.status]} />
+        {caseItem.isSynthetic ? <Pill tone="warning">Synthetic sample — not a live deal</Pill> : null}
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
           <Briefcase className="h-3 w-3" aria-hidden="true" />
           {caseItem.geography || "Geography not set"}
         </span>
+        {caseItem.website ? (
+          <a
+            href={caseItem.website.startsWith("http") ? caseItem.website : `https://${caseItem.website}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] font-medium text-brand-strong hover:underline"
+          >
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            Website
+          </a>
+        ) : null}
         {caseItem.nextStepDue ? (
           <span
             className={
@@ -111,9 +126,9 @@ const CaseDetail = () => {
             {dueLabel(caseItem.nextStepDue)}
           </span>
         ) : null}
-        {capture ? (
+        {source ? (
           <span className="text-[11px] text-muted-foreground">
-            Opened from a {capture.source === "voice" ? "voice" : "typed"} capture on {formatDate(capture.createdAt)}
+            Sourced from a {source.source === "voice" ? "voice" : "typed"} note on {formatDate(source.createdAt)}
           </span>
         ) : null}
       </div>
@@ -130,7 +145,7 @@ const CaseDetail = () => {
             ) : (
               <div className="mt-3 rounded-lg border border-dashed border-border px-3 py-5 text-center">
                 <p className="text-[12px] text-muted-foreground">
-                  No thesis recorded. Add it from Edit so the case file stands on its own.
+                  No thesis recorded. Add it from Edit so the deal file stands on its own.
                 </p>
                 <Button size="sm" variant="ghost" className="mt-1 text-brand-strong" onClick={() => setEditOpen(true)}>
                   Add thesis
@@ -139,8 +154,8 @@ const CaseDetail = () => {
             )}
           </section>
 
-          <EvidenceSection caseId={caseItem.id} items={evidence} />
-          <QuestionsSection caseId={caseItem.id} items={questions} />
+          <ClaimsSection dealId={caseItem.id} items={claims} />
+          <DecisionGapsSection dealId={caseItem.id} items={gaps} />
         </div>
 
         <aside className="space-y-4">
@@ -150,8 +165,8 @@ const CaseDetail = () => {
             </h2>
             <dl className="mt-3 space-y-2.5">
               {[
-                { label: "Round", value: caseItem.roundStage || "Not set" },
-                { label: "Round size", value: formatCurrency(caseItem.raiseAmount, { compact: false }) },
+                { label: "Stage", value: caseItem.roundStage || "Not set" },
+                { label: "Target raise", value: formatCurrency(caseItem.raiseAmount, { compact: false }) },
                 { label: "Cheque sought", value: formatCurrency(caseItem.chequeSought, { compact: false }) },
                 { label: "Pre-money", value: formatCurrency(caseItem.preMoneyValuation, { compact: false }) },
                 { label: "Ownership target", value: caseItem.ownershipTarget ? `${caseItem.ownershipTarget}%` : "—" },
@@ -166,7 +181,7 @@ const CaseDetail = () => {
               ))}
             </dl>
             <p className="mt-3 text-[10.5px] leading-relaxed text-muted-foreground">
-              Cheque sought and round stage feed the deterministic matching rules.
+              Cheque sought and stage feed the deterministic matching rules.
             </p>
           </section>
 
@@ -195,14 +210,14 @@ const CaseDetail = () => {
               </>
             ) : (
               <p className="mt-2 text-[12px] text-muted-foreground">
-                No next step recorded. Cases move faster when the next action is explicit.
+                No next step recorded. Deals move faster when the next action is explicit.
               </p>
             )}
           </section>
 
           <section className="panel p-5" aria-labelledby="record-heading">
             <h2 id="record-heading" className="text-[15px] font-semibold tracking-tight">
-              Case record
+              Deal record
             </h2>
             <dl className="mt-3 space-y-2 text-[11.5px]">
               <div className="flex justify-between gap-3">
@@ -214,12 +229,12 @@ const CaseDetail = () => {
                 <dd className="font-medium">{formatDate(caseItem.updatedAt)}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Evidence</dt>
-                <dd className="font-medium">{evidence.length}</dd>
+                <dt className="text-muted-foreground">Claims</dt>
+                <dd className="font-medium">{claims.length}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Open questions</dt>
-                <dd className="font-medium">{questions.filter((item) => item.status === "open").length}</dd>
+                <dt className="text-muted-foreground">Open gaps</dt>
+                <dd className="font-medium">{openGaps.length}</dd>
               </div>
             </dl>
             <Link

@@ -1,0 +1,9 @@
+revoke execute on function public.claim_workspace() from anon;
+revoke execute on function public.import_investors(jsonb) from anon;
+revoke execute on function public.is_project_member() from anon;
+revoke execute on function public.can_write_project() from anon;
+revoke execute on function public.is_project_admin() from anon;
+revoke execute on function public.current_member_role() from anon;
+revoke execute on function public.record_audit_event() from anon, authenticated;
+revoke execute on function public.guard_workspace_member_update() from anon, authenticated;
+revoke execute on function public.touch_updated_at() from anon, authenticated;

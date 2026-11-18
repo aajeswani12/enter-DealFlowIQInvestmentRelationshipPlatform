@@ -3,18 +3,25 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Pill } from "@/components/common/status-pill";
 import { Field } from "@/components/forms/form-field";
+import { SelectField } from "@/components/forms/select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
-import { formatShortDate } from "@/lib/format";
-import type { CaseQuestion } from "@/lib/types";
+import { SEVERITY_LABEL, SEVERITY_OPTIONS } from "@/lib/constants";
+import { formatShortDate, fromDateInputValue } from "@/lib/format";
+import type { DecisionGap, GapSeverity } from "@/lib/types";
 
-export function QuestionsSection({ caseId, items }: { caseId: string; items: CaseQuestion[] }) {
+const SEVERITY_TONE = { low: "neutral", medium: "brand", high: "warning", critical: "danger" } as const;
+
+export function DecisionGapsSection({ dealId, items }: { dealId: string; items: DecisionGap[] }) {
   const actions = useWorkspaceActions();
   const [adding, setAdding] = useState(false);
   const [question, setQuestion] = useState("");
   const [owner, setOwner] = useState("");
+  const [severity, setSeverity] = useState<GapSeverity>("medium");
+  const [blocking, setBlocking] = useState(false);
+  const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState("");
   const [answeringId, setAnsweringId] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
@@ -24,33 +31,36 @@ export function QuestionsSection({ caseId, items }: { caseId: string; items: Cas
 
   const handleAdd = async () => {
     if (!question.trim()) {
-      setError("Write the question you need answered.");
+      setError("Write the gap you need to close.");
       return;
     }
     try {
-      await actions.createQuestion.mutateAsync({
-        caseId,
+      await actions.createGap.mutateAsync({
+        dealId,
         question: question.trim(),
         owner: owner.trim(),
+        severity,
+        blockingDecision: blocking,
+        dueDate: fromDateInputValue(dueDate),
       });
-      toast.success("Question added");
+      toast.success("Decision gap added");
       setQuestion("");
       setOwner("");
+      setSeverity("medium");
+      setBlocking(false);
+      setDueDate("");
       setError("");
       setAdding(false);
-    } catch {
-      toast.error("Could not add this question.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add this gap.");
     }
   };
 
   const handleAnswer = async (id: string) => {
     if (!answer.trim()) return;
     try {
-      await actions.updateQuestion.mutateAsync({
-        id,
-        patch: { answer: answer.trim(), status: "answered" },
-      });
-      toast.success("Question answered");
+      await actions.updateGap.mutateAsync({ id, patch: { answer: answer.trim(), status: "answered" } });
+      toast.success("Decision gap closed");
       setAnsweringId(null);
       setAnswer("");
     } catch {
@@ -60,36 +70,38 @@ export function QuestionsSection({ caseId, items }: { caseId: string; items: Cas
 
   const handleReopen = async (id: string) => {
     try {
-      await actions.updateQuestion.mutateAsync({ id, patch: { status: "open" } });
+      await actions.updateGap.mutateAsync({ id, patch: { status: "open" } });
     } catch {
-      toast.error("Could not reopen this question.");
+      toast.error("Could not reopen this gap.");
     }
   };
 
   return (
-    <section className="panel p-5" aria-labelledby="questions-heading">
+    <section className="panel p-5" aria-labelledby="gaps-heading">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="questions-heading" className="text-[15px] font-semibold tracking-tight">
-            Outstanding questions
+          <h2 id="gaps-heading" className="text-[15px] font-semibold tracking-tight">
+            Decision gaps
           </h2>
           <p className="text-[11.5px] text-muted-foreground">
-            {open.length === 0 ? "Nothing open on this case." : `${open.length} open · ${answered.length} answered`}
+            {open.length === 0
+              ? "Nothing open on this deal."
+              : `${open.length} open · ${open.filter((item) => item.blockingDecision).length} blocking · ${answered.length} closed`}
           </p>
         </div>
         {!adding ? (
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAdding(true)}>
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            Add question
+            Add gap
           </Button>
         ) : null}
       </div>
 
       {adding ? (
         <div className="mt-4 space-y-3 rounded-lg border border-border bg-secondary/30 p-4">
-          <Field label="Question" htmlFor="question-text" hint={error}>
+          <Field label="What is unresolved" htmlFor="gap-question" hint={error}>
             <Textarea
-              id="question-text"
+              id="gap-question"
               rows={2}
               value={question}
               onChange={(event) => {
@@ -101,31 +113,62 @@ export function QuestionsSection({ caseId, items }: { caseId: string; items: Cas
               aria-invalid={Boolean(error)}
             />
           </Field>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <Field label="Owner" htmlFor="question-owner" optional className="flex-1">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Owner" htmlFor="gap-owner" optional>
               <Input
-                id="question-owner"
+                id="gap-owner"
                 value={owner}
                 onChange={(event) => setOwner(event.target.value)}
                 placeholder="Who is chasing this?"
                 className="bg-card"
               />
             </Field>
-            <div className="flex gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleAdd} disabled={actions.createQuestion.isPending}>
-                {actions.createQuestion.isPending ? "Adding…" : "Add question"}
-              </Button>
-            </div>
+            <Field label="Severity" htmlFor="gap-severity">
+              <SelectField
+                id="gap-severity"
+                value={severity}
+                onChange={(value) => setSeverity(value as GapSeverity)}
+                options={SEVERITY_OPTIONS}
+              />
+            </Field>
+            <Field label="Due date" htmlFor="gap-due" optional>
+              <Input
+                id="gap-due"
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className="bg-card"
+              />
+            </Field>
+            <Field label="Blocks a decision" htmlFor="gap-blocking" hint="Flags this as a gate for IC.">
+              <div className="flex h-10 items-center">
+                <Button
+                  type="button"
+                  id="gap-blocking"
+                  variant={blocking ? "default" : "outline"}
+                  size="sm"
+                  aria-pressed={blocking}
+                  onClick={() => setBlocking((value) => !value)}
+                >
+                  {blocking ? "Blocking" : "Not blocking"}
+                </Button>
+              </div>
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleAdd} disabled={actions.createGap.isPending}>
+              {actions.createGap.isPending ? "Adding…" : "Add gap"}
+            </Button>
           </div>
         </div>
       ) : null}
 
       {items.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-border px-3 py-6 text-center text-[12px] text-muted-foreground">
-          No questions recorded. Add the first thing you need to verify.
+          No decision gaps recorded. Add the first thing you need to verify.
         </p>
       ) : (
         <ul className="mt-4 divide-y divide-border">
@@ -139,12 +182,17 @@ export function QuestionsSection({ caseId, items }: { caseId: string; items: Cas
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="text-[13px] font-medium leading-snug">{item.question}</p>
-                    <Pill tone={item.status === "open" ? "warning" : "success"}>
-                      {item.status === "open" ? "Open" : "Answered"}
-                    </Pill>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Pill tone={SEVERITY_TONE[item.severity]}>{SEVERITY_LABEL[item.severity]}</Pill>
+                      {item.blockingDecision ? <Pill tone="danger">Blocking</Pill> : null}
+                      <Pill tone={item.status === "open" ? "warning" : "success"}>
+                        {item.status === "open" ? "Open" : "Closed"}
+                      </Pill>
+                    </div>
                   </div>
                   <p className="mt-1 text-[10.5px] text-muted-foreground">
                     {item.owner ? `${item.owner} · ` : ""}Raised {formatShortDate(item.createdAt)}
+                    {item.dueDate ? ` · due ${formatShortDate(item.dueDate)}` : ""}
                   </p>
 
                   {item.status === "answered" ? (
@@ -194,7 +242,7 @@ export function QuestionsSection({ caseId, items }: { caseId: string; items: Cas
                         setAnswer("");
                       }}
                     >
-                      Add answer
+                      Close the gap
                     </Button>
                   )}
                 </div>

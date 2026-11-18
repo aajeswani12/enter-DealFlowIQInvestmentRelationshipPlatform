@@ -1,7 +1,7 @@
-import { PenLine, ShieldCheck } from "lucide-react";
+import { PenLine, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Field } from "@/components/forms/form-field";
+import { Field, FormGrid } from "@/components/forms/form-field";
 import { SelectField } from "@/components/forms/select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { OUTREACH_CHANNEL_OPTIONS } from "@/lib/constants";
+import { fromDateInputValue } from "@/lib/format";
+import { primaryContact } from "@/lib/investors";
 import type { InvestmentCase, Investor, OutreachChannel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -18,29 +20,39 @@ interface OutreachComposerProps {
   onOpenChange: (open: boolean) => void;
   caseItem: InvestmentCase | null;
   investor: Investor | null;
+  onDrafted?: (contactId: string | null) => Promise<void> | void;
 }
 
-export function OutreachComposer({ open, onOpenChange, caseItem, investor }: OutreachComposerProps) {
+export function OutreachComposer({ open, onOpenChange, caseItem, investor, onDrafted }: OutreachComposerProps) {
   const isMobile = useIsMobile();
   const actions = useWorkspaceActions();
   const [channel, setChannel] = useState<OutreachChannel>("email");
+  const [contactId, setContactId] = useState("none");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [errors, setErrors] = useState<{ subject?: string; body?: string }>({});
+  const [followup, setFollowup] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const contacts = investor?.contacts ?? [];
+  const selectedContact = contacts.find((contact) => contact.id === contactId) ?? null;
+  const blocked = selectedContact?.outreachPermissionStatus === "do_not_contact";
 
   useEffect(() => {
     if (!open) return;
     setChannel("email");
+    setContactId(investor ? primaryContact(investor)?.id ?? "none" : "none");
     setSubject("");
     setBody("");
+    setFollowup("");
     setErrors({});
-  }, [open]);
+  }, [open, investor]);
 
   const handleSave = async () => {
     if (!caseItem || !investor) return;
-    const nextErrors: typeof errors = {};
+    const nextErrors: Record<string, string> = {};
     if (!subject.trim()) nextErrors.subject = "Add a subject so the message is easy to find.";
     if (!body.trim()) nextErrors.body = "Write the message yourself before saving.";
+    if (blocked) nextErrors.contact = "This contact is marked do-not-contact.";
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -48,17 +60,20 @@ export function OutreachComposer({ open, onOpenChange, caseItem, investor }: Out
 
     try {
       await actions.createOutreach.mutateAsync({
-        caseId: caseItem.id,
+        dealId: caseItem.id,
         investorId: investor.id,
+        contactId: contactId === "none" ? null : contactId,
         subject: subject.trim(),
         body: body.trim(),
         channel,
         status: "draft",
+        nextFollowupAt: fromDateInputValue(followup),
       });
+      await onDrafted?.(contactId === "none" ? null : contactId);
       toast.success("Draft saved. It still needs human approval before it is sent.");
       onOpenChange(false);
-    } catch {
-      toast.error("Could not save this draft.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save this draft.");
     }
   };
 
@@ -74,7 +89,7 @@ export function OutreachComposer({ open, onOpenChange, caseItem, investor }: Out
         <SheetHeader className="border-b border-border px-5 py-4 text-left">
           <SheetTitle className="font-display text-2xl tracking-tight">Draft outreach</SheetTitle>
           <SheetDescription className="text-[13px] leading-relaxed">
-            {investor ? `${investor.firmName}` : "Investor"} · {caseItem ? caseItem.companyName : "Case"}. Written by you,
+            {investor ? investor.name : "Investor"} · {caseItem ? caseItem.companyName : "Deal"}. Written by you,
             approved by a human, sent from your own inbox.
           </SheetDescription>
         </SheetHeader>
@@ -88,14 +103,45 @@ export function OutreachComposer({ open, onOpenChange, caseItem, investor }: Out
             </p>
           </div>
 
-          <Field label="Channel" htmlFor="outreach-channel">
-            <SelectField
-              id="outreach-channel"
-              value={channel}
-              onChange={(value) => setChannel(value as OutreachChannel)}
-              options={OUTREACH_CHANNEL_OPTIONS}
-            />
-          </Field>
+          <FormGrid>
+            <Field label="Contact" htmlFor="outreach-contact" hint={errors.contact}>
+              <SelectField
+                id="outreach-contact"
+                value={contactId}
+                onChange={(value) => setContactId(value)}
+                options={[
+                  { value: "none", label: "No specific contact" },
+                  ...contacts.map((contact) => ({
+                    value: contact.id,
+                    label: `${contact.contactName || contact.email || "Unnamed contact"}${
+                      contact.outreachPermissionStatus === "do_not_contact" ? " (do not contact)" : ""
+                    }`,
+                  })),
+                ]}
+              />
+            </Field>
+            <Field label="Channel" htmlFor="outreach-channel">
+              <SelectField
+                id="outreach-channel"
+                value={channel}
+                onChange={(value) => setChannel(value as OutreachChannel)}
+                options={OUTREACH_CHANNEL_OPTIONS}
+              />
+            </Field>
+          </FormGrid>
+
+          {contacts.length === 0 ? (
+            <p className="rounded-md border border-warning/25 bg-warning-soft px-3 py-2 text-[11px] leading-relaxed text-warning">
+              No contact is recorded for this investor. Add a named person on the investor record before sending anything.
+            </p>
+          ) : null}
+
+          {blocked ? (
+            <p role="alert" className="flex items-start gap-2 rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[11px] leading-relaxed text-destructive">
+              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              This contact is marked do-not-contact. Choose another contact or update the permission on the investor record.
+            </p>
+          ) : null}
 
           <Field label="Subject" htmlFor="outreach-subject" hint={errors.subject}>
             <Input
@@ -103,9 +149,11 @@ export function OutreachComposer({ open, onOpenChange, caseItem, investor }: Out
               value={subject}
               onChange={(event) => {
                 setSubject(event.target.value);
-                setErrors((current) => ({ ...current, subject: undefined }));
+                setErrors((current) => ({ ...current, subject: "" }));
               }}
-              placeholder={`${caseItem?.companyName ?? "Company"} — update for ${investor?.contactName ?? "the team"}`}
+              placeholder={`${caseItem?.companyName ?? "Deal"} — update for ${
+                selectedContact?.contactName || investor?.name || "the team"
+              }`}
               className="bg-card"
               aria-invalid={Boolean(errors.subject)}
             />
@@ -118,7 +166,7 @@ export function OutreachComposer({ open, onOpenChange, caseItem, investor }: Out
               value={body}
               onChange={(event) => {
                 setBody(event.target.value);
-                setErrors((current) => ({ ...current, body: undefined }));
+                setErrors((current) => ({ ...current, body: "" }));
               }}
               placeholder={"Hi,\n\nSharing an update on…\n\nBest,"}
               className="min-h-[220px] bg-card leading-relaxed"
@@ -126,10 +174,22 @@ export function OutreachComposer({ open, onOpenChange, caseItem, investor }: Out
             />
           </Field>
 
+          <Field label="Next follow-up" htmlFor="outreach-followup" optional hint="Shown on the outreach queue.">
+            <Input
+              id="outreach-followup"
+              type="date"
+              value={followup}
+              onChange={(event) => setFollowup(event.target.value)}
+              className="bg-card"
+            />
+          </Field>
+
           <p className="text-[10.5px] leading-relaxed text-muted-foreground">
-            Facts to reference: {caseItem?.roundStage || "round not set"} round ·{" "}
-            {caseItem?.chequeSought ? `cheque sought ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(caseItem.chequeSought)}` : "cheque not set"} ·{" "}
-            {caseItem?.geography || "geography not set"}.
+            Facts to reference: {caseItem?.roundStage || "stage not set"} ·{" "}
+            {caseItem?.chequeSought
+              ? `cheque sought ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(caseItem.chequeSought)}`
+              : "cheque not set"}{" "}
+            · {caseItem?.geography || "geography not set"}.
           </p>
         </div>
 
@@ -137,7 +197,7 @@ export function OutreachComposer({ open, onOpenChange, caseItem, investor }: Out
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" className="gap-1.5" onClick={handleSave} disabled={actions.createOutreach.isPending}>
+          <Button type="button" className="gap-1.5" onClick={handleSave} disabled={actions.createOutreach.isPending || blocked}>
             <PenLine className="h-4 w-4" aria-hidden="true" />
             {actions.createOutreach.isPending ? "Saving…" : "Save draft"}
           </Button>

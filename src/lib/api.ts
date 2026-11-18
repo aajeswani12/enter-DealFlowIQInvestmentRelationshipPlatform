@@ -2,33 +2,50 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { WorkspaceData } from "./workspace";
 import type {
+  AuditEvent,
   Capture,
   CaptureSource,
   CaptureStatus,
-  CaseQuestion,
   CaseStatus,
-  Evidence,
-  EvidenceKind,
+  ClaimType,
+  DealClaim,
+  DealInvestorMatch,
+  DecisionGap,
+  GapSeverity,
   Interaction,
   InteractionKind,
   InvestmentCase,
   Investor,
+  InvestorContact,
+  InvestorStatus,
   InvestorType,
+  MatchRule,
+  MatchStatus,
   Outreach,
   OutreachChannel,
+  OutreachPermission,
   OutreachStatus,
   QuestionStatus,
   RelationshipStatus,
+  RelationshipStrength,
+  VerificationStatus,
+  WorkspaceMember,
+  MemberRole,
+  MemberStatus,
 } from "./types";
 
 type Tables = Database["public"]["Tables"];
-type CaptureRow = Tables["deal_inbox_items"]["Row"];
-type CaseRow = Tables["investment_cases"]["Row"];
-type EvidenceRow = Tables["case_evidence"]["Row"];
-type QuestionRow = Tables["case_questions"]["Row"];
+type DealRow = Tables["deals"]["Row"];
+type SourceRow = Tables["sources"]["Row"];
+type ClaimRow = Tables["deal_claims"]["Row"];
+type GapRow = Tables["decision_gaps"]["Row"];
 type InvestorRow = Tables["investors"]["Row"];
+type ContactRow = Tables["investor_contacts"]["Row"];
 type InteractionRow = Tables["investor_interactions"]["Row"];
-type OutreachRow = Tables["outreach_messages"]["Row"];
+type OutreachRow = Tables["outreach_actions"]["Row"];
+type MatchRow = Tables["deal_investor_matches"]["Row"];
+type MemberRow = Tables["workspace_members"]["Row"];
+type AuditRow = Tables["audit_events"]["Row"];
 
 const VOICE_BUCKET = "voice-notes";
 const EVIDENCE_BUCKET = "case-evidence";
@@ -50,36 +67,39 @@ function extensionFor(mimeType: string, fallback = "webm"): string {
 const toNumber = (value: unknown): number | null =>
   value === null || value === undefined || value === "" ? null : Number(value);
 
-function mapCapture(row: CaptureRow, audioUrl: string | null): Capture {
+function mapCapture(row: SourceRow, audioUrl: string | null): Capture {
   return {
     id: row.id,
-    companyName: row.company_name,
+    companyName: row.title,
     founderName: row.founder_name,
     founderEmail: row.founder_email,
-    sector: row.sector,
-    roundStage: row.round_stage,
-    source: row.source as CaptureSource,
-    notes: row.notes,
+    sector: row.sector_hint,
+    roundStage: row.stage_hint,
+    source: row.source_type as CaptureSource,
+    notes: row.raw_text,
     audioUrl,
-    audioPath: row.audio_path,
+    audioPath: row.audio_storage_path,
     durationSeconds: row.duration_seconds,
-    status: row.status as CaptureStatus,
+    status: row.triage_status as CaptureStatus,
     referredBy: row.referred_by,
-    caseId: row.case_id,
+    dealId: row.deal_id,
+    investorId: row.investor_id,
+    sourceDate: row.source_date,
     createdAt: row.created_at,
   };
 }
 
-function mapCase(row: CaseRow): InvestmentCase {
+function mapDeal(row: DealRow): InvestmentCase {
   return {
     id: row.id,
     companyName: row.company_name,
-    oneLiner: row.one_liner,
+    website: row.website,
+    summary: row.summary,
     sector: row.sector,
     geography: row.geography,
-    roundStage: row.round_stage,
+    roundStage: row.stage,
     status: row.status as CaseStatus,
-    raiseAmount: toNumber(row.raise_amount),
+    raiseAmount: toNumber(row.target_raise),
     chequeSought: toNumber(row.cheque_sought),
     preMoneyValuation: toNumber(row.pre_money_valuation),
     ownershipTarget: toNumber(row.ownership_target),
@@ -89,56 +109,87 @@ function mapCase(row: CaseRow): InvestmentCase {
     thesis: row.thesis,
     nextStep: row.next_step,
     nextStepDue: row.next_step_due,
-    captureId: row.capture_id,
+    ownerUserId: row.owner_user_id,
+    isSynthetic: row.is_synthetic,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function mapEvidence(row: EvidenceRow): Evidence {
+function mapClaim(row: ClaimRow): DealClaim {
   return {
     id: row.id,
-    caseId: row.case_id,
-    kind: row.kind as EvidenceKind,
-    title: row.title,
-    detail: row.detail,
+    dealId: row.deal_id,
+    claimType: row.claim_type as ClaimType,
+    label: row.label,
+    supportingExcerpt: row.supporting_excerpt,
+    valueText: row.value_text,
+    normalizedValue: toNumber(row.normalized_value),
+    currency: row.currency,
+    reportingPeriod: row.reporting_period,
+    verificationStatus: row.verification_status as VerificationStatus,
+    sourceId: row.source_id,
     fileName: row.file_name,
     filePath: row.file_path,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
-function mapQuestion(row: QuestionRow): CaseQuestion {
+function mapGap(row: GapRow): DecisionGap {
   return {
     id: row.id,
-    caseId: row.case_id,
+    dealId: row.deal_id,
     question: row.question,
     owner: row.owner,
     status: row.status as QuestionStatus,
     answer: row.answer,
+    severity: row.severity as GapSeverity,
+    blockingDecision: row.blocking_decision,
+    dueDate: row.due_date,
     createdAt: row.created_at,
     resolvedAt: row.resolved_at,
   };
 }
 
-function mapInvestor(row: InvestorRow): Investor {
+function mapContact(row: ContactRow): InvestorContact {
   return {
     id: row.id,
-    firmName: row.firm_name,
+    investorId: row.investor_id,
     contactName: row.contact_name,
+    title: row.title,
     email: row.email,
+    relationshipOwner: row.relationship_owner,
+    relationshipStrength: row.relationship_strength as RelationshipStrength,
+    lastInteractionAt: row.last_interaction_at,
+    outreachPermissionStatus: row.outreach_permission_status as OutreachPermission,
+    isPrimary: row.is_primary,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapInvestor(row: InvestorRow, contacts: InvestorContact[]): Investor {
+  return {
+    id: row.id,
+    name: row.name,
     investorType: row.investor_type as InvestorType,
+    thesis: row.thesis,
     stages: row.stages ?? [],
     sectors: row.sectors ?? [],
-    geographies: row.geographies ?? [],
-    checkMin: toNumber(row.check_min),
-    checkMax: toNumber(row.check_max),
+    geographies: row.geography ?? [],
+    checkMin: toNumber(row.minimum_check),
+    checkMax: toNumber(row.maximum_check),
+    currency: row.currency,
+    status: row.status as InvestorStatus,
     leadsRounds: row.leads_rounds,
     relationship: row.relationship as RelationshipStatus,
     notes: row.notes,
     lastContactAt: row.last_contact_at,
     nextStep: row.next_step,
     nextStepDue: row.next_step_due,
+    isSynthetic: row.is_synthetic,
+    contacts: contacts.filter((contact) => contact.investorId === row.id),
     createdAt: row.created_at,
   };
 }
@@ -147,7 +198,7 @@ function mapInteraction(row: InteractionRow): Interaction {
   return {
     id: row.id,
     investorId: row.investor_id,
-    caseId: row.case_id,
+    dealId: row.deal_id,
     kind: row.kind as InteractionKind,
     summary: row.summary,
     occurredAt: row.occurred_at,
@@ -160,15 +211,59 @@ function mapInteraction(row: InteractionRow): Interaction {
 function mapOutreach(row: OutreachRow): Outreach {
   return {
     id: row.id,
-    caseId: row.case_id,
+    dealId: row.deal_id,
     investorId: row.investor_id,
-    subject: row.subject,
-    body: row.body,
+    contactId: row.contact_id,
+    subject: row.draft_subject,
+    body: row.draft_body,
     channel: row.channel as OutreachChannel,
     status: row.status as OutreachStatus,
+    ownerUserId: row.owner_user_id,
+    nextFollowupAt: row.next_followup_at,
     createdAt: row.created_at,
     approvedAt: row.approved_at,
     sentAt: row.sent_at,
+  };
+}
+
+function mapMatch(row: MatchRow): DealInvestorMatch {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    investorId: row.investor_id,
+    fitScore: toNumber(row.fit_score) ?? 0,
+    scoreBreakdown: (row.score_breakdown as unknown as MatchRule[]) ?? [],
+    fitExplanation: row.fit_explanation,
+    missingInformation: (row.missing_information as unknown as string[]) ?? [],
+    matchStatus: row.match_status as MatchStatus,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapMember(row: MemberRow): WorkspaceMember {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    email: row.email,
+    displayName: row.display_name,
+    role: row.role as MemberRole,
+    status: row.status as MemberStatus,
+    invitedBy: row.invited_by,
+    createdAt: row.created_at,
+  };
+}
+
+function mapAudit(row: AuditRow): AuditEvent {
+  return {
+    id: row.id,
+    actorUserId: row.actor_user_id,
+    actorEmail: row.actor_email,
+    action: row.action as AuditEvent["action"],
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    summary: row.summary,
+    createdAt: row.created_at,
   };
 }
 
@@ -193,7 +288,8 @@ export interface CaptureInput {
 
 export interface CaseInput {
   companyName: string;
-  oneLiner: string;
+  website: string;
+  summary: string;
   sector: string;
   geography: string;
   roundStage: string;
@@ -211,63 +307,154 @@ export interface CaseInput {
   captureId?: string | null;
 }
 
-export interface InvestorInput {
-  firmName: string;
+export interface ContactInput {
+  id?: string;
   contactName: string;
+  title: string;
   email: string;
+  relationshipOwner: string;
+  relationshipStrength: RelationshipStrength;
+  outreachPermissionStatus: OutreachPermission;
+  isPrimary: boolean;
+}
+
+export interface InvestorInput {
+  name: string;
   investorType: InvestorType;
+  thesis: string;
   stages: string[];
   sectors: string[];
   geographies: string[];
   checkMin: number | null;
   checkMax: number | null;
+  currency: string;
+  status: InvestorStatus;
   leadsRounds: boolean;
   relationship: RelationshipStatus;
   notes: string;
   nextStep: string;
   nextStepDue: string | null;
+  contact: ContactInput | null;
 }
 
 export interface OutreachInput {
-  caseId: string;
+  dealId: string;
   investorId: string;
+  contactId: string | null;
   subject: string;
   body: string;
   channel: OutreachChannel;
   status: OutreachStatus;
+  nextFollowupAt: string | null;
 }
 
-export interface EvidenceInput {
-  caseId: string;
-  kind: EvidenceKind;
-  title: string;
-  detail: string;
+export interface ClaimInput {
+  dealId: string;
+  claimType: ClaimType;
+  label: string;
+  supportingExcerpt: string;
+  valueText: string;
+  normalizedValue: number | null;
+  currency: string;
+  reportingPeriod: string;
+  verificationStatus: VerificationStatus;
+  sourceId: string | null;
   file: File | null;
 }
 
-export const api = {
-  async listWorkspace(): Promise<WorkspaceData> {
-    const [captures, cases, evidence, questions, investors, interactions, outreach] = await Promise.all([
-      supabase.from("deal_inbox_items").select("*").order("created_at", { ascending: false }),
-      supabase.from("investment_cases").select("*").order("updated_at", { ascending: false }),
-      supabase.from("case_evidence").select("*").order("created_at", { ascending: false }),
-      supabase.from("case_questions").select("*").order("created_at", { ascending: false }),
-      supabase.from("investors").select("*").order("created_at", { ascending: false }),
-      supabase.from("investor_interactions").select("*").order("occurred_at", { ascending: false }),
-      supabase.from("outreach_messages").select("*").order("created_at", { ascending: false }),
-    ]);
+export interface ImportSummary {
+  inserted: number;
+  skipped: number;
+  contacts: number;
+}
 
-    if (captures.error) fail("Could not load the Deal Inbox", captures.error);
-    if (cases.error) fail("Could not load investment cases", cases.error);
-    if (evidence.error) fail("Could not load case evidence", evidence.error);
-    if (questions.error) fail("Could not load case questions", questions.error);
+async function saveContact(investorId: string, input: ContactInput, userId: string): Promise<void> {
+  if (input.isPrimary) {
+    let query = supabase
+      .from("investor_contacts")
+      .update({ is_primary: false })
+      .eq("investor_id", investorId)
+      .eq("is_primary", true);
+    if (input.id) query = query.neq("id", input.id);
+    const { error } = await query;
+    if (error) fail("Could not update the primary contact", error);
+  }
+
+  const payload = {
+    investor_id: investorId,
+    contact_name: input.contactName,
+    title: input.title,
+    email: input.email ? input.email : null,
+    relationship_owner: input.relationshipOwner,
+    relationship_strength: input.relationshipStrength,
+    outreach_permission_status: input.outreachPermissionStatus,
+    is_primary: input.isPrimary,
+  };
+
+  if (input.id) {
+    const { error } = await supabase.from("investor_contacts").update(payload).eq("id", input.id);
+    if (error) fail("Could not update this contact", error);
+    return;
+  }
+
+  const { error } = await supabase.from("investor_contacts").insert({ ...payload, created_by: userId });
+  if (error) fail("Could not save this contact", error);
+}
+
+export const api = {
+  /**
+   * Activates a pending invitation or claims the workspace for the very first
+   * signed-in user, then returns the caller's own membership row.
+   */
+  async ensureMembership(): Promise<WorkspaceMember | null> {
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) return null;
+
+    const { error: claimError } = await supabase.rpc("claim_workspace");
+
+    const { data, error } = await supabase
+      .from("workspace_members")
+      .select("*")
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+    if (error) throw new Error(`Could not read workspace access: ${error.message}`);
+    if (!data && claimError) {
+      throw new Error(`Could not check workspace access: ${claimError.message}`);
+    }
+    return data ? mapMember(data) : null;
+  },
+
+  async listWorkspace(): Promise<WorkspaceData> {
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit] =
+      await Promise.all([
+        supabase.from("deals").select("*").order("updated_at", { ascending: false }),
+        supabase.from("sources").select("*").order("created_at", { ascending: false }),
+        supabase.from("deal_claims").select("*").order("created_at", { ascending: false }),
+        supabase.from("decision_gaps").select("*").order("created_at", { ascending: false }),
+        supabase.from("investors").select("*").order("created_at", { ascending: false }),
+        supabase.from("investor_contacts").select("*").order("created_at", { ascending: false }),
+        supabase.from("investor_interactions").select("*").order("occurred_at", { ascending: false }),
+        supabase.from("outreach_actions").select("*").order("created_at", { ascending: false }),
+        supabase.from("deal_investor_matches").select("*").order("updated_at", { ascending: false }),
+        supabase.from("workspace_members").select("*").order("created_at", { ascending: true }),
+        supabase.from("audit_events").select("*").order("created_at", { ascending: false }).limit(40),
+      ]);
+
+    if (deals.error) fail("Could not load deals", deals.error);
+    if (sources.error) fail("Could not load the Deal Inbox", sources.error);
+    if (claims.error) fail("Could not load deal claims", claims.error);
+    if (gaps.error) fail("Could not load decision gaps", gaps.error);
     if (investors.error) fail("Could not load the investor network", investors.error);
+    if (contacts.error) fail("Could not load investor contacts", contacts.error);
     if (interactions.error) fail("Could not load interactions", interactions.error);
     if (outreach.error) fail("Could not load outreach", outreach.error);
+    if (matches.error) fail("Could not load saved matches", matches.error);
+    if (members.error) fail("Could not load workspace members", members.error);
+    if (audit.error) fail("Could not load the audit trail", audit.error);
 
-    const captureRows = captures.data ?? [];
-    const audioPaths = captureRows
-      .map((row) => row.audio_path)
+    const sourceRows = sources.data ?? [];
+    const audioPaths = sourceRows
+      .map((row) => row.audio_storage_path)
       .filter((path): path is string => typeof path === "string" && path.length > 0);
 
     const signed = new Map<string, string>();
@@ -278,14 +465,21 @@ export const api = {
       });
     }
 
+    const contactList = (contacts.data ?? []).map(mapContact);
+
     return {
-      captures: captureRows.map((row) => mapCapture(row, row.audio_path ? signed.get(row.audio_path) ?? null : null)),
-      cases: (cases.data ?? []).map(mapCase),
-      evidence: (evidence.data ?? []).map(mapEvidence),
-      questions: (questions.data ?? []).map(mapQuestion),
-      investors: (investors.data ?? []).map(mapInvestor),
+      captures: sourceRows.map((row) =>
+        mapCapture(row, row.audio_storage_path ? signed.get(row.audio_storage_path) ?? null : null),
+      ),
+      cases: (deals.data ?? []).map(mapDeal),
+      claims: (claims.data ?? []).map(mapClaim),
+      gaps: (gaps.data ?? []).map(mapGap),
+      investors: (investors.data ?? []).map((row) => mapInvestor(row, contactList)),
       interactions: (interactions.data ?? []).map(mapInteraction),
       outreach: (outreach.data ?? []).map(mapOutreach),
+      matches: (matches.data ?? []).map(mapMatch),
+      members: (members.data ?? []).map(mapMember),
+      audit: (audit.data ?? []).map(mapAudit),
     };
   },
 
@@ -304,19 +498,19 @@ export const api = {
     }
 
     const { data, error } = await supabase
-      .from("deal_inbox_items")
+      .from("sources")
       .insert({
-        company_name: input.companyName,
+        title: input.companyName,
         founder_name: input.founderName,
         founder_email: input.founderEmail,
-        sector: input.sector,
-        round_stage: input.roundStage,
-        source: input.source,
-        notes: input.notes,
+        sector_hint: input.sector,
+        stage_hint: input.roundStage,
+        source_type: input.source,
+        raw_text: input.notes,
         duration_seconds: input.durationSeconds,
         referred_by: input.referredBy,
-        audio_path: audioPath,
-        created_by: userId,
+        audio_storage_path: audioPath,
+        uploaded_by: userId,
       })
       .select()
       .single();
@@ -335,31 +529,29 @@ export const api = {
     return mapCapture(data, audioUrl);
   },
 
-  async updateCapture(
-    id: string,
-    patch: Partial<Pick<Capture, "status" | "caseId" | "notes">>,
-  ): Promise<void> {
-    const update: Tables["deal_inbox_items"]["Update"] = {};
-    if (patch.status !== undefined) update.status = patch.status;
-    if (patch.caseId !== undefined) update.case_id = patch.caseId;
-    if (patch.notes !== undefined) update.notes = patch.notes;
+  async updateCapture(id: string, patch: { status?: CaptureStatus; dealId?: string | null; notes?: string }): Promise<void> {
+    const update: Tables["sources"]["Update"] = {};
+    if (patch.status !== undefined) update.triage_status = patch.status;
+    if (patch.dealId !== undefined) update.deal_id = patch.dealId;
+    if (patch.notes !== undefined) update.raw_text = patch.notes;
 
-    const { error } = await supabase.from("deal_inbox_items").update(update).eq("id", id);
+    const { error } = await supabase.from("sources").update(update).eq("id", id);
     if (error) fail("Could not update this capture", error);
   },
 
   async createCase(input: CaseInput): Promise<InvestmentCase> {
     const userId = await currentUserId();
     const { data, error } = await supabase
-      .from("investment_cases")
+      .from("deals")
       .insert({
         company_name: input.companyName,
-        one_liner: input.oneLiner,
+        website: input.website,
+        summary: input.summary,
         sector: input.sector,
         geography: input.geography,
-        round_stage: input.roundStage,
+        stage: input.roundStage,
         status: input.status,
-        raise_amount: input.raiseAmount,
+        target_raise: input.raiseAmount,
         cheque_sought: input.chequeSought,
         pre_money_valuation: input.preMoneyValuation,
         ownership_target: input.ownershipTarget,
@@ -369,37 +561,37 @@ export const api = {
         thesis: input.thesis,
         next_step: input.nextStep,
         next_step_due: input.nextStepDue,
-        capture_id: input.captureId ?? null,
+        owner_user_id: userId,
         created_by: userId,
       })
       .select()
       .single();
 
-    if (error) fail("Could not open this case", error);
+    if (error) fail("Could not open this deal", error);
 
     if (input.captureId) {
-      const { error: captureError } = await supabase
-        .from("deal_inbox_items")
-        .update({ status: "promoted", case_id: data.id })
+      const { error: sourceError } = await supabase
+        .from("sources")
+        .update({ deal_id: data.id, triage_status: "promoted" })
         .eq("id", input.captureId);
-      if (captureError) {
-        // The case exists; report the partial update instead of hiding it.
-        throw new Error(`Case opened, but the source capture was not linked: ${captureError.message}`);
+      if (sourceError) {
+        throw new Error(`Deal opened, but the source record was not linked: ${sourceError.message}`);
       }
     }
 
-    return mapCase(data);
+    return mapDeal(data);
   },
 
   async updateCase(id: string, patch: Partial<Omit<InvestmentCase, "id" | "createdAt">>): Promise<void> {
-    const update: Tables["investment_cases"]["Update"] = { updated_at: new Date().toISOString() };
+    const update: Tables["deals"]["Update"] = {};
     if (patch.companyName !== undefined) update.company_name = patch.companyName;
-    if (patch.oneLiner !== undefined) update.one_liner = patch.oneLiner;
+    if (patch.website !== undefined) update.website = patch.website;
+    if (patch.summary !== undefined) update.summary = patch.summary;
     if (patch.sector !== undefined) update.sector = patch.sector;
     if (patch.geography !== undefined) update.geography = patch.geography;
-    if (patch.roundStage !== undefined) update.round_stage = patch.roundStage;
+    if (patch.roundStage !== undefined) update.stage = patch.roundStage;
     if (patch.status !== undefined) update.status = patch.status;
-    if (patch.raiseAmount !== undefined) update.raise_amount = patch.raiseAmount;
+    if (patch.raiseAmount !== undefined) update.target_raise = patch.raiseAmount;
     if (patch.chequeSought !== undefined) update.cheque_sought = patch.chequeSought;
     if (patch.preMoneyValuation !== undefined) update.pre_money_valuation = patch.preMoneyValuation;
     if (patch.ownershipTarget !== undefined) update.ownership_target = patch.ownershipTarget;
@@ -410,93 +602,114 @@ export const api = {
     if (patch.nextStep !== undefined) update.next_step = patch.nextStep;
     if (patch.nextStepDue !== undefined) update.next_step_due = patch.nextStepDue;
 
-    const { error } = await supabase.from("investment_cases").update(update).eq("id", id);
-    if (error) fail("Could not update this case", error);
+    const { error } = await supabase.from("deals").update(update).eq("id", id);
+    if (error) fail("Could not update this deal", error);
   },
 
-  async createEvidence(input: EvidenceInput): Promise<void> {
+  async createClaim(input: ClaimInput): Promise<void> {
     const userId = await currentUserId();
     let filePath: string | null = null;
+    let fileName: string | null = null;
 
     if (input.file) {
       const safeName = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${userId}/${input.caseId}/${crypto.randomUUID()}-${safeName}`;
+      const path = `${userId}/${input.dealId}/${crypto.randomUUID()}-${safeName}`;
       const { error: uploadError } = await supabase.storage.from(EVIDENCE_BUCKET).upload(path, input.file, {
         contentType: input.file.type || "application/octet-stream",
         upsert: false,
       });
       if (uploadError) fail("Could not upload this document", uploadError);
       filePath = path;
+      fileName = input.file.name;
     }
 
-    const { error } = await supabase.from("case_evidence").insert({
-      case_id: input.caseId,
-      kind: input.kind,
-      title: input.title,
-      detail: input.detail,
-      file_name: input.file?.name ?? null,
+    const { error } = await supabase.from("deal_claims").insert({
+      deal_id: input.dealId,
+      claim_type: input.claimType,
+      label: input.label,
+      supporting_excerpt: input.supportingExcerpt,
+      value_text: input.valueText,
+      normalized_value: input.normalizedValue,
+      currency: input.currency,
+      reporting_period: input.reportingPeriod,
+      verification_status: input.verificationStatus,
+      source_id: input.sourceId,
+      file_name: fileName,
       file_path: filePath,
       created_by: userId,
     });
 
     if (error) {
       if (filePath) await supabase.storage.from(EVIDENCE_BUCKET).remove([filePath]);
-      fail("Could not save this evidence", error);
+      fail("Could not save this claim", error);
     }
   },
 
-  async deleteEvidence(id: string, filePath: string | null): Promise<void> {
-    const { error } = await supabase.from("case_evidence").delete().eq("id", id);
-    if (error) fail("Could not remove this evidence", error);
+  async deleteClaim(id: string, filePath: string | null): Promise<void> {
+    const { error } = await supabase.from("deal_claims").delete().eq("id", id);
+    if (error) fail("Could not remove this claim", error);
     if (filePath) await supabase.storage.from(EVIDENCE_BUCKET).remove([filePath]);
   },
 
-  async getEvidenceUrl(path: string): Promise<string | null> {
+  async getClaimUrl(path: string): Promise<string | null> {
     const { data, error } = await supabase.storage.from(EVIDENCE_BUCKET).createSignedUrl(path, SIGNED_URL_TTL);
     if (error) return null;
     return data?.signedUrl ?? null;
   },
 
-  async createQuestion(input: { caseId: string; question: string; owner: string }): Promise<void> {
+  async createGap(input: {
+    dealId: string;
+    question: string;
+    owner: string;
+    severity: GapSeverity;
+    blockingDecision: boolean;
+    dueDate: string | null;
+  }): Promise<void> {
     const userId = await currentUserId();
-    const { error } = await supabase.from("case_questions").insert({
-      case_id: input.caseId,
+    const { error } = await supabase.from("decision_gaps").insert({
+      deal_id: input.dealId,
       question: input.question,
       owner: input.owner,
+      severity: input.severity,
+      blocking_decision: input.blockingDecision,
+      due_date: input.dueDate,
       created_by: userId,
     });
-    if (error) fail("Could not add this question", error);
+    if (error) fail("Could not add this decision gap", error);
   },
 
-  async updateQuestion(
+  async updateGap(
     id: string,
-    patch: Partial<Pick<CaseQuestion, "answer" | "status" | "owner">>,
+    patch: Partial<Pick<DecisionGap, "answer" | "status" | "owner" | "severity" | "blockingDecision">>,
   ): Promise<void> {
-    const update: Tables["case_questions"]["Update"] = {};
+    const update: Tables["decision_gaps"]["Update"] = {};
     if (patch.answer !== undefined) update.answer = patch.answer;
     if (patch.owner !== undefined) update.owner = patch.owner;
+    if (patch.severity !== undefined) update.severity = patch.severity;
+    if (patch.blockingDecision !== undefined) update.blocking_decision = patch.blockingDecision;
     if (patch.status !== undefined) {
       update.status = patch.status;
       update.resolved_at = patch.status === "answered" ? new Date().toISOString() : null;
     }
-    const { error } = await supabase.from("case_questions").update(update).eq("id", id);
-    if (error) fail("Could not update this question", error);
+    const { error } = await supabase.from("decision_gaps").update(update).eq("id", id);
+    if (error) fail("Could not update this decision gap", error);
   },
 
-  async createInvestor(input: InvestorInput): Promise<Investor> {
+  async createInvestor(input: InvestorInput): Promise<{ id: string }> {
     const userId = await currentUserId();
     const { data, error } = await supabase
       .from("investors")
       .insert({
-        firm_name: input.firmName,
-        contact_name: input.contactName,
-        email: input.email,
+        name: input.name,
         investor_type: input.investorType,
+        thesis: input.thesis,
         stages: input.stages,
         sectors: input.sectors,
-        geographies: input.geographies,
-        check_min: input.checkMin,
-        check_max: input.checkMax,
+        geography: input.geographies,
+        minimum_check: input.checkMin,
+        maximum_check: input.checkMax,
+        currency: input.currency,
+        status: input.status,
         leads_rounds: input.leadsRounds,
         relationship: input.relationship,
         notes: input.notes,
@@ -504,23 +717,35 @@ export const api = {
         next_step_due: input.nextStepDue,
         created_by: userId,
       })
-      .select()
+      .select("id")
       .single();
     if (error) fail("Could not add this investor", error);
-    return mapInvestor(data);
+
+    const contact = input.contact;
+    if (contact && (contact.contactName || contact.email || contact.title)) {
+      await saveContact(data.id, { ...contact, isPrimary: true }, userId);
+    }
+
+    return { id: data.id };
   },
 
-  async updateInvestor(id: string, patch: Partial<Omit<Investor, "id" | "createdAt">>): Promise<void> {
+  async updateInvestor(
+    id: string,
+    patch: Partial<Omit<Investor, "id" | "createdAt" | "contacts">>,
+    contact?: ContactInput | null,
+  ): Promise<void> {
+    const userId = await currentUserId();
     const update: Tables["investors"]["Update"] = {};
-    if (patch.firmName !== undefined) update.firm_name = patch.firmName;
-    if (patch.contactName !== undefined) update.contact_name = patch.contactName;
-    if (patch.email !== undefined) update.email = patch.email;
+    if (patch.name !== undefined) update.name = patch.name;
     if (patch.investorType !== undefined) update.investor_type = patch.investorType;
+    if (patch.thesis !== undefined) update.thesis = patch.thesis;
     if (patch.stages !== undefined) update.stages = patch.stages;
     if (patch.sectors !== undefined) update.sectors = patch.sectors;
-    if (patch.geographies !== undefined) update.geographies = patch.geographies;
-    if (patch.checkMin !== undefined) update.check_min = patch.checkMin;
-    if (patch.checkMax !== undefined) update.check_max = patch.checkMax;
+    if (patch.geographies !== undefined) update.geography = patch.geographies;
+    if (patch.checkMin !== undefined) update.minimum_check = patch.checkMin;
+    if (patch.checkMax !== undefined) update.maximum_check = patch.checkMax;
+    if (patch.currency !== undefined) update.currency = patch.currency;
+    if (patch.status !== undefined) update.status = patch.status;
     if (patch.leadsRounds !== undefined) update.leads_rounds = patch.leadsRounds;
     if (patch.relationship !== undefined) update.relationship = patch.relationship;
     if (patch.notes !== undefined) update.notes = patch.notes;
@@ -530,21 +755,41 @@ export const api = {
 
     const { error } = await supabase.from("investors").update(update).eq("id", id);
     if (error) fail("Could not update this investor", error);
+
+    if (contact && (contact.contactName || contact.email || contact.title || contact.id)) {
+      await saveContact(id, { ...contact, isPrimary: true }, userId);
+    }
+  },
+
+  async createContact(investorId: string, input: ContactInput): Promise<void> {
+    const userId = await currentUserId();
+    await saveContact(investorId, input, userId);
+  },
+
+  async updateContact(investorId: string, input: ContactInput): Promise<void> {
+    const userId = await currentUserId();
+    await saveContact(investorId, input, userId);
+  },
+
+  async deleteContact(id: string): Promise<void> {
+    const { error } = await supabase.from("investor_contacts").delete().eq("id", id);
+    if (error) fail("Could not remove this contact", error);
   },
 
   async createInteraction(input: {
     investorId: string;
-    caseId: string | null;
+    dealId: string | null;
     kind: InteractionKind;
     summary: string;
     occurredAt: string;
     nextStep: string;
     nextStepDue: string | null;
+    contactId?: string | null;
   }): Promise<void> {
     const userId = await currentUserId();
     const { error } = await supabase.from("investor_interactions").insert({
       investor_id: input.investorId,
-      case_id: input.caseId,
+      deal_id: input.dealId,
       kind: input.kind,
       summary: input.summary,
       occurred_at: input.occurredAt,
@@ -567,19 +812,29 @@ export const api = {
       update.next_step_due = input.nextStepDue;
     }
     await supabase.from("investors").update(update).eq("id", input.investorId);
+
+    if (input.contactId) {
+      await supabase
+        .from("investor_contacts")
+        .update({ last_interaction_at: input.occurredAt })
+        .eq("id", input.contactId);
+    }
   },
 
   async createOutreach(input: OutreachInput): Promise<Outreach> {
     const userId = await currentUserId();
     const { data, error } = await supabase
-      .from("outreach_messages")
+      .from("outreach_actions")
       .insert({
-        case_id: input.caseId,
+        deal_id: input.dealId,
         investor_id: input.investorId,
-        subject: input.subject,
-        body: input.body,
+        contact_id: input.contactId,
+        draft_subject: input.subject,
+        draft_body: input.body,
         channel: input.channel,
         status: input.status,
+        owner_user_id: userId,
+        next_followup_at: input.nextFollowupAt,
         created_by: userId,
       })
       .select()
@@ -590,19 +845,87 @@ export const api = {
 
   async updateOutreach(
     id: string,
-    patch: Partial<Pick<Outreach, "subject" | "body" | "status" | "channel">>,
+    patch: Partial<Pick<Outreach, "subject" | "body" | "status" | "channel" | "contactId" | "nextFollowupAt">>,
   ): Promise<void> {
-    const update: Tables["outreach_messages"]["Update"] = {};
-    if (patch.subject !== undefined) update.subject = patch.subject;
-    if (patch.body !== undefined) update.body = patch.body;
+    const update: Tables["outreach_actions"]["Update"] = {};
+    if (patch.subject !== undefined) update.draft_subject = patch.subject;
+    if (patch.body !== undefined) update.draft_body = patch.body;
     if (patch.channel !== undefined) update.channel = patch.channel;
+    if (patch.contactId !== undefined) update.contact_id = patch.contactId;
+    if (patch.nextFollowupAt !== undefined) update.next_followup_at = patch.nextFollowupAt;
     if (patch.status !== undefined) {
       update.status = patch.status;
       const now = new Date().toISOString();
       if (patch.status === "approved") update.approved_at = now;
       if (patch.status === "sent") update.sent_at = now;
     }
-    const { error } = await supabase.from("outreach_messages").update(update).eq("id", id);
+    const { error } = await supabase.from("outreach_actions").update(update).eq("id", id);
     if (error) fail("Could not update this outreach", error);
+  },
+
+  async saveMatch(input: {
+    dealId: string;
+    investorId: string;
+    score: number;
+    rules: MatchRule[];
+    explanation: string;
+    gaps: string[];
+    status: MatchStatus;
+  }): Promise<void> {
+    const userId = await currentUserId();
+    const { error } = await supabase.from("deal_investor_matches").upsert(
+      {
+        deal_id: input.dealId,
+        investor_id: input.investorId,
+        fit_score: input.score,
+        score_breakdown: input.rules as unknown as Database["public"]["Tables"]["deal_investor_matches"]["Insert"]["score_breakdown"],
+        fit_explanation: input.explanation,
+        missing_information: input.gaps as unknown as Database["public"]["Tables"]["deal_investor_matches"]["Insert"]["missing_information"],
+        match_status: input.status,
+        created_by: userId,
+      },
+      { onConflict: "deal_id,investor_id" },
+    );
+    if (error) fail("Could not save this match", error);
+  },
+
+  async inviteMember(input: { email: string; role: MemberRole; displayName: string }): Promise<void> {
+    const userId = await currentUserId();
+    const { error } = await supabase.from("workspace_members").insert({
+      email: input.email.trim().toLowerCase(),
+      role: input.role,
+      display_name: input.displayName.trim(),
+      status: "invited",
+      invited_by: userId,
+    });
+    if (error) {
+      if (error.code === "23505") throw new Error("That email is already on the workspace list.");
+      fail("Could not invite this member", error);
+    }
+  },
+
+  async updateMember(id: string, patch: Partial<Pick<WorkspaceMember, "role" | "status" | "displayName">>): Promise<void> {
+    const update: Tables["workspace_members"]["Update"] = {};
+    if (patch.role !== undefined) update.role = patch.role;
+    if (patch.status !== undefined) update.status = patch.status;
+    if (patch.displayName !== undefined) update.display_name = patch.displayName;
+    const { error } = await supabase.from("workspace_members").update(update).eq("id", id);
+    if (error) fail("Could not update this member", error);
+  },
+
+  async removeMember(id: string): Promise<void> {
+    const { error } = await supabase.from("workspace_members").delete().eq("id", id);
+    if (error) fail("Could not remove this member", error);
+  },
+
+  async importInvestors(rows: Record<string, unknown>[]): Promise<ImportSummary> {
+    const { data, error } = await supabase.rpc("import_investors", { p_rows: rows });
+    if (error) fail("Could not import investors", error);
+    const summary = (data ?? {}) as Partial<ImportSummary>;
+    return {
+      inserted: summary.inserted ?? 0,
+      skipped: summary.skipped ?? 0,
+      contacts: summary.contacts ?? 0,
+    };
   },
 };

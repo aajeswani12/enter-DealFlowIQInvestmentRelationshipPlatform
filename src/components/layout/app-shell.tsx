@@ -5,6 +5,7 @@ import {
   LogOut,
   Menu,
   Mic,
+  ShieldCheck,
   Users,
   Waypoints,
   X,
@@ -131,7 +132,7 @@ function MobileNav() {
 export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, membership } = useAuth();
   const { isError, error, refetch } = useWorkspace();
   const active = NAV.find((item) => (item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)));
   const email = user?.email ?? "Signed in";
@@ -176,9 +177,18 @@ export function AppShell() {
             </span>
             <div className="min-w-0">
               <p className="truncate text-[11.5px] font-medium text-sidebar-accent-foreground">{email}</p>
-              <p className="text-[9.5px] uppercase tracking-[0.14em] text-sidebar-foreground/50">Talok Capital</p>
+              <p className="text-[9.5px] uppercase tracking-[0.14em] text-sidebar-foreground/50">
+                {membership?.role ?? "member"} · Talok Capital
+              </p>
             </div>
           </div>
+          <Link
+            to="/workspace"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[11px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-accent-foreground"
+          >
+            <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+            Team access
+          </Link>
           <button
             type="button"
             onClick={() => void signOut()}
@@ -274,6 +284,14 @@ export function AppShell() {
             </div>
             <div className="space-y-2 border-t border-sidebar-border px-3 pt-4 text-[11px] leading-relaxed text-sidebar-foreground/60">
               <p className="truncate">{email}</p>
+              <Link
+                to="/workspace"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-sidebar-foreground/80"
+              >
+                <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                Team access
+              </Link>
               <button
                 type="button"
                 onClick={() => void signOut()}

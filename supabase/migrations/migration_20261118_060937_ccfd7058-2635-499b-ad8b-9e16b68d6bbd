@@ -1,0 +1,8 @@
+drop policy if exists workspace_members_delete on public.workspace_members;
+create policy workspace_members_delete on public.workspace_members
+for delete to authenticated
+using (
+  public.is_project_admin()
+  and user_id is distinct from auth.uid()
+  and (role <> 'owner' or user_id is null)
+);

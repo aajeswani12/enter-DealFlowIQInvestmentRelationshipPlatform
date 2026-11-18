@@ -1,24 +1,44 @@
-import { Circle, CircleAlert, CircleCheck, ChevronDown, Send } from "lucide-react";
+import { Bookmark, ChevronDown, Circle, CircleAlert, CircleCheck, Send } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { RelationshipPill, TierPill } from "@/components/common/status-pill";
+import { Pill, TierPill } from "@/components/common/status-pill";
 import { Button } from "@/components/ui/button";
-import { RELATIONSHIP_LABEL } from "@/lib/constants";
 import { MATCH_TIER_LABEL } from "@/lib/matching";
-import type { MatchResult } from "@/lib/types";
+import { contactLabel, primaryContact } from "@/lib/investors";
+import type { MatchResult, MatchStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface MatchCardProps {
   match: MatchResult;
   rank: number;
   hasOutreach: boolean;
+  matchStatus?: MatchStatus;
   onDraft: () => void;
+  onShortlist?: () => void;
 }
 
-export function MatchCard({ match, rank, hasOutreach, onDraft }: MatchCardProps) {
+const STATUS_LABEL: Partial<Record<MatchStatus, string>> = {
+  shortlisted: "Shortlisted",
+  outreach_drafted: "Draft saved",
+  approved: "Approved",
+  contacted: "Contacted",
+  declined: "Declined",
+};
+
+const STATUS_TONE = {
+  shortlisted: "brand",
+  outreach_drafted: "warning",
+  approved: "brand",
+  contacted: "success",
+  declined: "danger",
+} as const;
+
+export function MatchCard({ match, rank, hasOutreach, matchStatus = "suggested", onDraft, onShortlist }: MatchCardProps) {
   const [expanded, setExpanded] = useState(rank === 1);
   const { investor, rules, score, tier } = match;
   const passing = rules.filter((rule) => rule.outcome === "pass").length;
+  const contact = primaryContact(investor);
+  const statusLabel = STATUS_LABEL[matchStatus];
 
   return (
     <article className="panel p-4 sm:p-5" aria-labelledby={`match-${investor.id}`}>
@@ -28,15 +48,21 @@ export function MatchCard({ match, rank, hasOutreach, onDraft }: MatchCardProps)
             {rank}
           </span>
           <div className="min-w-0">
-            <h3 id={`match-${investor.id}`} className="truncate text-[14.5px] font-semibold tracking-tight">
-              {investor.firmName}
-            </h3>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h3 id={`match-${investor.id}`} className="truncate text-[14.5px] font-semibold tracking-tight">
+                {investor.name}
+              </h3>
+              {investor.isSynthetic ? <Pill tone="warning">Sample</Pill> : null}
+            </div>
             <p className="truncate text-[11.5px] text-muted-foreground">
-              {investor.contactName || "No contact recorded"} · {investor.email || "No email"}
+              {contactLabel(contact)}
+              {contact?.title ? ` · ${contact.title}` : ""}
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <TierPill tier={tier} label={MATCH_TIER_LABEL[tier]} />
-              <RelationshipPill status={investor.relationship} label={RELATIONSHIP_LABEL[investor.relationship]} />
+              {statusLabel ? (
+                <Pill tone={STATUS_TONE[matchStatus as keyof typeof STATUS_TONE]}>{statusLabel}</Pill>
+              ) : null}
               <span className="text-[10.5px] text-muted-foreground">
                 {passing}/{rules.length} rules met
               </span>
@@ -51,7 +77,10 @@ export function MatchCard({ match, rank, hasOutreach, onDraft }: MatchCardProps)
 
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
         <div
-          className={cn("h-full rounded-full", tier === "strong" ? "bg-brand" : tier === "considered" ? "bg-brand/60" : "bg-muted-foreground/40")}
+          className={cn(
+            "h-full rounded-full",
+            tier === "strong" ? "bg-brand" : tier === "considered" ? "bg-brand/60" : "bg-muted-foreground/40",
+          )}
           style={{ width: `${score}%` }}
           role="img"
           aria-label={`Match score ${score} out of 100`}
@@ -78,6 +107,18 @@ export function MatchCard({ match, rank, hasOutreach, onDraft }: MatchCardProps)
           <Send className="h-3.5 w-3.5" aria-hidden="true" />
           {hasOutreach ? "Draft already exists" : "Draft outreach"}
         </Button>
+        {onShortlist ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={onShortlist}
+            disabled={matchStatus === "shortlisted"}
+          >
+            <Bookmark className={matchStatus === "shortlisted" ? "h-3.5 w-3.5 fill-current" : "h-3.5 w-3.5"} aria-hidden="true" />
+            {matchStatus === "shortlisted" ? "Shortlisted" : "Shortlist"}
+          </Button>
+        ) : null}
         <Button asChild size="sm" variant="ghost">
           <Link to={`/investors/${investor.id}`}>View investor</Link>
         </Button>

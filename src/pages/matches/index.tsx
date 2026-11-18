@@ -13,9 +13,9 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { ACTIVE_CASE_STATUSES } from "@/lib/constants";
 import { formatCurrency } from "@/lib/format";
-import { rankMatches } from "@/lib/matching";
+import { rankMatches, scoreMatch } from "@/lib/matching";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
-import type { Investor, Outreach } from "@/lib/types";
+import type { Investor, MatchStatus, Outreach } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { OutreachQueue } from "./outreach-queue";
 
@@ -30,13 +30,16 @@ const Matches = () => {
 
   const tab = searchParams.get("tab") === "outreach" ? "outreach" : "matches";
   const caseParam = searchParams.get("case");
+  const investorParam = searchParams.get("investor");
 
   const activeCases = workspace.cases.filter((item) => ACTIVE_CASE_STATUSES.includes(item.status));
   const selectable = activeCases.length > 0 ? activeCases : workspace.cases;
-  const selectedCase = workspace.cases.find((item) => item.id === caseParam) ?? selectable[0] ?? null;
+  const paramCase = workspace.cases.find((item) => item.id === caseParam);
+  const selectedCase = paramCase ?? selectable[0] ?? null;
 
   const matches = selectedCase ? rankMatches(selectedCase, workspace.investors) : [];
-  const visibleMatches = showAll ? matches : matches.filter((match) => match.score >= 50);
+  const filtered = matches.filter((match) => match.score >= 50);
+  const visibleMatches = showAll ? matches : filtered;
 
   const drafts = workspace.outreach.filter((item) => item.status === "draft");
   const awaitingApproval = workspace.outreach.filter((item) => item.status === "approved");
@@ -48,6 +51,29 @@ const Matches = () => {
     setSearchParams(next, { replace: true });
   };
 
+  const savedMatch = (dealId: string, investorId: string) =>
+    workspace.matches.find((item) => item.dealId === dealId && item.investorId === investorId);
+
+  const persistMatch = async (dealId: string, investorId: string, status: MatchStatus) => {
+    const deal = workspace.cases.find((item) => item.id === dealId);
+    const investor = workspace.investors.find((item) => item.id === investorId);
+    if (!deal || !investor) return;
+    const result = scoreMatch(deal, investor);
+    try {
+      await actions.saveMatch.mutateAsync({
+        dealId,
+        investorId,
+        score: result.score,
+        rules: result.rules,
+        explanation: `${result.score}/100 — ${result.rules.filter((rule) => rule.outcome === "pass").length} of ${result.rules.length} rules met.`,
+        gaps: result.gaps,
+        status,
+      });
+    } catch {
+      toast.error("The match decision was not saved.");
+    }
+  };
+
   const openComposer = (investor: Investor) => {
     setComposerInvestor(investor);
     setComposerOpen(true);
@@ -56,6 +82,7 @@ const Matches = () => {
   const handleApprove = async (item: Outreach) => {
     try {
       await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "approved" } });
+      await persistMatch(item.dealId, item.investorId, "approved");
       toast.success("Approved. Send it from your inbox, then record it as sent.");
     } catch {
       toast.error("Could not approve this draft.");
@@ -65,10 +92,17 @@ const Matches = () => {
   const handleRecordSent = async (item: Outreach) => {
     try {
       await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "sent" } });
+      await persistMatch(item.dealId, item.investorId, "contacted");
       toast.success("Recorded as sent");
     } catch {
       toast.error("Could not record this as sent.");
     }
+  };
+
+  const handleShortlist = async (investorId: string) => {
+    if (!selectedCase) return;
+    await persistMatch(selectedCase.id, investorId, "shortlisted");
+    toast.success("Added to the shortlist");
   };
 
   return (
@@ -84,8 +118,8 @@ const Matches = () => {
       ) : workspace.cases.length === 0 ? (
         <EmptyState
           icon={Waypoints}
-          title="No cases to match yet"
-          description="Matching starts from an investment case. Open one, record the round mechanics, then compare it against the investor network."
+          title="No deals to match yet"
+          description="Matching starts from a deal. Open one, record the round mechanics, then compare it against the investor network."
           action={
             <Button asChild size="sm" className="gap-1.5">
               <Link to="/cases">
@@ -112,11 +146,7 @@ const Matches = () => {
             <div className="inline-flex rounded-lg border border-border bg-secondary/50 p-1">
               {[
                 { value: "matches", label: "Matches", count: matches.length },
-                {
-                  value: "outreach",
-                  label: "Outreach queue",
-                  count: drafts.length + awaitingApproval.length,
-                },
+                { value: "outreach", label: "Outreach queue", count: drafts.length + awaitingApproval.length },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -146,11 +176,11 @@ const Matches = () => {
                   <div className="min-w-0">
                     <p className="label-caps">Matching against</p>
                     <h2 id="case-context-heading" className="mt-1 font-display text-xl tracking-tight">
-                      {selectedCase?.companyName ?? "No case"}
+                      {selectedCase?.companyName ?? "No deal"}
                     </h2>
                     <p className="mt-0.5 text-[11.5px] text-muted-foreground">
                       {selectedCase
-                        ? `${selectedCase.roundStage || "Round not set"} · ${selectedCase.sector || "Sector not set"} · ${
+                        ? `${selectedCase.roundStage || "Stage not set"} · ${selectedCase.sector || "Sector not set"} · ${
                             selectedCase.geography || "Geography not set"
                           } · cheque sought ${formatCurrency(selectedCase.chequeSought, { compact: false })}${
                             selectedCase.leadRequired ? " · lead required" : ""
@@ -163,14 +193,14 @@ const Matches = () => {
                       value={selectedCase?.id ?? ""}
                       onChange={(value) => setParam("case", value)}
                       options={selectable.map((item) => ({ value: item.id, label: item.companyName }))}
-                      ariaLabel="Select the case to match"
+                      ariaLabel="Select the deal to match"
                     />
                     {selectedCase ? (
                       <Link
                         to={`/cases/${selectedCase.id}`}
                         className="inline-flex items-center justify-end gap-1 text-[11.5px] font-medium text-brand-strong hover:underline"
                       >
-                        Open case file
+                        Open deal file
                         <ArrowRight className="h-3 w-3" aria-hidden="true" />
                       </Link>
                     ) : null}
@@ -179,15 +209,19 @@ const Matches = () => {
                 <p className="mt-3 flex items-start gap-1.5 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   Six rules: stage 28, sector 24, geography 14, cheque size 18, lead capacity 8, relationship signal 8.
-                  Nothing outside the recorded fields is used.
+                  Nothing outside the recorded fields is used. Shortlisting and drafting store the score and breakdown.
                 </p>
               </section>
+
+              {investorParam && !workspace.investors.some((item) => item.id === investorParam) ? (
+                <p className="text-[11.5px] text-muted-foreground">The investor linked in the URL no longer exists.</p>
+              ) : null}
 
               {visibleMatches.length === 0 ? (
                 <EmptyState
                   icon={Waypoints}
-                  title="No investor clears the bar on this case"
-                  description={`Every recorded investor scores below 50 against ${selectedCase?.companyName ?? "this case"}. Review the breakdown to see which preference blocks the fit.`}
+                  title="No investor clears the bar on this deal"
+                  description={`Every recorded investor scores below 50 against ${selectedCase?.companyName ?? "this deal"}. Review the breakdown to see which preference blocks the fit.`}
                   action={
                     <Button size="sm" variant="outline" onClick={() => setShowAll(true)}>
                       Show all {matches.length} rankings
@@ -197,20 +231,25 @@ const Matches = () => {
               ) : (
                 <>
                   <div className="grid gap-3 xl:grid-cols-2">
-                    {visibleMatches.map((match, index) => (
-                      <MatchCard
-                        key={match.investor.id}
-                        match={match}
-                        rank={matches.indexOf(match) + 1}
-                        hasOutreach={workspace.outreach.some(
-                          (item) =>
-                            item.caseId === selectedCase?.id &&
-                            item.investorId === match.investor.id &&
-                            item.status !== "sent",
-                        )}
-                        onDraft={() => openComposer(match.investor)}
-                      />
-                    ))}
+                    {visibleMatches.map((match) => {
+                      const saved = selectedCase ? savedMatch(selectedCase.id, match.investor.id) : undefined;
+                      return (
+                        <MatchCard
+                          key={match.investor.id}
+                          match={match}
+                          rank={matches.indexOf(match) + 1}
+                          matchStatus={saved?.matchStatus}
+                          hasOutreach={workspace.outreach.some(
+                            (item) =>
+                              item.dealId === selectedCase?.id &&
+                              item.investorId === match.investor.id &&
+                              item.status !== "sent",
+                          )}
+                          onDraft={() => openComposer(match.investor)}
+                          onShortlist={() => handleShortlist(match.investor.id)}
+                        />
+                      );
+                    })}
                   </div>
 
                   {!showAll && matches.length > visibleMatches.length ? (
@@ -264,8 +303,12 @@ const Matches = () => {
         onOpenChange={setComposerOpen}
         caseItem={selectedCase}
         investor={composerInvestor}
+        onDrafted={async () => {
+          if (selectedCase && composerInvestor) {
+            await persistMatch(selectedCase.id, composerInvestor.id, "outreach_drafted");
+          }
+        }}
       />
-
     </div>
   );
 };

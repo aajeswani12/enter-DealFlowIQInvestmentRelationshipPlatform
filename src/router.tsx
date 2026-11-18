@@ -1,4 +1,5 @@
 import { RequireAuth } from "./components/auth/require-auth";
+import { RequireMember } from "./components/auth/require-member";
 import { AppShell } from "./components/layout/app-shell";
 import Cases from "./pages/cases";
 import CaseDetail from "./pages/cases/detail";
@@ -9,6 +10,7 @@ import InvestorDetail from "./pages/investors/detail";
 import Login from "./pages/login";
 import Matches from "./pages/matches";
 import NotFound from "./pages/NotFound";
+import WorkspaceAccess from "./pages/workspace";
 
 export const routers = [
   {
@@ -20,7 +22,9 @@ export const routers = [
     path: "/",
     element: (
       <RequireAuth>
-        <AppShell />
+        <RequireMember>
+          <AppShell />
+        </RequireMember>
       </RequireAuth>
     ),
     children: [
@@ -31,6 +35,7 @@ export const routers = [
       { path: "investors", name: "investors", element: <Investors /> },
       { path: "investors/:id", name: "investor-detail", element: <InvestorDetail /> },
       { path: "matches", name: "matches", element: <Matches /> },
+      { path: "workspace", name: "workspace-access", element: <WorkspaceAccess /> },
     ],
   },
   /* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */

@@ -25,6 +25,7 @@ interface CaseFormProps {
 
 interface FormState {
   companyName: string;
+  website: string;
   oneLiner: string;
   sector: string;
   geography: string;
@@ -44,6 +45,7 @@ interface FormState {
 
 const BLANK: FormState = {
   companyName: "",
+  website: "",
   oneLiner: "",
   sector: "",
   geography: "",
@@ -72,7 +74,8 @@ function toState(initial?: InvestmentCase | null, capture?: Capture | null): For
   if (initial) {
     return {
       companyName: initial.companyName,
-      oneLiner: initial.oneLiner,
+      website: initial.website,
+      oneLiner: initial.summary,
       sector: initial.sector,
       geography: initial.geography,
       roundStage: initial.roundStage,
@@ -129,7 +132,8 @@ export function CaseForm({ open, onOpenChange, initial, capture, onCreated }: Ca
 
     const payload = {
       companyName: fields.companyName.trim(),
-      oneLiner: fields.oneLiner.trim(),
+      website: fields.website.trim(),
+      summary: fields.oneLiner.trim(),
       sector: fields.sector,
       geography: fields.geography,
       roundStage: fields.roundStage,
@@ -210,6 +214,16 @@ export function CaseForm({ open, onOpenChange, initial, capture, onCreated }: Ca
                     onChange={(event) => set("oneLiner", event.target.value)}
                     placeholder="What the company does, in one sentence"
                     className="bg-card"
+                  />
+                </Field>
+                <Field label="Website" htmlFor="case-website" optional className="sm:col-span-2">
+                  <Input
+                    id="case-website"
+                    value={fields.website}
+                    onChange={(event) => set("website", event.target.value)}
+                    placeholder="https://company.com"
+                    className="bg-card"
+                    inputMode="url"
                   />
                 </Field>
                 <Field label="Sector" htmlFor="case-sector">

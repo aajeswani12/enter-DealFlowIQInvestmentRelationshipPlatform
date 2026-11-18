@@ -11,17 +11,18 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { INTERACTION_KIND_OPTIONS } from "@/lib/constants";
 import { fromDateInputValue, toDateInputValue } from "@/lib/format";
-import type { InteractionKind, InvestmentCase } from "@/lib/types";
+import type { InteractionKind, InvestmentCase, InvestorContact } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface InteractionFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   investorId: string;
-  cases: InvestmentCase[];
+  deals: InvestmentCase[];
+  contacts: InvestorContact[];
 }
 
-export function InteractionForm({ open, onOpenChange, investorId, cases }: InteractionFormProps) {
+export function InteractionForm({ open, onOpenChange, investorId, deals, contacts }: InteractionFormProps) {
   const isMobile = useIsMobile();
   const actions = useWorkspaceActions();
   const [kind, setKind] = useState<InteractionKind>("call");
@@ -29,7 +30,8 @@ export function InteractionForm({ open, onOpenChange, investorId, cases }: Inter
   const [occurredAt, setOccurredAt] = useState(toDateInputValue(new Date().toISOString()));
   const [nextStep, setNextStep] = useState("");
   const [nextStepDue, setNextStepDue] = useState("");
-  const [caseId, setCaseId] = useState("none");
+  const [dealId, setDealId] = useState("none");
+  const [contactId, setContactId] = useState("none");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -39,9 +41,10 @@ export function InteractionForm({ open, onOpenChange, investorId, cases }: Inter
     setOccurredAt(toDateInputValue(new Date().toISOString()));
     setNextStep("");
     setNextStepDue("");
-    setCaseId("none");
+    setDealId("none");
+    setContactId(contacts.find((contact) => contact.isPrimary)?.id ?? "none");
     setError("");
-  }, [open]);
+  }, [open, contacts]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -52,7 +55,8 @@ export function InteractionForm({ open, onOpenChange, investorId, cases }: Inter
     try {
       await actions.createInteraction.mutateAsync({
         investorId,
-        caseId: caseId === "none" ? null : caseId,
+        dealId: dealId === "none" ? null : dealId,
+        contactId: contactId === "none" ? null : contactId,
         kind,
         summary: summary.trim(),
         occurredAt: fromDateInputValue(occurredAt) ?? new Date().toISOString(),
@@ -61,8 +65,8 @@ export function InteractionForm({ open, onOpenChange, investorId, cases }: Inter
       });
       toast.success("Interaction logged");
       onOpenChange(false);
-    } catch {
-      toast.error("Could not log this interaction.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not log this interaction.");
     }
   };
 
@@ -119,17 +123,33 @@ export function InteractionForm({ open, onOpenChange, investorId, cases }: Inter
               />
             </Field>
 
-            <Field label="Related case" htmlFor="interaction-case" optional>
-              <SelectField
-                id="interaction-case"
-                value={caseId}
-                onChange={setCaseId}
-                options={[
-                  { value: "none", label: "No case attached" },
-                  ...cases.map((item) => ({ value: item.id, label: item.companyName })),
-                ]}
-              />
-            </Field>
+            <FormGrid>
+              <Field label="Contact" htmlFor="interaction-contact" optional>
+                <SelectField
+                  id="interaction-contact"
+                  value={contactId}
+                  onChange={setContactId}
+                  options={[
+                    { value: "none", label: "No specific contact" },
+                    ...contacts.map((contact) => ({
+                      value: contact.id,
+                      label: contact.contactName || contact.email || "Unnamed contact",
+                    })),
+                  ]}
+                />
+              </Field>
+              <Field label="Related deal" htmlFor="interaction-deal" optional>
+                <SelectField
+                  id="interaction-deal"
+                  value={dealId}
+                  onChange={setDealId}
+                  options={[
+                    { value: "none", label: "No deal attached" },
+                    ...deals.map((item) => ({ value: item.id, label: item.companyName })),
+                  ]}
+                />
+              </Field>
+            </FormGrid>
 
             <FormGrid>
               <Field label="Next step" htmlFor="interaction-next" optional>

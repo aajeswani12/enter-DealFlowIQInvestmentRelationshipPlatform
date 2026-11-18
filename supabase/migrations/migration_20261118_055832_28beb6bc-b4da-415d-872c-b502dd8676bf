@@ -1,0 +1,188 @@
+-- Investor data integrity
+alter table public.investors add constraint investors_check_range check (minimum_check is null or maximum_check is null or minimum_check <= maximum_check);
+alter table public.investor_contacts add constraint investor_contacts_email_format check (email is null or (position('@' in email) > 1 and position(' ' in email) = 0 and length(email) <= 254));
+
+-- CSV import: runs as the caller so row level security and the membership check both apply.
+create or replace function public.import_investors(p_rows jsonb)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_row jsonb;
+  v_id uuid;
+  v_name text;
+  v_type text;
+  v_status text;
+  v_email text;
+  v_strength text;
+  v_permission text;
+  v_inserted int := 0;
+  v_skipped int := 0;
+  v_contacts int := 0;
+begin
+  if not public.can_write_project() then
+    raise exception 'Not authorized to import investor records' using errcode = '42501';
+  end if;
+  if jsonb_typeof(p_rows) <> 'array' then
+    raise exception 'Import payload must be an array of investor rows';
+  end if;
+
+  for v_row in select value from jsonb_array_elements(p_rows) loop
+    v_name := btrim(coalesce(v_row->>'name', ''));
+    if v_name = '' then
+      v_skipped := v_skipped + 1;
+      continue;
+    end if;
+    if exists (select 1 from public.investors i where lower(i.name) = lower(v_name)) then
+      v_skipped := v_skipped + 1;
+      continue;
+    end if;
+
+    v_type := coalesce(nullif(btrim(v_row->>'investor_type'), ''), 'vc');
+    if v_type not in ('vc', 'angel', 'family_office', 'corporate') then
+      raise exception 'Invalid investor_type for %', v_name;
+    end if;
+
+    v_status := coalesce(nullif(btrim(v_row->>'status'), ''), 'active');
+    if v_status not in ('active', 'prospect', 'watchlist', 'archived') then
+      raise exception 'Invalid status for %', v_name;
+    end if;
+
+    v_email := nullif(btrim(coalesce(v_row->>'email', '')), '');
+    v_strength := coalesce(nullif(btrim(v_row->>'relationship_strength'), ''), 'unknown');
+    if v_strength not in ('unknown', 'weak', 'warm', 'strong') then
+      raise exception 'Invalid relationship_strength for %', v_name;
+    end if;
+
+    v_permission := coalesce(nullif(btrim(v_row->>'outreach_permission_status'), ''), 'unknown');
+    if v_permission not in ('unknown', 'permitted', 'requires_intro', 'do_not_contact') then
+      raise exception 'Invalid outreach_permission_status for %', v_name;
+    end if;
+
+    insert into public.investors (
+      name, investor_type, thesis, sectors, stages, geography,
+      minimum_check, maximum_check, currency, status, notes, created_by
+    ) values (
+      v_name,
+      v_type,
+      coalesce(v_row->>'thesis', ''),
+      array(select jsonb_array_elements_text(coalesce(v_row->'sectors', '[]'::jsonb))),
+      array(select jsonb_array_elements_text(coalesce(v_row->'stages', '[]'::jsonb))),
+      array(select jsonb_array_elements_text(coalesce(v_row->'geography', '[]'::jsonb))),
+      nullif(btrim(coalesce(v_row->>'minimum_check', '')), '')::numeric,
+      nullif(btrim(coalesce(v_row->>'maximum_check', '')), '')::numeric,
+      coalesce(nullif(btrim(v_row->>'currency'), ''), 'USD'),
+      v_status,
+      coalesce(v_row->>'notes', ''),
+      auth.uid()
+    ) returning id into v_id;
+
+    v_inserted := v_inserted + 1;
+
+    if btrim(coalesce(v_row->>'contact_name', '')) <> '' or v_email is not null then
+      insert into public.investor_contacts (
+        investor_id, contact_name, title, email, relationship_owner,
+        relationship_strength, outreach_permission_status, is_primary, created_by
+      ) values (
+        v_id,
+        btrim(coalesce(v_row->>'contact_name', '')),
+        btrim(coalesce(v_row->>'title', '')),
+        v_email,
+        btrim(coalesce(v_row->>'relationship_owner', '')),
+        v_strength,
+        v_permission,
+        true,
+        auth.uid()
+      );
+      v_contacts := v_contacts + 1;
+    end if;
+  end loop;
+
+  return jsonb_build_object('inserted', v_inserted, 'skipped', v_skipped, 'contacts', v_contacts);
+end;
+$$;
+
+revoke all on function public.import_investors(jsonb) from public;
+grant execute on function public.import_investors(jsonb) to authenticated;
+
+-- Clearly labelled synthetic records. Fixed ids keep this seed idempotent.
+insert into public.deals (
+  id, company_name, summary, sector, geography, stage, status, target_raise, cheque_sought,
+  pre_money_valuation, ownership_target, lead_required, thesis, next_step, next_step_due, is_synthetic
+) values
+(
+  '11111111-1111-4111-8111-111111111101',
+  'Alderbrook Freight (sample)',
+  'Synthetic sample: shared truckload marketplace for regional distributors. Not a live company.',
+  'Logistics', 'Southeast Asia', 'Pre-seed', 'diligence', 1500000, 750000,
+  6000000, 12.5, false,
+  'Synthetic sample thesis for evaluation only. Regional distributors run half-empty return legs; the pooling product is the test.',
+  'Reference calls with two anchor distributors', now() + interval '4 days', true
+),
+(
+  '11111111-1111-4111-8111-111111111102',
+  'Verdant Grid (sample)',
+  'Synthetic sample: metering and settlement software for rooftop solar aggregators. Not a live company.',
+  'Climate', 'India', 'Series A', 'ic_review', 12000000, 5000000,
+  55000000, 8, true,
+  'Synthetic sample thesis for evaluation only. Auditable metering with utility integration is the claimed wedge.',
+  'Circulate IC memo and open partner vote', now() + interval '2 days', true
+),
+(
+  '11111111-1111-4111-8111-111111111103',
+  'Meridian Pay (sample)',
+  'Synthetic sample: cross-border payroll rails for remote teams. Not a live company.',
+  'Fintech', 'Southeast Asia', 'Seed', 'sourcing', 3500000, 1500000,
+  15000000, 10, true,
+  'Synthetic sample thesis for evaluation only. Licences held directly in three markets is the hypothesis to test.',
+  'Request net revenue retention cohort file', now() + interval '7 days', true
+)
+on conflict (id) do nothing;
+
+insert into public.investors (
+  id, name, investor_type, thesis, sectors, stages, geography, minimum_check, maximum_check,
+  currency, status, notes, relationship, is_synthetic
+) values
+(
+  '22222222-2222-4222-8222-222222222201',
+  'Blue Harbor Partners (sample)', 'vc',
+  'Synthetic sample investor for evaluation only. Backs licensed financial infrastructure and B2B software.',
+  array['Fintech','Enterprise SaaS'], array['Seed','Series A'], array['Southeast Asia','India'],
+  1000000, 6000000, 'USD', 'active',
+  'Synthetic sample record — no contact details or email are attached.', 'new', true
+),
+(
+  '22222222-2222-4222-8222-222222222202',
+  'Cedar Peak Family Office (sample)', 'family_office',
+  'Synthetic sample investor for evaluation only. Patient capital with healthcare and climate interest.',
+  array['Healthtech','Climate'], array['Series A'], array['Global'],
+  3000000, 15000000, 'USD', 'active',
+  'Synthetic sample record — no contact details or email are attached.', 'new', true
+),
+(
+  '22222222-2222-4222-8222-222222222203',
+  'Meridian Angel Syndicate (sample)', 'angel',
+  'Synthetic sample investor for evaluation only. Operator angels writing small cheques.',
+  array['Fintech','Consumer'], array['Pre-seed','Seed'], array['Southeast Asia'],
+  50000, 500000, 'USD', 'prospect',
+  'Synthetic sample record — no contact details or email are attached.', 'new', true
+),
+(
+  '22222222-2222-4222-8222-222222222204',
+  'Sunda Growth Fund (sample)', 'corporate',
+  'Synthetic sample investor for evaluation only. Strategic arm interested in logistics and energy.',
+  array['Logistics','Climate'], array['Seed','Series A'], array['Southeast Asia'],
+  1000000, 8000000, 'USD', 'active',
+  'Synthetic sample record — no contact details or email are attached.', 'new', true
+),
+(
+  '22222222-2222-4222-8222-222222222205',
+  'Lumen Ventures (sample)', 'vc',
+  'Synthetic sample investor for evaluation only. Early-stage fund with a cross-border practice.',
+  array['Healthtech','Climate'], array['Pre-seed','Seed'], array['Europe','Global'],
+  500000, 2000000, 'USD', 'watchlist',
+  'Synthetic sample record — no contact details or email are attached.', 'new', true
+)
+on conflict (id) do nothing;

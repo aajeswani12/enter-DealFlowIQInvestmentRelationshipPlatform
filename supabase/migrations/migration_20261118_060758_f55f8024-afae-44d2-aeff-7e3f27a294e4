@@ -1,0 +1,9 @@
+drop policy if exists workspace_members_insert on public.workspace_members;
+create policy workspace_members_insert on public.workspace_members
+for insert to authenticated
+with check (
+  public.is_project_admin()
+  and status = 'invited'
+  and user_id is null
+  and (role <> 'owner' or public.current_member_role() = 'owner')
+);

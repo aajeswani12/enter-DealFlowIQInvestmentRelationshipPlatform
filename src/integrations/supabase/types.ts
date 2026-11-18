@@ -3264,155 +3264,309 @@ export type Database = {
   }
   public: {
     Tables: {
-      case_evidence: {
+      audit_events: {
         Row: {
-          case_id: string
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
           created_at: string
-          created_by: string
-          detail: string
+          detail: Json
+          entity_id: string | null
+          entity_type: string
+          id: string
+          summary: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          summary?: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          summary?: string
+        }
+        Relationships: []
+      }
+      deal_claims: {
+        Row: {
+          claim_type: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          deal_id: string
           file_name: string | null
           file_path: string | null
           id: string
-          kind: string
-          title: string
+          label: string
+          normalized_value: number | null
+          reporting_period: string
+          source_id: string | null
+          supporting_excerpt: string
+          updated_at: string
+          value_text: string
+          verification_status: string
         }
         Insert: {
-          case_id: string
+          claim_type?: string
           created_at?: string
-          created_by?: string
-          detail?: string
+          created_by?: string | null
+          currency?: string
+          deal_id: string
           file_name?: string | null
           file_path?: string | null
           id?: string
-          kind?: string
-          title: string
+          label: string
+          normalized_value?: number | null
+          reporting_period?: string
+          source_id?: string | null
+          supporting_excerpt?: string
+          updated_at?: string
+          value_text?: string
+          verification_status?: string
         }
         Update: {
-          case_id?: string
+          claim_type?: string
           created_at?: string
-          created_by?: string
-          detail?: string
+          created_by?: string | null
+          currency?: string
+          deal_id?: string
           file_name?: string | null
           file_path?: string | null
           id?: string
-          kind?: string
-          title?: string
+          label?: string
+          normalized_value?: number | null
+          reporting_period?: string
+          source_id?: string | null
+          supporting_excerpt?: string
+          updated_at?: string
+          value_text?: string
+          verification_status?: string
         }
         Relationships: [
           {
             foreignKeyName: "case_evidence_case_id_fkey"
-            columns: ["case_id"]
+            columns: ["deal_id"]
             isOneToOne: false
-            referencedRelation: "investment_cases"
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_claims_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
             referencedColumns: ["id"]
           },
         ]
       }
-      case_questions: {
+      deal_investor_matches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          fit_explanation: string
+          fit_score: number
+          id: string
+          investor_id: string
+          match_status: string
+          missing_information: Json
+          score_breakdown: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          fit_explanation?: string
+          fit_score?: number
+          id?: string
+          investor_id: string
+          match_status?: string
+          missing_information?: Json
+          score_breakdown?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          fit_explanation?: string
+          fit_score?: number
+          id?: string
+          investor_id?: string
+          match_status?: string
+          missing_information?: Json
+          score_breakdown?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_investor_matches_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_investor_matches_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deals: {
+        Row: {
+          cheque_sought: number | null
+          company_name: string
+          created_at: string
+          created_by: string | null
+          geography: string
+          id: string
+          is_synthetic: boolean
+          lead_partner: string
+          lead_required: boolean
+          next_step: string
+          next_step_due: string | null
+          owner_user_id: string | null
+          ownership_target: number | null
+          pre_money_valuation: number | null
+          referred_by: string
+          sector: string
+          stage: string
+          status: string
+          summary: string
+          target_raise: number | null
+          thesis: string
+          updated_at: string
+          website: string
+        }
+        Insert: {
+          cheque_sought?: number | null
+          company_name: string
+          created_at?: string
+          created_by?: string | null
+          geography?: string
+          id?: string
+          is_synthetic?: boolean
+          lead_partner?: string
+          lead_required?: boolean
+          next_step?: string
+          next_step_due?: string | null
+          owner_user_id?: string | null
+          ownership_target?: number | null
+          pre_money_valuation?: number | null
+          referred_by?: string
+          sector?: string
+          stage?: string
+          status?: string
+          summary?: string
+          target_raise?: number | null
+          thesis?: string
+          updated_at?: string
+          website?: string
+        }
+        Update: {
+          cheque_sought?: number | null
+          company_name?: string
+          created_at?: string
+          created_by?: string | null
+          geography?: string
+          id?: string
+          is_synthetic?: boolean
+          lead_partner?: string
+          lead_required?: boolean
+          next_step?: string
+          next_step_due?: string | null
+          owner_user_id?: string | null
+          ownership_target?: number | null
+          pre_money_valuation?: number | null
+          referred_by?: string
+          sector?: string
+          stage?: string
+          status?: string
+          summary?: string
+          target_raise?: number | null
+          thesis?: string
+          updated_at?: string
+          website?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_owner_user_fk"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_members"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      decision_gaps: {
         Row: {
           answer: string
-          case_id: string
+          blocking_decision: boolean
           created_at: string
-          created_by: string
+          created_by: string | null
+          deal_id: string
+          due_date: string | null
           id: string
           owner: string
           question: string
           resolved_at: string | null
+          severity: string
           status: string
+          updated_at: string
         }
         Insert: {
           answer?: string
-          case_id: string
+          blocking_decision?: boolean
           created_at?: string
-          created_by?: string
+          created_by?: string | null
+          deal_id: string
+          due_date?: string | null
           id?: string
           owner?: string
           question: string
           resolved_at?: string | null
+          severity?: string
           status?: string
+          updated_at?: string
         }
         Update: {
           answer?: string
-          case_id?: string
+          blocking_decision?: boolean
           created_at?: string
-          created_by?: string
+          created_by?: string | null
+          deal_id?: string
+          due_date?: string | null
           id?: string
           owner?: string
           question?: string
           resolved_at?: string | null
+          severity?: string
           status?: string
+          updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "case_questions_case_id_fkey"
-            columns: ["case_id"]
+            columns: ["deal_id"]
             isOneToOne: false
-            referencedRelation: "investment_cases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      deal_inbox_items: {
-        Row: {
-          audio_path: string | null
-          audio_url: string | null
-          case_id: string | null
-          company_name: string
-          created_at: string
-          created_by: string
-          duration_seconds: number | null
-          founder_email: string
-          founder_name: string
-          id: string
-          notes: string
-          referred_by: string
-          round_stage: string
-          sector: string
-          source: string
-          status: string
-        }
-        Insert: {
-          audio_path?: string | null
-          audio_url?: string | null
-          case_id?: string | null
-          company_name: string
-          created_at?: string
-          created_by?: string
-          duration_seconds?: number | null
-          founder_email?: string
-          founder_name?: string
-          id?: string
-          notes?: string
-          referred_by?: string
-          round_stage?: string
-          sector?: string
-          source?: string
-          status?: string
-        }
-        Update: {
-          audio_path?: string | null
-          audio_url?: string | null
-          case_id?: string | null
-          company_name?: string
-          created_at?: string
-          created_by?: string
-          duration_seconds?: number | null
-          founder_email?: string
-          founder_name?: string
-          id?: string
-          notes?: string
-          referred_by?: string
-          round_stage?: string
-          sector?: string
-          source?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "deal_inbox_items_case_id_fkey"
-            columns: ["case_id"]
-            isOneToOne: false
-            referencedRelation: "investment_cases"
+            referencedRelation: "deals"
             referencedColumns: ["id"]
           },
         ]
@@ -3432,91 +3586,67 @@ export type Database = {
         }
         Relationships: []
       }
-      investment_cases: {
+      investor_contacts: {
         Row: {
-          capture_id: string | null
-          cheque_sought: number | null
-          company_name: string
+          contact_name: string
           created_at: string
-          created_by: string
-          geography: string
+          created_by: string | null
+          email: string | null
           id: string
-          lead_partner: string
-          lead_required: boolean
-          next_step: string
-          next_step_due: string | null
-          one_liner: string
-          ownership_target: number | null
-          pre_money_valuation: number | null
-          raise_amount: number | null
-          referred_by: string
-          round_stage: string
-          sector: string
-          status: string
-          thesis: string
+          investor_id: string
+          is_primary: boolean
+          last_interaction_at: string | null
+          outreach_permission_status: string
+          relationship_owner: string
+          relationship_strength: string
+          title: string
           updated_at: string
         }
         Insert: {
-          capture_id?: string | null
-          cheque_sought?: number | null
-          company_name: string
+          contact_name?: string
           created_at?: string
-          created_by?: string
-          geography?: string
+          created_by?: string | null
+          email?: string | null
           id?: string
-          lead_partner?: string
-          lead_required?: boolean
-          next_step?: string
-          next_step_due?: string | null
-          one_liner?: string
-          ownership_target?: number | null
-          pre_money_valuation?: number | null
-          raise_amount?: number | null
-          referred_by?: string
-          round_stage?: string
-          sector?: string
-          status?: string
-          thesis?: string
+          investor_id: string
+          is_primary?: boolean
+          last_interaction_at?: string | null
+          outreach_permission_status?: string
+          relationship_owner?: string
+          relationship_strength?: string
+          title?: string
           updated_at?: string
         }
         Update: {
-          capture_id?: string | null
-          cheque_sought?: number | null
-          company_name?: string
+          contact_name?: string
           created_at?: string
-          created_by?: string
-          geography?: string
+          created_by?: string | null
+          email?: string | null
           id?: string
-          lead_partner?: string
-          lead_required?: boolean
-          next_step?: string
-          next_step_due?: string | null
-          one_liner?: string
-          ownership_target?: number | null
-          pre_money_valuation?: number | null
-          raise_amount?: number | null
-          referred_by?: string
-          round_stage?: string
-          sector?: string
-          status?: string
-          thesis?: string
+          investor_id?: string
+          is_primary?: boolean
+          last_interaction_at?: string | null
+          outreach_permission_status?: string
+          relationship_owner?: string
+          relationship_strength?: string
+          title?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "investment_cases_capture_fk"
-            columns: ["capture_id"]
+            foreignKeyName: "investor_contacts_investor_id_fkey"
+            columns: ["investor_id"]
             isOneToOne: false
-            referencedRelation: "deal_inbox_items"
+            referencedRelation: "investors"
             referencedColumns: ["id"]
           },
         ]
       }
       investor_interactions: {
         Row: {
-          case_id: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
+          deal_id: string | null
           id: string
           investor_id: string
           kind: string
@@ -3526,9 +3656,9 @@ export type Database = {
           summary: string
         }
         Insert: {
-          case_id?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
+          deal_id?: string | null
           id?: string
           investor_id: string
           kind?: string
@@ -3538,9 +3668,9 @@ export type Database = {
           summary: string
         }
         Update: {
-          case_id?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
+          deal_id?: string | null
           id?: string
           investor_id?: string
           kind?: string
@@ -3552,9 +3682,9 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "investor_interactions_case_id_fkey"
-            columns: ["case_id"]
+            columns: ["deal_id"]
             isOneToOne: false
-            referencedRelation: "investment_cases"
+            referencedRelation: "deals"
             referencedColumns: ["id"]
           },
           {
@@ -3568,113 +3698,148 @@ export type Database = {
       }
       investors: {
         Row: {
-          check_max: number | null
-          check_min: number | null
-          contact_name: string
           created_at: string
-          created_by: string
-          email: string
-          firm_name: string
-          geographies: string[]
+          created_by: string | null
+          currency: string
+          geography: string[]
           id: string
           investor_type: string
+          is_synthetic: boolean
           last_contact_at: string | null
           leads_rounds: boolean
+          maximum_check: number | null
+          minimum_check: number | null
+          name: string
           next_step: string
           next_step_due: string | null
           notes: string
           relationship: string
           sectors: string[]
           stages: string[]
+          status: string
+          thesis: string
+          updated_at: string
         }
         Insert: {
-          check_max?: number | null
-          check_min?: number | null
-          contact_name?: string
           created_at?: string
-          created_by?: string
-          email?: string
-          firm_name: string
-          geographies?: string[]
+          created_by?: string | null
+          currency?: string
+          geography?: string[]
           id?: string
           investor_type?: string
+          is_synthetic?: boolean
           last_contact_at?: string | null
           leads_rounds?: boolean
+          maximum_check?: number | null
+          minimum_check?: number | null
+          name: string
           next_step?: string
           next_step_due?: string | null
           notes?: string
           relationship?: string
           sectors?: string[]
           stages?: string[]
+          status?: string
+          thesis?: string
+          updated_at?: string
         }
         Update: {
-          check_max?: number | null
-          check_min?: number | null
-          contact_name?: string
           created_at?: string
-          created_by?: string
-          email?: string
-          firm_name?: string
-          geographies?: string[]
+          created_by?: string | null
+          currency?: string
+          geography?: string[]
           id?: string
           investor_type?: string
+          is_synthetic?: boolean
           last_contact_at?: string | null
           leads_rounds?: boolean
+          maximum_check?: number | null
+          minimum_check?: number | null
+          name?: string
           next_step?: string
           next_step_due?: string | null
           notes?: string
           relationship?: string
           sectors?: string[]
           stages?: string[]
+          status?: string
+          thesis?: string
+          updated_at?: string
         }
         Relationships: []
       }
-      outreach_messages: {
+      outreach_actions: {
         Row: {
           approved_at: string | null
-          body: string
-          case_id: string
           channel: string
+          contact_id: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
+          deal_id: string
+          draft_body: string
+          draft_subject: string
           id: string
           investor_id: string
+          next_followup_at: string | null
+          owner_user_id: string | null
           sent_at: string | null
           status: string
-          subject: string
+          updated_at: string
         }
         Insert: {
           approved_at?: string | null
-          body: string
-          case_id: string
           channel?: string
+          contact_id?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
+          deal_id: string
+          draft_body: string
+          draft_subject: string
           id?: string
           investor_id: string
+          next_followup_at?: string | null
+          owner_user_id?: string | null
           sent_at?: string | null
           status?: string
-          subject: string
+          updated_at?: string
         }
         Update: {
           approved_at?: string | null
-          body?: string
-          case_id?: string
           channel?: string
+          contact_id?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
+          deal_id?: string
+          draft_body?: string
+          draft_subject?: string
           id?: string
           investor_id?: string
+          next_followup_at?: string | null
+          owner_user_id?: string | null
           sent_at?: string | null
           status?: string
-          subject?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "outreach_messages_case_id_fkey"
-            columns: ["case_id"]
+            foreignKeyName: "outreach_actions_contact_id_fkey"
+            columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "investment_cases"
+            referencedRelation: "investor_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_actions_owner_user_fk"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_members"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "outreach_messages_case_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
             referencedColumns: ["id"]
           },
           {
@@ -3686,12 +3851,128 @@ export type Database = {
           },
         ]
       }
+      sources: {
+        Row: {
+          audio_storage_path: string | null
+          created_at: string
+          deal_id: string | null
+          duration_seconds: number | null
+          founder_email: string
+          founder_name: string
+          id: string
+          investor_id: string | null
+          raw_text: string
+          referred_by: string
+          sector_hint: string
+          source_date: string
+          source_type: string
+          stage_hint: string
+          title: string
+          triage_status: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          audio_storage_path?: string | null
+          created_at?: string
+          deal_id?: string | null
+          duration_seconds?: number | null
+          founder_email?: string
+          founder_name?: string
+          id?: string
+          investor_id?: string | null
+          raw_text?: string
+          referred_by?: string
+          sector_hint?: string
+          source_date?: string
+          source_type?: string
+          stage_hint?: string
+          title: string
+          triage_status?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          audio_storage_path?: string | null
+          created_at?: string
+          deal_id?: string | null
+          duration_seconds?: number | null
+          founder_email?: string
+          founder_name?: string
+          id?: string
+          investor_id?: string | null
+          raw_text?: string
+          referred_by?: string
+          sector_hint?: string
+          source_date?: string
+          source_type?: string
+          stage_hint?: string
+          title?: string
+          triage_status?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_inbox_items_case_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sources_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_members: {
+        Row: {
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          invited_by: string | null
+          role: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_write_project: { Args: never; Returns: boolean }
+      claim_workspace: { Args: never; Returns: string }
+      current_member_role: { Args: never; Returns: string }
+      import_investors: { Args: { p_rows: Json }; Returns: Json }
+      is_project_admin: { Args: never; Returns: boolean }
+      is_project_member: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

@@ -4,6 +4,7 @@ import { OutreachStatusPill } from "@/components/common/status-pill";
 import { Button } from "@/components/ui/button";
 import { OUTREACH_CHANNEL_LABEL, OUTREACH_STATUS_LABEL } from "@/lib/constants";
 import { formatShortDate } from "@/lib/format";
+import { primaryContact } from "@/lib/investors";
 import type { InvestmentCase, Investor, Outreach } from "@/lib/types";
 
 interface OutreachQueueProps {
@@ -38,8 +39,11 @@ export function OutreachQueue({ outreach, cases, investors, pending, onApprove, 
   return (
     <ul className="space-y-3">
       {sorted.map((item) => {
-        const caseItem = cases.find((record) => record.id === item.caseId);
+        const deal = cases.find((record) => record.id === item.dealId);
         const investor = investors.find((record) => record.id === item.investorId);
+        const contact =
+          investor?.contacts.find((person) => person.id === item.contactId) ??
+          (investor ? primaryContact(investor) : null);
         const expanded = expandedId === item.id;
 
         return (
@@ -47,12 +51,12 @@ export function OutreachQueue({ outreach, cases, investors, pending, onApprove, 
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-[14px] font-semibold tracking-tight">{investor?.firmName ?? "Investor removed"}</h3>
+                  <h3 className="text-[14px] font-semibold tracking-tight">{investor?.name ?? "Investor removed"}</h3>
                   <OutreachStatusPill status={item.status} label={OUTREACH_STATUS_LABEL[item.status]} />
                 </div>
                 <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                  {caseItem?.companyName ?? "Case removed"} · {OUTREACH_CHANNEL_LABEL[item.channel]} ·{" "}
-                  {investor?.contactName || "No contact"}
+                  {deal?.companyName ?? "Deal removed"} · {OUTREACH_CHANNEL_LABEL[item.channel]} ·{" "}
+                  {contact?.contactName || contact?.email || "No contact recorded"}
                 </p>
               </div>
               <p className="text-[10.5px] text-muted-foreground">
@@ -65,7 +69,13 @@ export function OutreachQueue({ outreach, cases, investors, pending, onApprove, 
             </div>
 
             <p className="mt-3 text-[13px] font-medium leading-snug">{item.subject}</p>
-            <p className={expanded ? "mt-1 whitespace-pre-line text-[12px] leading-relaxed text-muted-foreground" : "mt-1 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground"}>
+            <p
+              className={
+                expanded
+                  ? "mt-1 whitespace-pre-line text-[12px] leading-relaxed text-muted-foreground"
+                  : "mt-1 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground"
+              }
+            >
               {item.body}
             </p>
 
@@ -97,6 +107,12 @@ export function OutreachQueue({ outreach, cases, investors, pending, onApprove, 
                 <span className="inline-flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
                   <Mail className="h-3 w-3" aria-hidden="true" />
                   Sent outside DealFlow IQ · recorded by a partner
+                </span>
+              ) : null}
+
+              {item.nextFollowupAt ? (
+                <span className="ml-auto text-[10.5px] text-muted-foreground">
+                  Follow-up {formatShortDate(item.nextFollowupAt)}
                 </span>
               ) : null}
             </div>

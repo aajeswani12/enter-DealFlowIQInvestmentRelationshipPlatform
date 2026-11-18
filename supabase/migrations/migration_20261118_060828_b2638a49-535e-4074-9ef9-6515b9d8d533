@@ -1,0 +1,2 @@
+alter table public.investor_contacts enable row level security;
+alter table public.deal_investor_matches enable row level security;

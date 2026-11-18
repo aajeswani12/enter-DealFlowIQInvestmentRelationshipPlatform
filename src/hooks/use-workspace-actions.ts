@@ -8,10 +8,6 @@ export function useWorkspaceActions() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["workspace"] });
 
-  const updateCache = (updater: (data: WorkspaceData) => WorkspaceData) => {
-    queryClient.setQueryData<WorkspaceData>(["workspace"], (current) => (current ? updater(current) : current));
-  };
-
   return {
     createCapture: useMutation({ mutationFn: api.createCapture, onSuccess: invalidate }),
     updateCapture: useMutation({
@@ -19,34 +15,47 @@ export function useWorkspaceActions() {
         api.updateCapture(id, patch),
       onSuccess: invalidate,
     }),
-    deleteCapture: useMutation({ mutationFn: api.deleteCapture, onSuccess: invalidate }),
     createCase: useMutation({ mutationFn: api.createCase, onSuccess: invalidate }),
     updateCase: useMutation({
       mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateCase>[1] }) =>
         api.updateCase(id, patch),
       onSuccess: invalidate,
     }),
-    createEvidence: useMutation({ mutationFn: api.createEvidence, onSuccess: invalidate }),
-    deleteEvidence: useMutation({
-      mutationFn: ({ id, filePath }: { id: string; filePath: string | null }) => api.deleteEvidence(id, filePath),
+    createClaim: useMutation({ mutationFn: api.createClaim, onSuccess: invalidate }),
+    deleteClaim: useMutation({
+      mutationFn: ({ id, filePath }: { id: string; filePath: string | null }) => api.deleteClaim(id, filePath),
       onSuccess: invalidate,
     }),
-    createQuestion: useMutation({ mutationFn: api.createQuestion, onSuccess: invalidate }),
-    updateQuestion: useMutation({
-      mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateQuestion>[1] }) =>
-        api.updateQuestion(id, patch),
+    createGap: useMutation({ mutationFn: api.createGap, onSuccess: invalidate }),
+    updateGap: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateGap>[1] }) => api.updateGap(id, patch),
       onSuccess: invalidate,
     }),
     createInvestor: useMutation({ mutationFn: api.createInvestor, onSuccess: invalidate }),
     updateInvestor: useMutation({
-      mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateInvestor>[1] }) =>
-        api.updateInvestor(id, patch),
+      mutationFn: ({
+        id,
+        patch,
+        contact,
+      }: {
+        id: string;
+        patch: Parameters<typeof api.updateInvestor>[1];
+        contact?: Parameters<typeof api.updateInvestor>[2];
+      }) => api.updateInvestor(id, patch, contact),
       onSuccess: invalidate,
     }),
-    createInteraction: useMutation({
-      mutationFn: api.createInteraction,
+    createContact: useMutation({
+      mutationFn: ({ investorId, input }: { investorId: string; input: Parameters<typeof api.createContact>[1] }) =>
+        api.createContact(investorId, input),
       onSuccess: invalidate,
     }),
+    updateContact: useMutation({
+      mutationFn: ({ investorId, input }: { investorId: string; input: Parameters<typeof api.updateContact>[1] }) =>
+        api.updateContact(investorId, input),
+      onSuccess: invalidate,
+    }),
+    deleteContact: useMutation({ mutationFn: api.deleteContact, onSuccess: invalidate }),
+    createInteraction: useMutation({ mutationFn: api.createInteraction, onSuccess: invalidate }),
     createOutreach: useMutation({ mutationFn: api.createOutreach, onSuccess: invalidate }),
     updateOutreach: useMutation({
       mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateOutreach>[1] }) =>
@@ -54,20 +63,33 @@ export function useWorkspaceActions() {
       onSuccess: invalidate,
       onMutate: async ({ id, patch }) => {
         await queryClient.cancelQueries({ queryKey: ["workspace"] });
-        updateCache((data) => ({
-          ...data,
-          outreach: data.outreach.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  ...patch,
-                  approvedAt: patch.status === "approved" ? new Date().toISOString() : item.approvedAt,
-                  sentAt: patch.status === "sent" ? new Date().toISOString() : item.sentAt,
-                }
-              : item,
-          ),
-        }));
+        queryClient.setQueryData<WorkspaceData>(["workspace"], (current) =>
+          current
+            ? {
+                ...current,
+                outreach: current.outreach.map((item) =>
+                  item.id === id
+                    ? {
+                        ...item,
+                        ...patch,
+                        approvedAt: patch.status === "approved" ? new Date().toISOString() : item.approvedAt,
+                        sentAt: patch.status === "sent" ? new Date().toISOString() : item.sentAt,
+                      }
+                    : item,
+                ),
+              }
+            : current,
+        );
       },
     }),
+    saveMatch: useMutation({ mutationFn: api.saveMatch, onSuccess: invalidate }),
+    inviteMember: useMutation({ mutationFn: api.inviteMember, onSuccess: invalidate }),
+    updateMember: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateMember>[1] }) =>
+        api.updateMember(id, patch),
+      onSuccess: invalidate,
+    }),
+    removeMember: useMutation({ mutationFn: api.removeMember, onSuccess: invalidate }),
+    importInvestors: useMutation({ mutationFn: api.importInvestors, onSuccess: invalidate }),
   };
 }

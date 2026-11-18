@@ -217,8 +217,8 @@ const DealInbox = () => {
                   </Button>
                 ) : null}
 
-                {capture.caseId ? (
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/cases/${capture.caseId}`)}>
+                {capture.dealId ? (
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/cases/${capture.dealId}`)}>
                     <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
                     Open case
                   </Button>

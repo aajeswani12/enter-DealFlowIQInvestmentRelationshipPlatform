@@ -41,9 +41,9 @@ const Cases = () => {
       })
       .map((item) => ({
         ...item,
-        evidenceCount: workspace.evidence.filter((evidence) => evidence.caseId === item.id).length,
-        openQuestionCount: workspace.questions.filter(
-          (question) => question.caseId === item.id && question.status === "open",
+        claimCount: workspace.claims.filter((claim) => claim.dealId === item.id).length,
+        openGapCount: workspace.gaps.filter(
+          (gap) => gap.dealId === item.id && gap.status === "open",
         ).length,
       }));
   }, [workspace, query, status]);
@@ -53,7 +53,7 @@ const Cases = () => {
       <PageHeader
         eyebrow="Pipeline"
         title="Investment Cases"
-        description="A persistent file for every company under review: thesis, evidence, open questions and the next step."
+        description="A persistent file for every company under review: thesis, claims, decision gaps and the next step."
         actions={
           <Button className="gap-1.5" onClick={() => setFormOpen(true)}>
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -133,10 +133,10 @@ const Cases = () => {
                           {item.companyName}
                         </p>
                         <p className="mt-0.5 line-clamp-1 text-[11.5px] text-muted-foreground">
-                          {item.oneLiner || `${item.sector || "Sector not set"} · ${item.geography || "Geography not set"}`}
+                          {item.summary || `${item.sector || "Sector not set"} · ${item.geography || "Geography not set"}`}
                         </p>
                         <p className="mt-1 text-[10.5px] text-muted-foreground/80">
-                          {item.evidenceCount} evidence · {item.openQuestionCount} open questions
+                          {item.claimCount} claims · {item.openGapCount} open gaps{item.isSynthetic ? " · Synthetic sample" : ""}
                         </p>
                       </Link>
                     </td>
@@ -194,7 +194,7 @@ const Cases = () => {
                     <div className="min-w-0">
                       <p className="text-[14px] font-semibold tracking-tight">{item.companyName}</p>
                       <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-relaxed text-muted-foreground">
-                        {item.oneLiner || `${item.sector || "Sector not set"} · ${item.geography || "Geography not set"}`}
+                        {item.summary || `${item.sector || "Sector not set"} · ${item.geography || "Geography not set"}`}
                       </p>
                     </div>
                     <CaseStatusPill status={item.status} label={CASE_STATUS_LABEL[item.status]} />
@@ -219,8 +219,7 @@ const Cases = () => {
                         isOverdue(item.nextStepDue) ? "text-destructive" : "text-muted-foreground",
                       )}
                     >
-                      {item.nextStepDue ? formatShortDate(item.nextStepDue) : "No due date"} · {item.openQuestionCount} open
-                      questions
+                      {item.nextStepDue ? formatShortDate(item.nextStepDue) : "No due date"} · {item.openGapCount} open gaps
                     </p>
                   </div>
                 </Link>

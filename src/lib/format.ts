@@ -1,19 +1,27 @@
-export function formatCurrency(value: number | null | undefined, opts?: { compact?: boolean }): string {
+export function formatCurrency(
+  value: number | null | undefined,
+  opts?: { compact?: boolean; currency?: string },
+): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   const compact = opts?.compact ?? true;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: (opts?.currency ?? "USD").toUpperCase(),
     maximumFractionDigits: compact ? 1 : 0,
     notation: compact ? "compact" : "standard",
   }).format(value);
 }
 
-export function formatCurrencyRange(min: number | null, max: number | null): string {
+export function formatCurrencyRange(
+  min: number | null,
+  max: number | null,
+  currency = "USD",
+): string {
   if (min === null && max === null) return "Not recorded";
-  if (min !== null && max !== null) return `${formatCurrency(min)} – ${formatCurrency(max)}`;
-  if (min !== null) return `${formatCurrency(min)}+`;
-  return `Up to ${formatCurrency(max)}`;
+  if (min !== null && max !== null)
+    return `${formatCurrency(min, { currency })} – ${formatCurrency(max, { currency })}`;
+  if (min !== null) return `${formatCurrency(min, { currency })}+`;
+  return `Up to ${formatCurrency(max, { currency })}`;
 }
 
 export function formatDate(value: string | null | undefined): string {

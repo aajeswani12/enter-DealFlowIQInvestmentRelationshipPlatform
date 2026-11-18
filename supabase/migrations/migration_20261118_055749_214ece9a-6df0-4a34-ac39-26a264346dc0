@@ -1,0 +1,184 @@
+-- Audit trail
+create table public.audit_events (
+  id uuid primary key default gen_random_uuid(),
+  actor_user_id uuid,
+  actor_email text,
+  action text not null check (action in ('created','updated','deleted')),
+  entity_type text not null,
+  entity_id uuid,
+  summary text not null default '',
+  detail jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index audit_events_created_idx on public.audit_events (created_at desc);
+create index audit_events_entity_idx on public.audit_events (entity_type, entity_id);
+
+alter table public.audit_events enable row level security;
+
+create or replace function public.record_audit_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_email text;
+  v_action text;
+  v_entity uuid;
+  v_summary text;
+  v_detail jsonb;
+begin
+  if v_actor is not null then
+    select m.email into v_email from public.workspace_members m where m.user_id = v_actor;
+  end if;
+
+  if tg_op = 'INSERT' then
+    v_action := 'created';
+  elsif tg_op = 'UPDATE' then
+    v_action := 'updated';
+  else
+    v_action := 'deleted';
+  end if;
+
+  if tg_op = 'DELETE' then
+    v_entity := old.id;
+    v_detail := jsonb_build_object('record', to_jsonb(old));
+  elsif tg_op = 'UPDATE' then
+    v_entity := new.id;
+    v_detail := jsonb_build_object('before', to_jsonb(old), 'after', to_jsonb(new));
+  else
+    v_entity := new.id;
+    v_detail := jsonb_build_object('record', to_jsonb(new));
+  end if;
+
+  if tg_table_name = 'deals' then
+    v_summary := 'Deal ' || coalesce(case when tg_op = 'DELETE' then old.company_name else new.company_name end, '') || ' ' || v_action;
+  elsif tg_table_name = 'investors' then
+    v_summary := 'Investor ' || coalesce(case when tg_op = 'DELETE' then old.name else new.name end, '') || ' ' || v_action;
+  elsif tg_table_name = 'investor_contacts' then
+    v_summary := 'Contact ' || coalesce(case when tg_op = 'DELETE' then old.contact_name else new.contact_name end, '') || ' ' || v_action;
+  elsif tg_table_name = 'sources' then
+    v_summary := 'Source ' || coalesce(case when tg_op = 'DELETE' then old.title else new.title end, '') || ' ' || v_action;
+  elsif tg_table_name = 'deal_claims' then
+    v_summary := 'Claim ' || coalesce(case when tg_op = 'DELETE' then old.label else new.label end, '') || ' ' || v_action;
+  elsif tg_table_name = 'decision_gaps' then
+    v_summary := 'Decision gap ' || v_action;
+  elsif tg_table_name = 'outreach_actions' then
+    v_summary := 'Outreach ' || coalesce(case when tg_op = 'DELETE' then old.draft_subject else new.draft_subject end, '') || ' ' || v_action;
+  elsif tg_table_name = 'deal_investor_matches' then
+    v_summary := 'Match ' || v_action;
+  else
+    v_summary := tg_table_name || ' ' || v_action;
+  end if;
+
+  insert into public.audit_events (actor_user_id, actor_email, action, entity_type, entity_id, summary, detail)
+  values (v_actor, v_email, v_action, tg_table_name, v_entity, v_summary, v_detail);
+
+  return null;
+end;
+$$;
+
+create trigger deals_audit after insert or update or delete on public.deals for each row execute function public.record_audit_event();
+create trigger sources_audit after insert or update or delete on public.sources for each row execute function public.record_audit_event();
+create trigger deal_claims_audit after insert or update or delete on public.deal_claims for each row execute function public.record_audit_event();
+create trigger decision_gaps_audit after insert or update or delete on public.decision_gaps for each row execute function public.record_audit_event();
+create trigger investors_audit after insert or update or delete on public.investors for each row execute function public.record_audit_event();
+create trigger investor_contacts_audit after insert or update or delete on public.investor_contacts for each row execute function public.record_audit_event();
+create trigger deal_investor_matches_audit after insert or update or delete on public.deal_investor_matches for each row execute function public.record_audit_event();
+create trigger outreach_actions_audit after insert or update or delete on public.outreach_actions for each row execute function public.record_audit_event();
+create trigger workspace_members_audit after insert or update or delete on public.workspace_members for each row execute function public.record_audit_event();
+
+-- Replace per-user policies with membership-scoped policies
+drop policy if exists investment_cases_select on public.deals;
+drop policy if exists investment_cases_insert on public.deals;
+drop policy if exists investment_cases_update on public.deals;
+drop policy if exists investment_cases_delete on public.deals;
+drop policy if exists deal_inbox_items_select on public.sources;
+drop policy if exists deal_inbox_items_insert on public.sources;
+drop policy if exists deal_inbox_items_update on public.sources;
+drop policy if exists deal_inbox_items_delete on public.sources;
+drop policy if exists case_evidence_select on public.deal_claims;
+drop policy if exists case_evidence_insert on public.deal_claims;
+drop policy if exists case_evidence_update on public.deal_claims;
+drop policy if exists case_evidence_delete on public.deal_claims;
+drop policy if exists case_questions_select on public.decision_gaps;
+drop policy if exists case_questions_insert on public.decision_gaps;
+drop policy if exists case_questions_update on public.decision_gaps;
+drop policy if exists case_questions_delete on public.decision_gaps;
+drop policy if exists investors_select on public.investors;
+drop policy if exists investors_insert on public.investors;
+drop policy if exists investors_update on public.investors;
+drop policy if exists investors_delete on public.investors;
+drop policy if exists investor_interactions_select on public.investor_interactions;
+drop policy if exists investor_interactions_insert on public.investor_interactions;
+drop policy if exists investor_interactions_update on public.investor_interactions;
+drop policy if exists investor_interactions_delete on public.investor_interactions;
+drop policy if exists outreach_messages_select on public.outreach_actions;
+drop policy if exists outreach_messages_insert on public.outreach_actions;
+drop policy if exists outreach_messages_update on public.outreach_actions;
+drop policy if exists outreach_messages_delete on public.outreach_actions;
+
+create policy deals_member_select on public.deals for select to authenticated using (public.is_project_member());
+create policy deals_member_insert on public.deals for insert to authenticated with check (public.can_write_project());
+create policy deals_member_update on public.deals for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy deals_admin_delete on public.deals for delete to authenticated using (public.is_project_admin());
+
+create policy sources_member_select on public.sources for select to authenticated using (public.is_project_member());
+create policy sources_member_insert on public.sources for insert to authenticated with check (public.can_write_project());
+create policy sources_member_update on public.sources for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy sources_admin_delete on public.sources for delete to authenticated using (public.is_project_admin());
+
+create policy deal_claims_member_select on public.deal_claims for select to authenticated using (public.is_project_member());
+create policy deal_claims_member_insert on public.deal_claims for insert to authenticated with check (public.can_write_project());
+create policy deal_claims_member_update on public.deal_claims for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy deal_claims_admin_delete on public.deal_claims for delete to authenticated using (public.is_project_admin());
+
+create policy decision_gaps_member_select on public.decision_gaps for select to authenticated using (public.is_project_member());
+create policy decision_gaps_member_insert on public.decision_gaps for insert to authenticated with check (public.can_write_project());
+create policy decision_gaps_member_update on public.decision_gaps for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy decision_gaps_admin_delete on public.decision_gaps for delete to authenticated using (public.is_project_admin());
+
+create policy investors_member_select on public.investors for select to authenticated using (public.is_project_member());
+create policy investors_member_insert on public.investors for insert to authenticated with check (public.can_write_project());
+create policy investors_member_update on public.investors for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy investors_admin_delete on public.investors for delete to authenticated using (public.is_project_admin());
+
+create policy investor_contacts_member_select on public.investor_contacts for select to authenticated using (public.is_project_member());
+create policy investor_contacts_member_insert on public.investor_contacts for insert to authenticated with check (public.can_write_project());
+create policy investor_contacts_member_update on public.investor_contacts for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy investor_contacts_admin_delete on public.investor_contacts for delete to authenticated using (public.is_project_admin());
+
+create policy investor_interactions_member_select on public.investor_interactions for select to authenticated using (public.is_project_member());
+create policy investor_interactions_member_insert on public.investor_interactions for insert to authenticated with check (public.can_write_project());
+create policy investor_interactions_member_update on public.investor_interactions for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy investor_interactions_admin_delete on public.investor_interactions for delete to authenticated using (public.is_project_admin());
+
+create policy deal_investor_matches_member_select on public.deal_investor_matches for select to authenticated using (public.is_project_member());
+create policy deal_investor_matches_member_insert on public.deal_investor_matches for insert to authenticated with check (public.can_write_project());
+create policy deal_investor_matches_member_update on public.deal_investor_matches for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy deal_investor_matches_admin_delete on public.deal_investor_matches for delete to authenticated using (public.is_project_admin());
+
+create policy outreach_actions_member_select on public.outreach_actions for select to authenticated using (public.is_project_member());
+create policy outreach_actions_member_insert on public.outreach_actions for insert to authenticated with check (public.can_write_project());
+create policy outreach_actions_member_update on public.outreach_actions for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy outreach_actions_admin_delete on public.outreach_actions for delete to authenticated using (public.is_project_admin());
+
+create policy audit_events_member_select on public.audit_events for select to authenticated using (public.is_project_member());
+
+-- Storage access follows the same membership rules
+drop policy if exists dfi_voice_notes_select on storage.objects;
+drop policy if exists dfi_voice_notes_insert on storage.objects;
+drop policy if exists dfi_voice_notes_delete on storage.objects;
+drop policy if exists dfi_case_evidence_select on storage.objects;
+drop policy if exists dfi_case_evidence_insert on storage.objects;
+drop policy if exists dfi_case_evidence_delete on storage.objects;
+
+create policy dfi_voice_notes_select on storage.objects for select to authenticated using (bucket_id = 'voice-notes' and public.is_project_member());
+create policy dfi_voice_notes_insert on storage.objects for insert to authenticated with check (bucket_id = 'voice-notes' and public.can_write_project());
+create policy dfi_voice_notes_delete on storage.objects for delete to authenticated using (bucket_id = 'voice-notes' and public.is_project_admin());
+
+create policy dfi_case_evidence_select on storage.objects for select to authenticated using (bucket_id = 'case-evidence' and public.is_project_member());
+create policy dfi_case_evidence_insert on storage.objects for insert to authenticated with check (bucket_id = 'case-evidence' and public.can_write_project());
+create policy dfi_case_evidence_delete on storage.objects for delete to authenticated using (bucket_id = 'case-evidence' and public.is_project_admin());
