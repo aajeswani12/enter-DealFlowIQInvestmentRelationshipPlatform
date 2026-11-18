@@ -3,13 +3,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LoadingPanel } from "@/components/common/loading-panel";
 import { OutreachStatusPill, Pill } from "@/components/common/status-pill";
+import { MATCH_STATUS_META } from "@/lib/match-status";
 import { ContactForm } from "@/components/forms/contact-form";
 import { InvestorForm } from "@/components/forms/investor-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/hooks/use-workspace";
 import {
-  ACTIVE_CASE_STATUSES,
   INTERACTION_KIND_LABEL,
   INVESTOR_STATUS_LABEL,
   INVESTOR_TYPE_LABEL,
@@ -19,7 +19,6 @@ import {
 } from "@/lib/constants";
 import { dueLabel, formatCurrencyRange, formatShortDate, isOverdue, relativeDays } from "@/lib/format";
 import { primaryContact } from "@/lib/investors";
-import { MATCH_TIER_LABEL, scoreMatch } from "@/lib/matching";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import type { InvestorContact } from "@/lib/types";
 import { InteractionForm } from "./interaction-form";
@@ -82,10 +81,9 @@ const InvestorDetail = () => {
     .filter((item) => item.investorId === investor.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const matches = workspace.cases
-    .filter((item) => ACTIVE_CASE_STATUSES.includes(item.status))
-    .map((item) => scoreMatch(item, investor))
-    .sort((a, b) => b.score - a.score)
+  const investorMatches = workspace.matches
+    .filter((match) => match.investorId === investor.id)
+    .sort((a, b) => b.fitScore - a.fitScore)
     .slice(0, 4);
 
   return (
@@ -106,7 +104,7 @@ const InvestorDetail = () => {
               Log interaction
             </Button>
             <Button asChild className="gap-1.5">
-              <Link to={matches[0] ? `/matches?case=${matches[0].dealId}&investor=${investor.id}` : "/matches"}>
+              <Link to={investorMatches[0] ? `/matches?case=${investorMatches[0].dealId}&investor=${investor.id}` : "/matches"}>
                 <Send className="h-4 w-4" aria-hidden="true" />
                 Matches
               </Link>
@@ -357,12 +355,14 @@ const InvestorDetail = () => {
             <h2 id="matched-heading" className="text-[15px] font-semibold tracking-tight">
               Matched deals
             </h2>
-            {matches.length === 0 ? (
-              <p className="mt-2 text-[12px] text-muted-foreground">No active deals to test this investor against yet.</p>
+            {investorMatches.length === 0 ? (
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                No saved matches yet. Run matching against a deal to rank this investor.
+              </p>
             ) : (
               <ul className="mt-3 space-y-2">
-                {matches.map((match) => (
-                  <li key={match.dealId}>
+                {investorMatches.map((match) => (
+                  <li key={match.id}>
                     <Link
                       to={`/matches?case=${match.dealId}`}
                       className="block rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:border-brand/40"
@@ -371,12 +371,17 @@ const InvestorDetail = () => {
                         <p className="text-[12.5px] font-medium">
                           {workspace.cases.find((item) => item.id === match.dealId)?.companyName ?? "Deal"}
                         </p>
-                        <span className="text-[12px] font-semibold tabular-nums text-brand-strong">{match.score}</span>
+                        <span className="text-[12px] font-semibold tabular-nums text-brand-strong">
+                          {Math.round(match.fitScore)}
+                        </span>
                       </div>
                       <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-secondary">
-                        <div className="h-full rounded-full bg-brand" style={{ width: `${match.score}%` }} />
+                        <div className="h-full rounded-full bg-brand" style={{ width: `${match.fitScore}%` }} />
                       </div>
-                      <p className="mt-1 text-[10.5px] text-muted-foreground">{MATCH_TIER_LABEL[match.tier]}</p>
+                      <p className="mt-1 text-[10.5px] text-muted-foreground">
+                        {MATCH_STATUS_META[match.matchStatus].label}
+                        {match.needsResearch ? " · Needs Research" : ""}
+                      </p>
                     </Link>
                   </li>
                 ))}
@@ -408,7 +413,7 @@ const InvestorDetail = () => {
               </ul>
             )}
             <Link
-              to={matches[0] ? `/matches?case=${matches[0].dealId}` : "/matches"}
+              to={investorMatches[0] ? `/matches?case=${investorMatches[0].dealId}` : "/matches"}
               className="mt-3 inline-flex items-center gap-1 text-[11.5px] font-medium text-brand-strong hover:underline"
             >
               Open matching

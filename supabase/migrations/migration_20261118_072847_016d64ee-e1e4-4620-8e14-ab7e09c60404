@@ -1,0 +1,61 @@
+create or replace function public.decide_deal_match(p_match_id uuid, p_status text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_match public.deal_investor_matches%rowtype;
+  v_is_owner boolean := false;
+  v_has_owner boolean := false;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+  if not public.can_write_project() then
+    raise exception 'You do not have write access to this workspace' using errcode = '42501';
+  end if;
+  if p_status not in ('accepted','dismissed','deferred','suggested') then
+    raise exception 'Invalid match decision' using errcode = '22023';
+  end if;
+
+  select * into v_match from public.deal_investor_matches where id = p_match_id;
+  if not found then
+    raise exception 'Match not found' using errcode = 'P0002';
+  end if;
+
+  select exists(
+    select 1 from public.investor_contacts c
+    where c.investor_id = v_match.investor_id
+      and c.relationship_owner_user_id = v_uid
+  ) into v_is_owner;
+  select exists(
+    select 1 from public.investor_contacts c
+    where c.investor_id = v_match.investor_id
+      and c.relationship_owner_user_id is not null
+  ) into v_has_owner;
+
+  if not (
+    public.is_project_admin()
+    or v_is_owner
+    or (not v_has_owner and v_match.created_by = v_uid)
+  ) then
+    raise exception 'Only the relationship owner or a workspace admin can decide this match' using errcode = '42501';
+  end if;
+
+  perform set_config('dealflow.match_decision', '1', true);
+  update public.deal_investor_matches
+  set match_status = p_status,
+      decided_by = v_uid,
+      decided_at = now(),
+      updated_at = now()
+  where id = p_match_id;
+  perform set_config('dealflow.match_decision', '', true);
+
+  return jsonb_build_object('id', p_match_id, 'status', p_status, 'decided_by', v_uid);
+end;
+$$;
+
+revoke all on function public.decide_deal_match(uuid, text) from public, anon;
+grant execute on function public.decide_deal_match(uuid, text) to authenticated;

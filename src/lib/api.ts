@@ -29,6 +29,8 @@ import type {
   InvestorType,
   MatchRule,
   MatchStatus,
+  MatchWeightConfig,
+  MatchWeights,
   Outreach,
   OutreachChannel,
   OutreachPermission,
@@ -273,8 +275,27 @@ function mapMatch(row: MatchRow): DealInvestorMatch {
     scoreBreakdown: (row.score_breakdown as unknown as MatchRule[]) ?? [],
     fitExplanation: row.fit_explanation,
     missingInformation: (row.missing_information as unknown as string[]) ?? [],
+    restrictions: (row.restrictions as unknown as string[]) ?? [],
+    introductionStrategy: row.introduction_strategy,
+    needsResearch: row.needs_research,
+    weights: (row.weights as unknown as Partial<MatchWeights>) ?? {},
     matchStatus: row.match_status as MatchStatus,
+    decidedBy: row.decided_by,
+    decidedAt: row.decided_at,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapWeightConfig(row: Tables["match_weight_configs"]["Row"]): MatchWeightConfig {
+  return {
+    id: row.id,
+    sectorThesis: row.sector_thesis,
+    stage: row.stage,
+    checkSize: row.check_size,
+    geography: row.geography,
+    relationship: row.relationship,
+    recentInterest: row.recent_interest,
     updatedAt: row.updated_at,
   };
 }
@@ -546,7 +567,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -561,6 +582,7 @@ export const api = {
         supabase.from("audit_events").select("*").order("created_at", { ascending: false }).limit(40),
         supabase.from("deal_analysis_runs").select("*").order("created_at", { ascending: false }).limit(200),
         supabase.from("deal_briefs").select("*").order("created_at", { ascending: false }).limit(200),
+        supabase.from("match_weight_configs").select("*").order("updated_at", { ascending: false }).limit(1),
       ]);
 
     if (deals.error) fail("Could not load deals", deals.error);
@@ -576,6 +598,7 @@ export const api = {
     if (audit.error) fail("Could not load the audit trail", audit.error);
     if (runs.error) fail("Could not load analysis runs", runs.error);
     if (briefs.error) fail("Could not load deal briefs", briefs.error);
+    if (weightConfigs.error) fail("Could not load matching settings", weightConfigs.error);
 
     const sourceRows = sources.data ?? [];
     const audioPaths = sourceRows
@@ -607,6 +630,7 @@ export const api = {
       audit: (audit.data ?? []).map(mapAudit),
       analysisRuns: (runs.data ?? []).map(mapRun),
       briefs: (briefs.data ?? []).map(mapBrief),
+      matchWeights: weightConfigs.data && weightConfigs.data[0] ? mapWeightConfig(weightConfigs.data[0]) : null,
     };
   },
 
@@ -709,6 +733,58 @@ export const api = {
     });
     if (error && error.code !== "23505") fail("Could not create the deal", error);
     return { dealId: input.clientCaptureId, created: !error };
+  },
+
+  async runInvestorMatching(dealId: string): Promise<{
+    configured: boolean;
+    weights?: MatchWeights;
+    matchesSaved?: number;
+    excluded?: { investorId: string; investorName: string; reasons: string[] }[];
+    missingDealInputs?: string[];
+    warnings?: string[];
+    needsResearch?: number;
+    error?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke("matchInvestorsToDeal", {
+      body: { deal_id: dealId },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { configured: false, error: "The matching service returned no response." }) as {
+      configured: boolean;
+      weights?: MatchWeights;
+      matchesSaved?: number;
+      excluded?: { investorId: string; investorName: string; reasons: string[] }[];
+      missingDealInputs?: string[];
+      warnings?: string[];
+      needsResearch?: number;
+      error?: string;
+    };
+  },
+
+  async updateMatchWeights(id: string, weights: MatchWeights): Promise<void> {
+    const userId = await currentUserId();
+    const { error } = await supabase
+      .from("match_weight_configs")
+      .update({
+        sector_thesis: weights.sectorThesis,
+        stage: weights.stage,
+        check_size: weights.checkSize,
+        geography: weights.geography,
+        relationship: weights.relationship,
+        recent_interest: weights.recentInterest,
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) fail("Could not save matching settings", error);
+  },
+
+  async decideMatch(matchId: string, status: "accepted" | "dismissed" | "deferred" | "suggested"): Promise<void> {
+    const { error } = await supabase.rpc("decide_deal_match", {
+      p_match_id: matchId,
+      p_status: status,
+    });
+    if (error) fail("Could not record this match decision", error);
   },
 
   async analyzeDealSource(sourceId: string, dealId: string): Promise<{

@@ -4,6 +4,7 @@ import type {
   DealAnalysisRun,
   DealBrief,
   DealClaim,
+  MatchWeightConfig,
   DealInvestorMatch,
   DecisionGap,
   Interaction,
@@ -25,6 +26,7 @@ export interface WorkspaceData {
   matches: DealInvestorMatch[];
   analysisRuns: DealAnalysisRun[];
   briefs: DealBrief[];
+  matchWeights: MatchWeightConfig | null;
   members: WorkspaceMember[];
   audit: AuditEvent[];
 }
@@ -40,6 +42,7 @@ export const EMPTY_WORKSPACE: WorkspaceData = {
   matches: [],
   analysisRuns: [],
   briefs: [],
+  matchWeights: null,
   members: [],
   audit: [],
 };

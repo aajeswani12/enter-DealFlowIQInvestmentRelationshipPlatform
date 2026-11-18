@@ -1,0 +1,162 @@
+-- Investor status vocabulary (legacy values kept for data preservation)
+alter table public.investors drop constraint investors_status_check;
+alter table public.investors add constraint investors_status_check check (
+  status in ('active','inactive','restricted','unknown','prospect','watchlist','archived')
+);
+
+-- Clearly labeled synthetic profiles: different preferences and eligibility states.
+update public.investors set status = 'active', relationship = 'active', last_contact_at = '2026-10-20T15:00:00Z'
+  where id = '22222222-2222-4222-8222-222222222201' and is_synthetic;
+update public.investors set status = 'active', relationship = 'warm', last_contact_at = '2026-07-20T15:00:00Z'
+  where id = '22222222-2222-4222-8222-222222222202' and is_synthetic;
+update public.investors set status = 'inactive', relationship = 'dormant', last_contact_at = '2025-09-01T15:00:00Z'
+  where id = '22222222-2222-4222-8222-222222222203' and is_synthetic;
+update public.investors set status = 'restricted', relationship = 'warm', last_contact_at = '2026-09-20T15:00:00Z'
+  where id = '22222222-2222-4222-8222-222222222204' and is_synthetic;
+update public.investors set status = 'unknown', relationship = 'new', last_contact_at = null
+  where id = '22222222-2222-4222-8222-222222222205' and is_synthetic;
+
+-- Relationship ownership for match decisions.
+alter table public.investor_contacts add column relationship_owner_user_id uuid;
+
+-- Workspace-wide, user-editable scoring weights.
+create table public.match_weight_configs (
+  id uuid primary key default gen_random_uuid(),
+  sector_thesis integer not null default 30 check (sector_thesis between 0 and 100),
+  stage integer not null default 25 check (stage between 0 and 100),
+  check_size integer not null default 20 check (check_size between 0 and 100),
+  geography integer not null default 10 check (geography between 0 and 100),
+  relationship integer not null default 10 check (relationship between 0 and 100),
+  recent_interest integer not null default 5 check (recent_interest between 0 and 100),
+  updated_by uuid,
+  updated_at timestamptz not null default now(),
+  check (sector_thesis + stage + check_size + geography + relationship + recent_interest = 100)
+);
+
+alter table public.match_weight_configs enable row level security;
+create policy match_weight_configs_select on public.match_weight_configs
+for select to authenticated using (public.is_project_member());
+create policy match_weight_configs_insert on public.match_weight_configs
+for insert to authenticated with check (public.can_write_project());
+create policy match_weight_configs_update on public.match_weight_configs
+for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy match_weight_configs_delete on public.match_weight_configs
+for delete to authenticated using (public.is_project_admin());
+
+create trigger match_weight_configs_touch before update on public.match_weight_configs
+for each row execute function public.touch_updated_at();
+
+insert into public.match_weight_configs (id, sector_thesis, stage, check_size, geography, relationship, recent_interest)
+values ('66666666-6666-4666-8666-666666666661', 30, 25, 20, 10, 10, 5)
+on conflict (id) do nothing;
+
+-- Match result detail and owner decisions.
+alter table public.deal_investor_matches
+  add column restrictions jsonb not null default '[]'::jsonb,
+  add column introduction_strategy text not null default '',
+  add column needs_research boolean not null default false,
+  add column weights jsonb not null default '{}'::jsonb,
+  add column decided_by uuid,
+  add column decided_at timestamptz;
+
+alter table public.deal_investor_matches drop constraint deal_investor_matches_match_status_check;
+alter table public.deal_investor_matches add constraint deal_investor_matches_match_status_check
+  check (match_status in ('suggested','shortlisted','outreach_drafted','approved','contacted','declined','accepted','dismissed','deferred'));
+
+create or replace function public.guard_match_decision()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.match_status is distinct from old.match_status
+     and coalesce(current_setting('dealflow.match_decision', true), '') <> '1' then
+    raise exception 'Match decisions must be recorded through decide_deal_match' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger deal_investor_matches_decision_guard
+before update on public.deal_investor_matches
+for each row execute function public.guard_match_decision();
+
+create or replace function public.decide_deal_match(p_match_id uuid, p_status text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_match public.deal_investor_matches%rowtype;
+  v_is_owner boolean := false;
+  v_has_owner boolean := false;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+  if not public.can_write_project() then
+    raise exception 'You do not have write access to this workspace' using errcode = '42501';
+  end if;
+  if p_status not in ('accepted','dismissed','deferred','suggested') then
+    raise exception 'Invalid match decision' using errcode = '22023';
+  end if;
+
+  select * into v_match from public.deal_investor_matches where id = p_match_id;
+  if not found then
+    raise exception 'Match not found' using errcode = 'P0002';
+  end if;
+
+  select exists(
+    select 1 from public.investor_contacts c
+    where c.investor_id = v_match.investor_id
+      and c.relationship_owner_user_id = v_uid
+  ) into v_is_owner;
+  select exists(
+    select 1 from public.investor_contacts c
+    where c.investor_id = v_match.investor_id
+      and c.relationship_owner_user_id is not null
+  ) into v_has_owner;
+
+  if not (
+    public.is_project_admin()
+    or v_is_owner
+    or (not v_has_owner and v_match.created_by = v_uid)
+  ) then
+    raise exception 'Only the relationship owner or a workspace admin can decide this match' using errcode = '42501';
+  end if;
+
+  perform set_config('dealflow.match_decision', '1', true);
+  update public.deal_investor_matches
+  set match_status = p_status,
+      decided_by = v_uid,
+      decided_at = now(),
+      updated_at = now()
+  where id = p_match_id;
+
+  return jsonb_build_object('id', p_match_id, 'status', p_status, 'decided_by', v_uid);
+end;
+$$;
+
+revoke all on function public.decide_deal_match(uuid, text) from public, anon;
+grant execute on function public.decide_deal_match(uuid, text) to authenticated;
+revoke all on function public.guard_match_decision() from public, anon, authenticated;
+
+-- Synthetic relationship history: no names, emails or invented contacts.
+insert into public.investor_interactions (id, investor_id, deal_id, kind, summary, occurred_at, next_step, next_step_due, created_by)
+values
+  ('77777777-7777-4777-8777-777777777701', '22222222-2222-4222-8222-222222222201', null, 'call',
+   'Synthetic sample interaction: the partner expressed interest in seed-stage B2B software and asked for a follow-up next quarter.',
+   '2026-10-20T15:00:00Z', 'Follow up on seed-stage B2B pipeline', '2027-01-15T15:00:00Z', null),
+  ('77777777-7777-4777-8777-777777777702', '22222222-2222-4222-8222-222222222202', null, 'meeting',
+   'Synthetic sample interaction: discussed healthcare and climate mandates; interested in Series A companies with clinical evidence.',
+   '2026-07-20T15:00:00Z', 'Send Series A healthcare materials', '2026-12-15T15:00:00Z', null),
+  ('77777777-7777-4777-8777-777777777703', '22222222-2222-4222-8222-222222222203', null, 'note',
+   'Synthetic sample interaction: no recent interest; revisit next year.',
+   '2025-09-01T15:00:00Z', '', null, null),
+  ('77777777-7777-4777-8777-777777777704', '22222222-2222-4222-8222-222222222204', null, 'call',
+   'Synthetic sample interaction: strategic interest in logistics and climate.',
+   '2026-09-20T15:00:00Z', 'Confirm strategic mandate scope', '2026-12-01T15:00:00Z', null)
+on conflict (id) do nothing;

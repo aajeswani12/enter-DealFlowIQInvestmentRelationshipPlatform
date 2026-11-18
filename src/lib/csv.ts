@@ -59,7 +59,7 @@ const HEADER_ALIASES: Record<string, string> = {
 };
 
 const INVESTOR_TYPES = ["vc", "angel", "family_office", "corporate"];
-const INVESTOR_STATUSES = ["active", "prospect", "watchlist", "archived"];
+const INVESTOR_STATUSES = ["active", "inactive", "restricted", "unknown", "prospect", "watchlist", "archived"];
 const STRENGTHS = ["unknown", "weak", "warm", "strong"];
 const PERMISSIONS = ["unknown", "permitted", "requires_intro", "do_not_contact"];
 
@@ -181,7 +181,7 @@ export function buildInvestorImport(text: string): {
 
     const status = (record.status || "active").toLowerCase();
     if (!INVESTOR_STATUSES.includes(status)) {
-      errors.push({ row: rowNumber, message: `Unknown status "${record.status}". Use active, prospect, watchlist or archived.` });
+      errors.push({ row: rowNumber, message: `Unknown status "${record.status}". Use active, inactive, restricted or unknown.` });
       return;
     }
 

@@ -1,0 +1,101 @@
+CREATE OR REPLACE FUNCTION public.import_investors(p_rows jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_row jsonb;
+  v_id uuid;
+  v_name text;
+  v_type text;
+  v_status text;
+  v_email text;
+  v_strength text;
+  v_permission text;
+  v_inserted int := 0;
+  v_skipped int := 0;
+  v_contacts int := 0;
+begin
+  if not public.can_write_project() then
+    raise exception 'Not authorized to import investor records' using errcode = '42501';
+  end if;
+  if jsonb_typeof(p_rows) <> 'array' then
+    raise exception 'Import payload must be an array of investor rows';
+  end if;
+
+  for v_row in select value from jsonb_array_elements(p_rows) loop
+    v_name := btrim(coalesce(v_row->>'name', ''));
+    if v_name = '' then
+      v_skipped := v_skipped + 1;
+      continue;
+    end if;
+    if exists (select 1 from public.investors i where lower(i.name) = lower(v_name)) then
+      v_skipped := v_skipped + 1;
+      continue;
+    end if;
+
+    v_type := coalesce(nullif(btrim(v_row->>'investor_type'), ''), 'vc');
+    if v_type not in ('vc', 'angel', 'family_office', 'corporate') then
+      raise exception 'Invalid investor_type for %', v_name;
+    end if;
+
+    v_status := coalesce(nullif(btrim(v_row->>'status'), ''), 'active');
+    if v_status not in ('active', 'inactive', 'restricted', 'unknown', 'prospect', 'watchlist', 'archived') then
+      raise exception 'Invalid status for %', v_name;
+    end if;
+
+    v_email := nullif(btrim(coalesce(v_row->>'email', '')), '');
+    v_strength := coalesce(nullif(btrim(v_row->>'relationship_strength'), ''), 'unknown');
+    if v_strength not in ('unknown', 'weak', 'warm', 'strong') then
+      raise exception 'Invalid relationship_strength for %', v_name;
+    end if;
+
+    v_permission := coalesce(nullif(btrim(v_row->>'outreach_permission_status'), ''), 'unknown');
+    if v_permission not in ('unknown', 'permitted', 'requires_intro', 'do_not_contact') then
+      raise exception 'Invalid outreach_permission_status for %', v_name;
+    end if;
+
+    insert into public.investors (
+      name, investor_type, thesis, sectors, stages, geography,
+      minimum_check, maximum_check, currency, status, notes, created_by
+    ) values (
+      v_name,
+      v_type,
+      coalesce(v_row->>'thesis', ''),
+      array(select jsonb_array_elements_text(coalesce(v_row->'sectors', '[]'::jsonb))),
+      array(select jsonb_array_elements_text(coalesce(v_row->'stages', '[]'::jsonb))),
+      array(select jsonb_array_elements_text(coalesce(v_row->'geography', '[]'::jsonb))),
+      nullif(btrim(coalesce(v_row->>'minimum_check', '')), '')::numeric,
+      nullif(btrim(coalesce(v_row->>'maximum_check', '')), '')::numeric,
+      coalesce(nullif(btrim(v_row->>'currency'), ''), 'USD'),
+      v_status,
+      coalesce(v_row->>'notes', ''),
+      auth.uid()
+    ) returning id into v_id;
+
+    v_inserted := v_inserted + 1;
+
+    if btrim(coalesce(v_row->>'contact_name', '')) <> '' or v_email is not null then
+      insert into public.investor_contacts (
+        investor_id, contact_name, title, email, relationship_owner,
+        relationship_strength, outreach_permission_status, is_primary, created_by,
+        relationship_owner_user_id
+      ) values (
+        v_id,
+        btrim(coalesce(v_row->>'contact_name', '')),
+        btrim(coalesce(v_row->>'title', '')),
+        v_email,
+        btrim(coalesce(v_row->>'relationship_owner', '')),
+        v_strength,
+        v_permission,
+        true,
+        auth.uid(),
+        auth.uid()
+      );
+      v_contacts := v_contacts + 1;
+    end if;
+  end loop;
+
+  return jsonb_build_object('inserted', v_inserted, 'skipped', v_skipped, 'contacts', v_contacts);
+end;
+$function$;

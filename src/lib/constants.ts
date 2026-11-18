@@ -67,9 +67,9 @@ export const INVESTOR_TYPE_OPTIONS: { value: InvestorType; label: string }[] = [
 
 export const INVESTOR_STATUS_OPTIONS: { value: InvestorStatus; label: string }[] = [
   { value: "active", label: "Active" },
-  { value: "prospect", label: "Prospect" },
-  { value: "watchlist", label: "Watchlist" },
-  { value: "archived", label: "Archived" },
+  { value: "inactive", label: "Inactive" },
+  { value: "restricted", label: "Restricted" },
+  { value: "unknown", label: "Unknown" },
 ];
 
 export const RELATIONSHIP_OPTIONS: { value: RelationshipStatus; label: string }[] = [
@@ -178,9 +178,12 @@ export const INVESTOR_TYPE_LABEL: Record<InvestorType, string> = {
 
 export const INVESTOR_STATUS_LABEL: Record<InvestorStatus, string> = {
   active: "Active",
-  prospect: "Prospect",
-  watchlist: "Watchlist",
-  archived: "Archived",
+  inactive: "Inactive",
+  restricted: "Restricted",
+  unknown: "Unknown",
+  prospect: "Unknown (legacy)",
+  watchlist: "Inactive (legacy)",
+  archived: "Inactive (legacy)",
 };
 
 export const RELATIONSHIP_LABEL: Record<RelationshipStatus, string> = {

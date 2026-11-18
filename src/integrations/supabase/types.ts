@@ -3551,40 +3551,58 @@ export type Database = {
           created_at: string
           created_by: string | null
           deal_id: string
+          decided_at: string | null
+          decided_by: string | null
           fit_explanation: string
           fit_score: number
           id: string
+          introduction_strategy: string
           investor_id: string
           match_status: string
           missing_information: Json
+          needs_research: boolean
+          restrictions: Json
           score_breakdown: Json
           updated_at: string
+          weights: Json
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           deal_id: string
+          decided_at?: string | null
+          decided_by?: string | null
           fit_explanation?: string
           fit_score?: number
           id?: string
+          introduction_strategy?: string
           investor_id: string
           match_status?: string
           missing_information?: Json
+          needs_research?: boolean
+          restrictions?: Json
           score_breakdown?: Json
           updated_at?: string
+          weights?: Json
         }
         Update: {
           created_at?: string
           created_by?: string | null
           deal_id?: string
+          decided_at?: string | null
+          decided_by?: string | null
           fit_explanation?: string
           fit_score?: number
           id?: string
+          introduction_strategy?: string
           investor_id?: string
           match_status?: string
           missing_information?: Json
+          needs_research?: boolean
+          restrictions?: Json
           score_breakdown?: Json
           updated_at?: string
+          weights?: Json
         }
         Relationships: [
           {
@@ -3807,6 +3825,7 @@ export type Database = {
           last_interaction_at: string | null
           outreach_permission_status: string
           relationship_owner: string
+          relationship_owner_user_id: string | null
           relationship_strength: string
           title: string
           updated_at: string
@@ -3822,6 +3841,7 @@ export type Database = {
           last_interaction_at?: string | null
           outreach_permission_status?: string
           relationship_owner?: string
+          relationship_owner_user_id?: string | null
           relationship_strength?: string
           title?: string
           updated_at?: string
@@ -3837,6 +3857,7 @@ export type Database = {
           last_interaction_at?: string | null
           outreach_permission_status?: string
           relationship_owner?: string
+          relationship_owner_user_id?: string | null
           relationship_strength?: string
           title?: string
           updated_at?: string
@@ -3974,6 +3995,42 @@ export type Database = {
           status?: string
           thesis?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      match_weight_configs: {
+        Row: {
+          check_size: number
+          geography: number
+          id: string
+          recent_interest: number
+          relationship: number
+          sector_thesis: number
+          stage: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          check_size?: number
+          geography?: number
+          id?: string
+          recent_interest?: number
+          relationship?: number
+          sector_thesis?: number
+          stage?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          check_size?: number
+          geography?: number
+          id?: string
+          recent_interest?: number
+          relationship?: number
+          sector_thesis?: number
+          stage?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -4215,6 +4272,10 @@ export type Database = {
       can_write_project: { Args: never; Returns: boolean }
       claim_workspace: { Args: never; Returns: string }
       current_member_role: { Args: never; Returns: string }
+      decide_deal_match: {
+        Args: { p_match_id: string; p_status: string }
+        Returns: Json
+      }
       import_investors: { Args: { p_rows: Json }; Returns: Json }
       is_project_admin: { Args: never; Returns: boolean }
       is_project_member: { Args: never; Returns: boolean }

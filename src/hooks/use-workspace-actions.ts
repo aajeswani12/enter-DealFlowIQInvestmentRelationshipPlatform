@@ -83,6 +83,26 @@ export function useWorkspaceActions() {
       },
     }),
     saveMatch: useMutation({ mutationFn: api.saveMatch, onSuccess: invalidate }),
+    runInvestorMatching: useMutation({
+      mutationFn: (dealId: string) => api.runInvestorMatching(dealId),
+      onSuccess: invalidate,
+      onError: invalidate,
+    }),
+    updateMatchWeights: useMutation({
+      mutationFn: ({ id, weights }: { id: string; weights: Parameters<typeof api.updateMatchWeights>[1] }) =>
+        api.updateMatchWeights(id, weights),
+      onSuccess: invalidate,
+    }),
+    decideMatch: useMutation({
+      mutationFn: ({
+        matchId,
+        status,
+      }: {
+        matchId: string;
+        status: "accepted" | "dismissed" | "deferred" | "suggested";
+      }) => api.decideMatch(matchId, status),
+      onSuccess: invalidate,
+    }),
     analyzeDealSource: useMutation({
       mutationFn: ({ sourceId, dealId }: { sourceId: string; dealId: string }) =>
         api.analyzeDealSource(sourceId, dealId),

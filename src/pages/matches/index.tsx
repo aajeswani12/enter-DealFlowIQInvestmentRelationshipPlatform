@@ -1,48 +1,157 @@
-import { ArrowRight, Info, ShieldCheck, Users, Waypoints } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, Info, Loader2, Settings2, ShieldCheck, Sparkles, Users, Waypoints } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/common/empty-state";
 import { LoadingPanel } from "@/components/common/loading-panel";
+import { Pill } from "@/components/common/status-pill";
+import { Field } from "@/components/forms/form-field";
 import { SelectField } from "@/components/forms/select-field";
 import { PageHeader } from "@/components/layout/page-header";
-import { MatchCard } from "@/components/matches/match-card";
 import { OutreachComposer } from "@/components/outreach/outreach-composer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
-import { ACTIVE_CASE_STATUSES } from "@/lib/constants";
+import { ACTIVE_CASE_STATUSES, INVESTOR_STATUS_LABEL } from "@/lib/constants";
 import { formatCurrency } from "@/lib/format";
-import { rankMatches, scoreMatch } from "@/lib/matching";
+import { primaryContact } from "@/lib/investors";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
-import type { Investor, MatchStatus, Outreach } from "@/lib/types";
+import type { DealInvestorMatch, Investor, MatchWeights } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { MATCH_STATUS_META } from "@/lib/match-status";
+import { MatchResultCard } from "./match-result-card";
 import { OutreachQueue } from "./outreach-queue";
+
+const DEFAULT_WEIGHTS: MatchWeights = {
+  sectorThesis: 30,
+  stage: 25,
+  checkSize: 20,
+  geography: 10,
+  relationship: 10,
+  recentInterest: 5,
+};
+
+const WEIGHT_FIELDS: { key: keyof MatchWeights; label: string; hint: string }[] = [
+  { key: "sectorThesis", label: "Sector & thesis", hint: "Exact sector, or thematic overlap" },
+  { key: "stage", label: "Stage", hint: "Exact stage, adjacent partial" },
+  { key: "checkSize", label: "Cheque size", hint: "Range compatibility" },
+  { key: "geography", label: "Geography", hint: "Exact or global" },
+  { key: "relationship", label: "Relationship strength", hint: "Rollup or named contact" },
+  { key: "recentInterest", label: "Recent interest", hint: "Interaction in last 180 days" },
+];
+
+const DECISION_FILTERS = [
+  { value: "all", label: "All decisions" },
+  { value: "suggested", label: "Suggested" },
+  { value: "accepted", label: "Accepted" },
+  { value: "deferred", label: "Deferred" },
+  { value: "dismissed", label: "Dismissed" },
+];
+
+type MatchRun = Awaited<ReturnType<ReturnType<typeof useWorkspaceActions>["runInvestorMatching"]["mutateAsync"]>>;
+
+function exclusionReasons(investor: Investor): string[] {
+  const reasons: string[] = [];
+  const status = investor.status.toLowerCase();
+  if (status === "restricted") reasons.push("Marked restricted by the firm");
+  if (status === "inactive" || status === "watchlist" || status === "archived") reasons.push("Investor is inactive");
+  const contact = primaryContact(investor);
+  if (contact?.outreachPermissionStatus === "do_not_contact") {
+    reasons.push("Primary contact is marked do not contact");
+  }
+  return reasons;
+}
 
 const Matches = () => {
   const { data, isLoading } = useWorkspace();
   const workspace = data ?? EMPTY_WORKSPACE;
   const actions = useWorkspaceActions();
+  const { membership } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showAll, setShowAll] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerInvestor, setComposerInvestor] = useState<Investor | null>(null);
+  const [decisionFilter, setDecisionFilter] = useState("all");
+  const [weights, setWeights] = useState<MatchWeights>(DEFAULT_WEIGHTS);
+  const [runResult, setRunResult] = useState<MatchRun | null>(null);
+  const [runError, setRunError] = useState("");
 
   const tab = searchParams.get("tab") === "outreach" ? "outreach" : "matches";
   const caseParam = searchParams.get("case");
-  const investorParam = searchParams.get("investor");
+  const canWrite = membership?.role === "owner" || membership?.role === "partner" || membership?.role === "analyst";
 
   const activeCases = workspace.cases.filter((item) => ACTIVE_CASE_STATUSES.includes(item.status));
   const selectable = activeCases.length > 0 ? activeCases : workspace.cases;
-  const paramCase = workspace.cases.find((item) => item.id === caseParam);
-  const selectedCase = paramCase ?? selectable[0] ?? null;
-
-  const matches = selectedCase ? rankMatches(selectedCase, workspace.investors) : [];
-  const filtered = matches.filter((match) => match.score >= 50);
-  const visibleMatches = showAll ? matches : filtered;
+  const selectedCase = workspace.cases.find((item) => item.id === caseParam) ?? selectable[0] ?? null;
 
   const drafts = workspace.outreach.filter((item) => item.status === "draft");
   const awaitingApproval = workspace.outreach.filter((item) => item.status === "approved");
+
+  const config = workspace.matchWeights;
+
+  useEffect(() => {
+    if (!config) return;
+    setWeights({
+      sectorThesis: config.sectorThesis,
+      stage: config.stage,
+      checkSize: config.checkSize,
+      geography: config.geography,
+      relationship: config.relationship,
+      recentInterest: config.recentInterest,
+    });
+    // Reset only when the saved config changes, not on every object identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.id, config?.updatedAt]);
+
+  useEffect(() => {
+    setRunResult(null);
+    setRunError("");
+  }, [selectedCase?.id]);
+
+  const investorById = useMemo(
+    () => new Map(workspace.investors.map((investor) => [investor.id, investor])),
+    [workspace.investors],
+  );
+
+  const savedMatches = useMemo(
+    () =>
+      workspace.matches
+        .filter((match) => match.dealId === selectedCase?.id)
+        .sort((a, b) => b.fitScore - a.fitScore),
+    [workspace.matches, selectedCase?.id],
+  );
+
+  const exclusions = useMemo(
+    () =>
+      workspace.investors
+        .map((investor) => ({ investor, reasons: exclusionReasons(investor) }))
+        .filter((item) => item.reasons.length > 0),
+    [workspace.investors],
+  );
+
+  const excludedIds = useMemo(() => new Set(exclusions.map((item) => item.investor.id)), [exclusions]);
+
+  const eligibleMatches = savedMatches.filter((match) => !excludedIds.has(match.investorId));
+  const visibleMatches = eligibleMatches.filter((match) =>
+    decisionFilter === "all"
+      ? true
+      : match.matchStatus === decisionFilter ||
+        (decisionFilter === "accepted" && match.matchStatus === "approved") ||
+        (decisionFilter === "dismissed" && match.matchStatus === "declined"),
+  );
+
+  const totalWeight = Object.values(weights).reduce((total, value) => total + value, 0);
+  const weightsValid =
+    totalWeight === 100 && Object.values(weights).every((value) => value >= 0 && Number.isInteger(value));
+  const weightsChanged = config
+    ? config.sectorThesis !== weights.sectorThesis ||
+      config.stage !== weights.stage ||
+      config.checkSize !== weights.checkSize ||
+      config.geography !== weights.geography ||
+      config.relationship !== weights.relationship ||
+      config.recentInterest !== weights.recentInterest
+    : true;
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams);
@@ -51,26 +160,47 @@ const Matches = () => {
     setSearchParams(next, { replace: true });
   };
 
-  const savedMatch = (dealId: string, investorId: string) =>
-    workspace.matches.find((item) => item.dealId === dealId && item.investorId === investorId);
-
-  const persistMatch = async (dealId: string, investorId: string, status: MatchStatus) => {
-    const deal = workspace.cases.find((item) => item.id === dealId);
-    const investor = workspace.investors.find((item) => item.id === investorId);
-    if (!deal || !investor) return;
-    const result = scoreMatch(deal, investor);
+  const runMatching = async () => {
+    if (!selectedCase) return;
+    setRunError("");
     try {
-      await actions.saveMatch.mutateAsync({
-        dealId,
-        investorId,
-        score: result.score,
-        rules: result.rules,
-        explanation: `${result.score}/100 — ${result.rules.filter((rule) => rule.outcome === "pass").length} of ${result.rules.length} rules met.`,
-        gaps: result.gaps,
-        status,
-      });
-    } catch {
-      toast.error("The match decision was not saved.");
+      const result = await actions.runInvestorMatching.mutateAsync(selectedCase.id);
+      setRunResult(result);
+      if (result.error) {
+        setRunError(result.error);
+      } else {
+        toast.success(
+          `Matching saved for ${result.matchesSaved ?? 0} investor${result.matchesSaved === 1 ? "" : "s"}. ${
+            result.needsResearch ? `${result.needsResearch} marked Needs Research.` : ""
+          }`,
+        );
+      }
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Matching failed.";
+      setRunError(message);
+      toast.error(message);
+    }
+  };
+
+  const saveWeights = async () => {
+    if (!config || !weightsValid) return;
+    try {
+      await actions.updateMatchWeights.mutateAsync({ id: config.id, weights });
+      toast.success("Matching weights saved. Run matching to apply them.");
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not save matching weights.");
+    }
+  };
+
+  const decide = async (
+    match: DealInvestorMatch,
+    status: "accepted" | "dismissed" | "deferred" | "suggested",
+  ) => {
+    try {
+      await actions.decideMatch.mutateAsync({ matchId: match.id, status });
+      toast.success(`Match marked ${MATCH_STATUS_META[status].label.toLowerCase()}`);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not record this decision.");
     }
   };
 
@@ -79,38 +209,12 @@ const Matches = () => {
     setComposerOpen(true);
   };
 
-  const handleApprove = async (item: Outreach) => {
-    try {
-      await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "approved" } });
-      await persistMatch(item.dealId, item.investorId, "approved");
-      toast.success("Approved. Send it from your inbox, then record it as sent.");
-    } catch {
-      toast.error("Could not approve this draft.");
-    }
-  };
-
-  const handleRecordSent = async (item: Outreach) => {
-    try {
-      await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "sent" } });
-      await persistMatch(item.dealId, item.investorId, "contacted");
-      toast.success("Recorded as sent");
-    } catch {
-      toast.error("Could not record this as sent.");
-    }
-  };
-
-  const handleShortlist = async (investorId: string) => {
-    if (!selectedCase) return;
-    await persistMatch(selectedCase.id, investorId, "shortlisted");
-    toast.success("Added to the shortlist");
-  };
-
   return (
     <div className="page-enter space-y-5">
       <PageHeader
-        eyebrow="Matching"
+        eyebrow="Investor relationship intelligence"
         title="Matches & Outreach"
-        description="Ranked against the preferences your team recorded. Every point is traceable, and every message is drafted by hand."
+        description="Deterministic preference fit across Talok's manually maintained investor database. Scores never imply investor interest, and every owner decision is preserved."
       />
 
       {isLoading ? (
@@ -119,7 +223,7 @@ const Matches = () => {
         <EmptyState
           icon={Waypoints}
           title="No deals to match yet"
-          description="Matching starts from a deal. Open one, record the round mechanics, then compare it against the investor network."
+          description="Matching starts from a deal. Open one, record its sector, stage, geography and cheque sought, then run matching."
           action={
             <Button asChild size="sm" className="gap-1.5">
               <Link to="/cases">
@@ -133,7 +237,7 @@ const Matches = () => {
         <EmptyState
           icon={Users}
           title="No investor preferences recorded"
-          description="Add the funds and angels you know, with stages, sectors, geographies and cheque ranges. Matching has nothing to compare until then."
+          description="Add the funds, angels and family offices you know, with stages, sectors, geographies and cheque ranges. Matching only uses those recorded fields."
           action={
             <Button asChild size="sm" className="gap-1.5">
               <Link to="/investors">Open Investor Network</Link>
@@ -145,7 +249,7 @@ const Matches = () => {
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-border bg-secondary/50 p-1">
               {[
-                { value: "matches", label: "Matches", count: matches.length },
+                { value: "matches", label: "Matches", count: savedMatches.length },
                 { value: "outreach", label: "Outreach queue", count: drafts.length + awaitingApproval.length },
               ].map((option) => (
                 <button
@@ -165,124 +269,313 @@ const Matches = () => {
             </div>
             <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              No automatic sending
+              No automatic sending · decisions are server-authorized
             </span>
           </div>
 
           {tab === "matches" ? (
-            <>
-              <section className="panel p-4 sm:p-5" aria-labelledby="case-context-heading">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="label-caps">Matching against</p>
-                    <h2 id="case-context-heading" className="mt-1 font-display text-xl tracking-tight">
-                      {selectedCase?.companyName ?? "No deal"}
-                    </h2>
-                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                      {selectedCase
-                        ? `${selectedCase.roundStage || "Stage not set"} · ${selectedCase.sector || "Sector not set"} · ${
-                            selectedCase.geography || "Geography not set"
-                          } · cheque sought ${formatCurrency(selectedCase.chequeSought, { compact: false })}${
-                            selectedCase.leadRequired ? " · lead required" : ""
-                          }`
-                        : ""}
-                    </p>
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
+              <div className="space-y-4">
+                <section className="panel p-4 sm:p-5" aria-labelledby="deal-context-heading">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="label-caps">Matching against</p>
+                      <h2 id="deal-context-heading" className="mt-1 font-display text-xl tracking-tight">
+                        {selectedCase?.companyName ?? "No deal"}
+                      </h2>
+                      <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                        {selectedCase
+                          ? `${selectedCase.roundStage || "Stage not set"} · ${selectedCase.sector || "Sector not set"} · ${
+                              selectedCase.geography || "Geography not set"
+                            } · cheque sought ${formatCurrency(selectedCase.chequeSought, { compact: false })}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:w-[260px]">
+                      <SelectField
+                        value={selectedCase?.id ?? ""}
+                        onChange={(value) => setParam("case", value)}
+                        options={selectable.map((item) => ({ value: item.id, label: item.companyName }))}
+                        ariaLabel="Select the deal to match"
+                      />
+                      {selectedCase ? (
+                        <Link
+                          to={`/cases/${selectedCase.id}`}
+                          className="inline-flex items-center justify-end gap-1 text-[11.5px] font-medium text-brand-strong hover:underline"
+                        >
+                          Open deal file
+                          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                        </Link>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2 sm:w-[260px]">
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                    <Button
+                      onClick={() => void runMatching()}
+                      disabled={!selectedCase || !canWrite || actions.runInvestorMatching.isPending}
+                      className="h-9 gap-2"
+                    >
+                      {actions.runInvestorMatching.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" aria-hidden="true" />
+                      )}
+                      {actions.runInvestorMatching.isPending ? "Running matching…" : "Run matching"}
+                    </Button>
+                    <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+                      {canWrite
+                        ? "Saves ranked results. Existing accept, dismiss or defer decisions are preserved."
+                        : "Read-only: your role cannot run matching or record decisions."}
+                    </span>
+                  </div>
+
+                  {runError ? (
+                    <p role="alert" className="mt-3 rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[11px] leading-relaxed text-destructive">
+                      {runError}
+                    </p>
+                  ) : null}
+
+                  {runResult ? (
+                    <div className="mt-3 space-y-2 rounded-md border border-border bg-secondary/30 px-3 py-2.5 text-[10.5px] leading-relaxed text-muted-foreground">
+                      <p>
+                        Saved {runResult.matchesSaved ?? 0} matches ·{" "}
+                        {runResult.needsResearch ?? 0} need research · {runResult.excluded?.length ?? 0} excluded.
+                        {" "}Weights used:{" "}
+                        {runResult.weights
+                          ? Object.entries(runResult.weights)
+                              .map(([key, value]) => `${key} ${value}`)
+                              .join(" · ")
+                          : "defaults"}
+                        .
+                      </p>
+                      {runResult.missingDealInputs && runResult.missingDealInputs.length > 0 ? (
+                        <p className="text-warning">
+                          Missing deal inputs: {runResult.missingDealInputs.join(" ")} Edit the deal to improve coverage.
+                        </p>
+                      ) : null}
+                      {runResult.warnings && runResult.warnings.length > 0 ? (
+                        <p className="text-warning">{runResult.warnings.join(" ")}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <p className="mt-3 flex items-start gap-1.5 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Missing inputs are shown separately from mismatches. A missing sector, stage, geography, cheque or
+                    investor preference is not treated as a negative preference, but the match is marked Needs Research.
+                  </p>
+                </section>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="label-caps">
+                    Ranked investors · {eligibleMatches.length}
+                    {exclusions.length > 0 ? ` · ${exclusions.length} excluded` : ""}
+                  </p>
+                  <div className="w-[170px]">
                     <SelectField
-                      value={selectedCase?.id ?? ""}
-                      onChange={(value) => setParam("case", value)}
-                      options={selectable.map((item) => ({ value: item.id, label: item.companyName }))}
-                      ariaLabel="Select the deal to match"
+                      value={decisionFilter}
+                      onChange={setDecisionFilter}
+                      options={DECISION_FILTERS}
+                      ariaLabel="Filter by match decision"
                     />
-                    {selectedCase ? (
-                      <Link
-                        to={`/cases/${selectedCase.id}`}
-                        className="inline-flex items-center justify-end gap-1 text-[11.5px] font-medium text-brand-strong hover:underline"
-                      >
-                        Open deal file
-                        <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                      </Link>
-                    ) : null}
                   </div>
                 </div>
-                <p className="mt-3 flex items-start gap-1.5 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  Six rules: stage 28, sector 24, geography 14, cheque size 18, lead capacity 8, relationship signal 8.
-                  Nothing outside the recorded fields is used. Shortlisting and drafting store the score and breakdown.
-                </p>
-              </section>
 
-              {investorParam && !workspace.investors.some((item) => item.id === investorParam) ? (
-                <p className="text-[11.5px] text-muted-foreground">The investor linked in the URL no longer exists.</p>
-              ) : null}
-
-              {visibleMatches.length === 0 ? (
-                <EmptyState
-                  icon={Waypoints}
-                  title="No investor clears the bar on this deal"
-                  description={`Every recorded investor scores below 50 against ${selectedCase?.companyName ?? "this deal"}. Review the breakdown to see which preference blocks the fit.`}
-                  action={
-                    <Button size="sm" variant="outline" onClick={() => setShowAll(true)}>
-                      Show all {matches.length} rankings
-                    </Button>
-                  }
-                />
-              ) : (
-                <>
-                  <div className="grid gap-3 xl:grid-cols-2">
+                {eligibleMatches.length === 0 ? (
+                  <EmptyState
+                    icon={Waypoints}
+                    title="No saved matches for this deal"
+                    description="Run matching to rank the manually maintained investor database against this deal. Nothing is inferred beyond the recorded fields."
+                    action={
+                      canWrite ? (
+                        <Button size="sm" onClick={() => void runMatching()} disabled={actions.runInvestorMatching.isPending}>
+                          Run matching
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                ) : visibleMatches.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground">
+                    No matches with this decision. Change the filter to see the ranked list.
+                  </p>
+                ) : (
+                  <div className="grid gap-3 2xl:grid-cols-2">
                     {visibleMatches.map((match) => {
-                      const saved = selectedCase ? savedMatch(selectedCase.id, match.investor.id) : undefined;
+                      const investor = investorById.get(match.investorId);
+                      if (!investor) return null;
                       return (
-                        <MatchCard
-                          key={match.investor.id}
+                        <MatchResultCard
+                          key={match.id}
                           match={match}
-                          rank={matches.indexOf(match) + 1}
-                          matchStatus={saved?.matchStatus}
+                          investor={investor}
+                          canWrite={canWrite}
+                          deciding={actions.decideMatch.isPending}
                           hasOutreach={workspace.outreach.some(
                             (item) =>
-                              item.dealId === selectedCase?.id &&
-                              item.investorId === match.investor.id &&
+                              item.dealId === match.dealId &&
+                              item.investorId === match.investorId &&
                               item.status !== "sent",
                           )}
-                          onDraft={() => openComposer(match.investor)}
-                          onShortlist={() => handleShortlist(match.investor.id)}
+                          onDecision={(status) => void decide(match, status)}
+                          onDraft={() => openComposer(investor)}
                         />
                       );
                     })}
                   </div>
+                )}
 
-                  {!showAll && matches.length > visibleMatches.length ? (
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-border px-4 py-3">
-                      <p className="text-[11.5px] text-muted-foreground">
-                        {matches.length - visibleMatches.length} lower-fit investor
-                        {matches.length - visibleMatches.length === 1 ? "" : "s"} hidden (score below 50).
-                      </p>
-                      <Button size="sm" variant="ghost" className="h-7 text-[11.5px]" onClick={() => setShowAll(true)}>
-                        Show all rankings
-                      </Button>
+                {exclusions.length > 0 ? (
+                  <section className="panel p-4 sm:p-5" aria-labelledby="excluded-heading">
+                    <div className="flex items-start gap-2">
+                      <ShieldCheck className="mt-0.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <div>
+                        <h2 id="excluded-heading" className="text-[13px] font-semibold tracking-tight">
+                          Excluded by restriction
+                        </h2>
+                        <p className="text-[10.5px] leading-relaxed text-muted-foreground">
+                          These investors are not ranked. Their existing records and owner decisions are preserved.
+                        </p>
+                      </div>
                     </div>
-                  ) : null}
+                    <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {exclusions.map(({ investor, reasons }) => {
+                        const prior = savedMatches.find((match) => match.investorId === investor.id);
+                        return (
+                          <li key={investor.id} className="rounded-lg border border-border bg-card px-3 py-2.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Link
+                                to={`/investors/${investor.id}`}
+                                className="text-[12px] font-medium hover:text-brand-strong"
+                              >
+                                {investor.name}
+                              </Link>
+                              {investor.isSynthetic ? <Pill tone="warning">Sample</Pill> : null}
+                              <Pill tone="neutral">{INVESTOR_STATUS_LABEL[investor.status]}</Pill>
+                              {prior ? (
+                                <Pill tone={MATCH_STATUS_META[prior.matchStatus].tone}>
+                                  Previous: {MATCH_STATUS_META[prior.matchStatus].label}
+                                </Pill>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
+                              {reasons.join(" · ")}
+                            </p>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ) : null}
+              </div>
 
-                  {showAll ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowAll(false)}
-                      className="text-[11.5px] font-medium text-brand-strong hover:underline"
+              <aside className="space-y-4">
+                <section className="panel p-5" aria-labelledby="weights-heading">
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4 text-brand" aria-hidden="true" />
+                    <h2 id="weights-heading" className="text-[14px] font-semibold tracking-tight">
+                      Match settings
+                    </h2>
+                  </div>
+                  <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
+                    Workspace weights. They must total 100 and are applied to the next matching run.
+                  </p>
+                  <div className="mt-3 space-y-2.5">
+                    {WEIGHT_FIELDS.map((field) => (
+                      <div key={field.key} className="grid grid-cols-[1fr_70px] items-center gap-2">
+                        <div>
+                          <p className="text-[11.5px] font-medium">{field.label}</p>
+                          <p className="text-[9.5px] leading-tight text-muted-foreground">{field.hint}</p>
+                        </div>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={weights[field.key]}
+                          onChange={(event) => {
+                            const value = Number(event.target.value);
+                            setWeights((current) => ({
+                              ...current,
+                              [field.key]: Number.isFinite(value) ? value : 0,
+                            }));
+                          }}
+                          className="h-8 bg-card text-right text-[12px]"
+                          aria-label={`${field.label} weight`}
+                          disabled={!canWrite}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                    <span className={cn("text-[11px] font-semibold", weightsValid ? "text-success" : "text-destructive")}>
+                      Total {totalWeight} / 100
+                    </span>
+                    <Button
+                      size="sm"
+                      className="h-7 text-[11px]"
+                      onClick={() => void saveWeights()}
+                      disabled={!canWrite || !weightsValid || !weightsChanged || !config || actions.updateMatchWeights.isPending}
                     >
-                      Hide lower-fit investors
-                    </button>
+                      {actions.updateMatchWeights.isPending ? "Saving…" : "Save weights"}
+                    </Button>
+                  </div>
+                  {!weightsValid ? (
+                    <p className="mt-1.5 text-[10px] text-destructive">Weights must total exactly 100.</p>
                   ) : null}
-                </>
-              )}
-            </>
+                  {!config ? (
+                    <p className="mt-1.5 text-[10px] text-warning">Matching settings have not been initialised.</p>
+                  ) : null}
+                </section>
+
+                <section className="panel p-5" aria-labelledby="rules-heading">
+                  <h2 id="rules-heading" className="text-[14px] font-semibold tracking-tight">
+                    How matching works
+                  </h2>
+                  <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
+                    Deterministic rules over manually recorded fields only.
+                  </p>
+                  <ul className="mt-2.5 space-y-1.5 text-[10.5px] leading-relaxed text-muted-foreground">
+                    <li><span className="font-medium text-foreground">Sector & thesis:</span> exact sector earns the full weight. If sector is missing or mismatched, thematic overlap earns up to 60% (two or more shared words) or 30% (one).</li>
+                    <li><span className="font-medium text-foreground">Stage:</span> exact stage earns the full weight; adjacent stages earn 40%.</li>
+                    <li><span className="font-medium text-foreground">Cheque size:</span> inside the recorded range earns full; within 25% of the range earns half.</li>
+                    <li><span className="font-medium text-foreground">Geography:</span> exact or global earns full.</li>
+                    <li><span className="font-medium text-foreground">Relationship:</span> the stronger of the investor rollup and named contact strength.</li>
+                    <li><span className="font-medium text-foreground">Recent interest:</span> explicit interest in a recorded interaction within 180 days earns full; a recent interaction without explicit interest earns half.</li>
+                  </ul>
+                  <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                    <p><span className="font-medium text-foreground">Exclusions:</span> restricted or inactive investors, and a primary contact marked do not contact.</p>
+                    <p><span className="font-medium text-foreground">Needs Research:</span> any missing deal or investor input. Missing is not a mismatch.</p>
+                    <p><span className="font-medium text-foreground">Decisions:</span> accept, dismiss or defer is checked in the backend against the relationship owner or a workspace admin; rescoring preserves the decision.</p>
+                    <p>Score is preference fit only. It does not indicate or guarantee investor interest.</p>
+                  </div>
+                </section>
+
+                <section className="panel p-5">
+                  <h2 className="text-[13px] font-semibold tracking-tight">Decided matches</h2>
+                  <div className="mt-2 space-y-1.5">
+                    {(["accepted", "dismissed", "deferred"] as const).map((status) => {
+                      const count = savedMatches.filter((match) => match.matchStatus === status).length;
+                      return (
+                        <div key={status} className="flex items-center justify-between text-[11px]">
+                          <Pill tone={MATCH_STATUS_META[status].tone}>{MATCH_STATUS_META[status].label}</Pill>
+                          <span className="font-semibold tabular-nums text-muted-foreground">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              </aside>
+            </div>
           ) : (
             <>
               <div className="flex items-start gap-2 rounded-lg border border-brand/20 bg-brand-soft/50 px-3.5 py-2.5 text-[11px] leading-relaxed text-brand-strong">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <p>
                   A draft only moves forward with a human decision: approve it, send it yourself, then record it as sent.
-                  {drafts.length > 0 ? ` ${drafts.length} draft${drafts.length === 1 ? "" : "s"} still need approval.` : ""}
+                  {drafts.length > 0
+                    ? ` ${drafts.length} draft${drafts.length === 1 ? "" : "s"} still need approval.`
+                    : ""}
                 </p>
               </div>
               <OutreachQueue
@@ -290,8 +583,22 @@ const Matches = () => {
                 cases={workspace.cases}
                 investors={workspace.investors}
                 pending={actions.updateOutreach.isPending}
-                onApprove={handleApprove}
-                onRecordSent={handleRecordSent}
+                onApprove={async (item) => {
+                  try {
+                    await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "approved" } });
+                    toast.success("Approved. Send it from your inbox, then record it as sent.");
+                  } catch {
+                    toast.error("Could not approve this draft.");
+                  }
+                }}
+                onRecordSent={async (item) => {
+                  try {
+                    await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "sent" } });
+                    toast.success("Recorded as sent");
+                  } catch {
+                    toast.error("Could not record this as sent.");
+                  }
+                }}
               />
             </>
           )}
@@ -303,11 +610,6 @@ const Matches = () => {
         onOpenChange={setComposerOpen}
         caseItem={selectedCase}
         investor={composerInvestor}
-        onDrafted={async () => {
-          if (selectedCase && composerInvestor) {
-            await persistMatch(selectedCase.id, composerInvestor.id, "outreach_drafted");
-          }
-        }}
       />
     </div>
   );

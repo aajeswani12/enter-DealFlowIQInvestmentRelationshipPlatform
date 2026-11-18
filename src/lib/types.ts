@@ -58,7 +58,14 @@ export type GapSeverity = "low" | "medium" | "high" | "critical";
 export type QuestionStatus = "open" | "answered" | "needs_review" | "resolved";
 
 export type InvestorType = "vc" | "angel" | "family_office" | "corporate";
-export type InvestorStatus = "active" | "prospect" | "watchlist" | "archived";
+export type InvestorStatus =
+  | "active"
+  | "inactive"
+  | "restricted"
+  | "unknown"
+  | "prospect"
+  | "watchlist"
+  | "archived";
 export type RelationshipStatus = "new" | "warm" | "active" | "dormant";
 export type RelationshipStrength = "unknown" | "weak" | "warm" | "strong";
 export type OutreachPermission = "unknown" | "permitted" | "requires_intro" | "do_not_contact";
@@ -71,7 +78,24 @@ export type MatchStatus =
   | "outreach_drafted"
   | "approved"
   | "contacted"
-  | "declined";
+  | "declined"
+  | "accepted"
+  | "dismissed"
+  | "deferred";
+
+export interface MatchWeights {
+  sectorThesis: number;
+  stage: number;
+  checkSize: number;
+  geography: number;
+  relationship: number;
+  recentInterest: number;
+}
+
+export interface MatchWeightConfig extends MatchWeights {
+  id: string;
+  updatedAt: string;
+}
 
 export type InteractionKind = "intro" | "call" | "email" | "meeting" | "note";
 
@@ -339,7 +363,13 @@ export interface DealInvestorMatch {
   scoreBreakdown: MatchRule[];
   fitExplanation: string;
   missingInformation: string[];
+  restrictions: string[];
+  introductionStrategy: string;
+  needsResearch: boolean;
+  weights: Partial<MatchWeights>;
   matchStatus: MatchStatus;
+  decidedBy: string | null;
+  decidedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
