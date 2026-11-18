@@ -1,11 +1,37 @@
-import Index from "./pages/Index";
+import { RequireAuth } from "./components/auth/require-auth";
+import { AppShell } from "./components/layout/app-shell";
+import Cases from "./pages/cases";
+import CaseDetail from "./pages/cases/detail";
+import Dashboard from "./pages/dashboard";
+import DealInbox from "./pages/deal-inbox";
+import Investors from "./pages/investors";
+import InvestorDetail from "./pages/investors/detail";
+import Login from "./pages/login";
+import Matches from "./pages/matches";
 import NotFound from "./pages/NotFound";
 
 export const routers = [
   {
+    path: "/login",
+    name: "login",
+    element: <Login />,
+  },
+  {
     path: "/",
-    name: "home",
-    element: <Index />,
+    element: (
+      <RequireAuth>
+        <AppShell />
+      </RequireAuth>
+    ),
+    children: [
+      { index: true, name: "dashboard", element: <Dashboard /> },
+      { path: "inbox", name: "deal-inbox", element: <DealInbox /> },
+      { path: "cases", name: "cases", element: <Cases /> },
+      { path: "cases/:id", name: "case-detail", element: <CaseDetail /> },
+      { path: "investors", name: "investors", element: <Investors /> },
+      { path: "investors/:id", name: "investor-detail", element: <InvestorDetail /> },
+      { path: "matches", name: "matches", element: <Matches /> },
+    ],
   },
   /* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */
   {

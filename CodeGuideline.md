@@ -6,18 +6,25 @@
 project-root/
   ├── public/                # Static assets
   ├── src/
-  │   ├── components/        # All reusable UI components
-  │   │   └── ui/            # Prebuilt and custom UI components, grouped by function
-  │   ├── hooks/             # Custom React hooks
-  │   ├── lib/               # Utility functions and libraries
-  │   ├── pages/             # Application pages (each page in its own subdirectory)
-  │   ├── App.tsx            # Main app component, sets up route providers
-  │   ├── router.tsx         # Router config, sets up routing
-  │   ├── main.tsx           # Entry point for the React app
-  │   └── index.css          # Global styles
-  ├── package.json           # Project metadata and scripts
-  ├── tailwind.config.ts     # Tailwind CSS configuration
-  └── ...                    # Other config and lock files
+  │   ├── components/
+  │   │   ├── ui/            # Prebuilt shadcn primitives
+  │   │   ├── layout/        # AppShell (nav + sidebar + mobile nav), PageHeader
+  │   │   ├── auth/          # AuthContext, AuthProvider, RequireAuth
+  │   │   ├── common/        # Status pills, stat cards, empty/loading states
+  │   │   ├── forms/         # Capture, case, investor, evidence forms; voice recorder
+  │   │   ├── matches/       # Explainable match card
+  │   │   ├── outreach/      # Manually authored outreach composer
+  │   │   └── error-boundary/
+  │   ├── hooks/             # use-auth, use-workspace, use-workspace-actions, use-mobile
+  │   ├── lib/               # api (Enter Cloud access), types, constants, matching rules, format, workspace
+  │   ├── pages/             # dashboard, deal-inbox, cases, investors, matches, login
+  │   ├── integrations/supabase/  # Generated client and types (do not edit)
+  │   ├── App.tsx            # Providers (query + auth) and router
+  │   ├── router.tsx         # Route table
+  │   ├── main.tsx           # Entry point
+  │   └── index.css          # Design tokens and global styles
+  ├── tailwind.config.ts
+  └── ...
 ```
 
 ## Directory Responsibilities

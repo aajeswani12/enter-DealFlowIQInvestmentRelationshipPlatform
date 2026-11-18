@@ -1,24 +1,24 @@
-import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
 
-  useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">404</h1>
-        <p className="mb-4 text-xl text-gray-600">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 underline hover:text-blue-700">
-          Return to Home
-        </a>
+    <div className="flex min-h-screen items-center justify-center bg-background px-6">
+      <div className="w-full max-w-md text-center">
+        <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-brand-foreground">
+          <span className="font-display text-xl leading-none">T</span>
+        </span>
+        <p className="mt-5 label-caps">Page not found</p>
+        <h1 className="mt-2 font-display text-4xl tracking-tight">This page is not in the workspace</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Nothing is served at <code className="rounded bg-secondary px-1.5 py-0.5 text-[12px]">{location.pathname}</code>.
+          Head back to the deal desk.
+        </p>
+        <Button asChild className="mt-5">
+          <Link to="/">Return to dashboard</Link>
+        </Button>
       </div>
     </div>
   );
