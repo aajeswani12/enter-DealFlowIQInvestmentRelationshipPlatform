@@ -114,15 +114,20 @@ export function buildInvestmentMemo(input: MemoInput): { title: string; content:
   if (approved.length === 0) missing.push("No claims have been reviewed and approved.");
   if (dealInvestors.length === 0) missing.push("No investor has been manually associated with the deal.");
 
-  const tractionLines = traction.length
-    ? traction.map((claim) =>
-        [
-          `- ${claim.label}: ${claim.valueText || (claim.normalizedValue !== null ? String(claim.normalizedValue) : "No value recorded")}${
-            claim.reportingPeriod ? ` (${claim.reportingPeriod})` : ""
-          } — ${VERIFICATION_LABEL[claim.verificationStatus]}.${evidence(claim, documents, captures)}`,
-        ].join(""),
-      )
-    : ["- No approved traction, revenue or funding claims are recorded."];
+  const founderClaim = (claim: DealClaim) =>
+    claim.attribution === "founder" || claim.verificationStatus === "founder_reported";
+  const sourceSupportedTraction = traction.filter((claim) => !founderClaim(claim));
+  const founderTraction = traction.filter((claim) => founderClaim(claim));
+  const claimLine = (claim: DealClaim) =>
+    `- ${claim.label}: ${claim.valueText || (claim.normalizedValue !== null ? String(claim.normalizedValue) : "No value recorded")}${
+      claim.reportingPeriod ? ` (${claim.reportingPeriod})` : ""
+    }${claim.metricDefinition ? ` — definition: ${claim.metricDefinition}` : ""} — ${VERIFICATION_LABEL[claim.verificationStatus]}.${evidence(claim, documents, captures)}`;
+  const sourceSupportedLines = sourceSupportedTraction.length
+    ? sourceSupportedTraction.map(claimLine)
+    : ["- No approved non-founder traction, revenue or financial fact is recorded."];
+  const founderReportedLines = founderTraction.length
+    ? founderTraction.map(claimLine)
+    : ["- No founder-reported traction or revenue claim is approved."];
 
   const considerationLines =
     internal.length > 0
@@ -214,13 +219,16 @@ export function buildInvestmentMemo(input: MemoInput): { title: string; content:
       .filter((claim) => claim.claimType === "funding")
       .map((claim) => `- ${claim.label}: ${claim.valueText || "No value"}.${evidence(claim, documents, captures)}`),
     "",
-    "TRACTION / MILESTONES",
-    ...tractionLines,
+    "SOURCE-SUPPORTED FACTS",
+    ...sourceSupportedLines,
     "",
-    "INVESTMENT CONSIDERATIONS",
+    "FOUNDER-REPORTED CLAIMS",
+    ...founderReportedLines,
+    "",
+    "INTERNAL OBSERVATIONS",
     ...considerationLines,
     "",
-    "OPEN QUESTIONS",
+    "MISSING OR UNCERTAIN",
     ...questionLines,
     "",
     "RELEVANT INVESTORS",

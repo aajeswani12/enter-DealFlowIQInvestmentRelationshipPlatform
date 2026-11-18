@@ -60,7 +60,9 @@ import type {
 import { AnalysisSection } from "./analysis-section";
 import { ClaimsSection } from "./claims-section";
 import { DecisionGapsSection } from "./gaps-section";
+import { EvidenceTimeline } from "./evidence-timeline";
 import { FollowUpTasks } from "./follow-up-tasks";
+import { MemoDelta } from "./memo-delta";
 
 type CaseTab = "documents" | "activity" | "memo" | "more";
 type ReadinessStatus = "Available" | "Needs Review" | "Missing";
@@ -298,6 +300,8 @@ const CaseDetail = () => {
         dealId: caseItem.id,
         title: generated.title,
         content: generated.content,
+        origin: "template",
+        generationModel: "stored-fact template",
       });
       setMemoId(created.id);
       setMemoTitle(created.title);
@@ -642,7 +646,7 @@ const CaseDetail = () => {
                 : "border-b-2 border-transparent px-3 py-2 text-[11.5px] font-medium text-muted-foreground hover:text-foreground"}
             >
               {tab.label}
-              {tab.id === "documents" ? ` · ${caseDocuments.length}` : null}
+              {tab.id === "documents" ? ` · ${caseDocuments.length + sources.length}` : null}
             </button>
           ))}
         </div>
@@ -650,30 +654,14 @@ const CaseDetail = () => {
         <div className="mt-3">
           {activeTab === "documents" ? (
             <section role="tabpanel" id="case-panel-documents" aria-labelledby="case-tab-documents" className="space-y-3">
-              {caseDocuments.length > 0 ? (
-                <ul className="panel divide-y divide-border">
-                  {caseDocuments.map((document) => (
-                    <li key={document.id} className="flex items-center gap-2 px-4 py-2.5">
-                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11.5px] font-medium">{document.title}</p>
-                        <p className="text-[9.5px] text-muted-foreground">{document.documentType.toUpperCase()} · {formatDate(document.sourceDate)}</p>
-                      </div>
-                      <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => void api.getImportDocumentUrl(document.storagePath).then((url) => {
-                        if (!url) {
-                          toast.error("Original unavailable.");
-                          return;
-                        }
-                        window.open(url, "_blank", "noopener,noreferrer");
-                      })}>
-                        Open
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">No documents.</p>
-              )}
+              <EvidenceTimeline
+                dealId={caseItem.id}
+                documents={caseDocuments}
+                captures={sources}
+                batches={workspace.importBatches}
+                interactions={[]}
+                investors={workspace.investors}
+              />
               <details className="panel p-0">
                 <summary className="cursor-pointer px-4 py-2.5 text-[11.5px] font-semibold">Source analysis &amp; excerpts</summary>
                 <div className="border-t border-border">
@@ -758,6 +746,24 @@ const CaseDetail = () => {
                   </div>
                 )}
               </div>
+              <MemoDelta
+                deal={caseItem}
+                claims={claims}
+                sources={sources}
+                documents={caseDocuments}
+                versions={workspace.memoVersions}
+                proposals={workspace.factProposals}
+                reviews={workspace.factReviews}
+                gaps={gaps}
+                members={workspace.members}
+                currentMemo={caseMemos[0] ?? null}
+                onMemoCreated={(created) => {
+                  setMemoId(created.id);
+                  setMemoTitle(created.title);
+                  setMemoContent(created.content);
+                  setActiveTab("memo");
+                }}
+              />
             </section>
           ) : null}
 

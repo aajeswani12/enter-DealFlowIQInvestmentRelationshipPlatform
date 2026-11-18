@@ -15,6 +15,9 @@ import type {
   DealPerson,
   DealInvestor,
   DealMemo,
+  DealMemoVersion,
+  CaseFactProposal,
+  CaseFactReview,
   FollowUpTask,
   ImportBatch,
   ImportCandidate,
@@ -76,6 +79,9 @@ type CaseDocumentRow = Tables["case_documents"]["Row"];
 type DealPersonRow = Tables["deal_people"]["Row"];
 type DealInvestorRow = Tables["deal_investors"]["Row"];
 type DealMemoRow = Tables["deal_memos"]["Row"];
+type MemoVersionRow = Tables["deal_memo_versions"]["Row"];
+type FactProposalRow = Tables["case_fact_proposals"]["Row"];
+type FactReviewRow = Tables["case_fact_reviews"]["Row"];
 type FollowUpTaskRow = Tables["follow_up_tasks"]["Row"];
 type ImportBatchRow = Tables["import_batches"]["Row"];
 type ImportFileRow = Tables["import_files"]["Row"];
@@ -197,6 +203,7 @@ function mapClaim(row: ClaimRow): DealClaim {
     normalizedValue: toNumber(row.normalized_value),
     currency: row.currency,
     reportingPeriod: row.reporting_period,
+    metricDefinition: row.metric_definition,
     verificationStatus: row.verification_status as VerificationStatus,
     sourceId: row.source_id,
     documentId: row.document_id,
@@ -351,10 +358,89 @@ function mapDealMemo(row: DealMemoRow): DealMemo {
     title: row.title,
     content: row.content,
     status: row.status as DealMemo["status"],
+    origin: row.origin as DealMemo["origin"],
+    generationModel: row.generation_model,
+    sourceIds: row.source_ids ?? [],
+    approvedProposalIds: row.approved_proposal_ids ?? [],
+    humanEdited: row.human_edited,
+    editedBy: row.edited_by,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapMemoVersion(row: MemoVersionRow): DealMemoVersion {
+  return {
+    id: row.id,
+    memoId: row.memo_id,
+    dealId: row.deal_id,
+    versionNumber: row.version_number,
+    title: row.title,
+    content: row.content,
+    origin: row.origin as DealMemoVersion["origin"],
+    generationModel: row.generation_model,
+    sourceIds: row.source_ids ?? [],
+    approvedProposalIds: row.approved_proposal_ids ?? [],
+    humanEdited: row.human_edited,
+    editedBy: row.edited_by,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function mapFactProposal(row: FactProposalRow): CaseFactProposal {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    sourceKey: row.source_key,
+    sourceKind: row.source_kind as CaseFactProposal["sourceKind"],
+    sourceCaptureId: row.source_capture_id,
+    sourceDocumentId: row.source_document_id,
+    sourceTitle: row.source_title,
+    sourceDate: row.source_date,
+    sourceExcerpt: row.source_excerpt,
+    sourceReference: row.source_reference,
+    relation: row.relation as CaseFactProposal["relation"],
+    previousClaimId: row.previous_claim_id,
+    previousValueText: row.previous_value_text,
+    previousPeriod: row.previous_period,
+    previousCurrency: row.previous_currency,
+    claimType: row.claim_type as CaseFactProposal["claimType"],
+    label: row.label,
+    valueText: row.value_text,
+    normalizedValue: toNumber(row.normalized_value),
+    currency: row.currency,
+    reportingPeriod: row.reporting_period,
+    metricDefinition: row.metric_definition,
+    reason: row.reason,
+    attribution: row.attribution as CaseFactProposal["attribution"],
+    confidence: row.confidence as CaseFactProposal["confidence"],
+    status: row.status as CaseFactProposal["status"],
+    edited: row.edited,
+    reviewNote: row.review_note,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    appliedClaimId: row.applied_claim_id,
+    generationModel: row.generation_model,
+    fingerprint: row.fingerprint,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapFactReview(row: FactReviewRow): CaseFactReview {
+  return {
+    id: row.id,
+    proposalId: row.proposal_id,
+    action: row.action as CaseFactReview["action"],
+    before: (row.before ?? {}) as Record<string, unknown>,
+    after: (row.after ?? {}) as Record<string, unknown>,
+    note: row.note,
+    reviewer: row.reviewer,
+    createdAt: row.created_at,
   };
 }
 
@@ -786,6 +872,31 @@ async function saveContact(investorId: string, input: ContactInput, userId: stri
   if (error) fail("Could not save this contact", error);
 }
 
+export interface DeltaExtractionResponse {
+  status: "ok" | "no_proposals" | "failed";
+  proposals_count?: number;
+  existing?: boolean;
+  warnings?: string[];
+  model?: string;
+  error?: string;
+}
+
+export interface GeneratedMemoResponse {
+  status: "created" | "failed";
+  memo?: DealMemo;
+  version?: DealMemoVersion;
+  error?: string;
+}
+
+export interface FactProposalReviewResponse {
+  status: "accepted" | "rejected" | "stale" | "not_found";
+  proposal_id?: string;
+  claim_id?: string;
+  edited?: boolean;
+  idempotent?: boolean;
+  updated_at?: string;
+}
+
 export const api = {
   /**
    * Activates a pending invitation or claims the workspace for the very first
@@ -810,7 +921,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, dealPeople, dealInvestors, dealMemos, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, dealPeople, dealInvestors, dealMemos, memoVersions, factProposals, factReviews, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -831,6 +942,9 @@ export const api = {
         supabase.from("deal_people").select("*").order("name", { ascending: true }).limit(1000),
         supabase.from("deal_investors").select("*").order("created_at", { ascending: false }).limit(1000),
         supabase.from("deal_memos").select("*").order("updated_at", { ascending: false }).limit(500),
+        supabase.from("deal_memo_versions").select("*").order("created_at", { ascending: false }).limit(2000),
+        supabase.from("case_fact_proposals").select("*").order("created_at", { ascending: false }).limit(2000),
+        supabase.from("case_fact_reviews").select("*").order("created_at", { ascending: false }).limit(4000),
         supabase.from("follow_up_tasks").select("*").order("created_at", { ascending: false }).limit(500),
         supabase.from("import_batches").select("*").order("created_at", { ascending: false }).limit(100),
         supabase.from("import_files").select("*").order("created_at", { ascending: false }).limit(500),
@@ -857,6 +971,9 @@ export const api = {
     if (dealPeople.error) fail("Could not load deal people", dealPeople.error);
     if (dealInvestors.error) fail("Could not load deal investors", dealInvestors.error);
     if (dealMemos.error) fail("Could not load deal memos", dealMemos.error);
+    if (memoVersions.error) fail("Could not load memo versions", memoVersions.error);
+    if (factProposals.error) fail("Could not load proposed case changes", factProposals.error);
+    if (factReviews.error) fail("Could not load proposed change reviews", factReviews.error);
     if (followUpTasks.error) fail("Could not load follow-up tasks", followUpTasks.error);
     if (importBatches.error) fail("Could not load import batches", importBatches.error);
     if (importFiles.error) fail("Could not load import files", importFiles.error);
@@ -893,6 +1010,9 @@ export const api = {
       dealPeople: (dealPeople.data ?? []).map(mapDealPerson),
       dealInvestors: (dealInvestors.data ?? []).map(mapDealInvestor),
       dealMemos: (dealMemos.data ?? []).map(mapDealMemo),
+      memoVersions: (memoVersions.data ?? []).map(mapMemoVersion),
+      factProposals: (factProposals.data ?? []).map(mapFactProposal),
+      factReviews: (factReviews.data ?? []).map(mapFactReview),
       followUpTasks: (followUpTasks.data ?? []).map(mapFollowUpTask),
       importBatches: (importBatches.data ?? []).map(mapImportBatch),
       importFiles: (importFiles.data ?? []).map(mapImportFile),
@@ -1439,6 +1559,10 @@ export const api = {
     dealId: string;
     title: string;
     content: string;
+    origin?: DealMemo["origin"];
+    generationModel?: string;
+    sourceIds?: string[];
+    approvedProposalIds?: string[];
   }): Promise<DealMemo> {
     const userId = await currentUserId();
     const { data, error } = await supabase
@@ -1448,6 +1572,10 @@ export const api = {
         title: input.title.trim().slice(0, 200),
         content: input.content.slice(0, 100000),
         status: "draft",
+        origin: input.origin ?? "manual",
+        generation_model: input.generationModel ?? "",
+        source_ids: input.sourceIds ?? [],
+        approved_proposal_ids: input.approvedProposalIds ?? [],
         created_by: userId,
         updated_by: userId,
       })
@@ -1465,10 +1593,64 @@ export const api = {
         title: input.title.trim().slice(0, 200),
         content: input.content.slice(0, 100000),
         updated_by: userId,
+        edited_by: userId,
+        human_edited: true,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
     if (error) fail("Could not update this memo", error);
+  },
+
+  async extractCaseDelta(input: {
+    dealId: string;
+    sourceKind: "capture" | "document";
+    sourceId: string;
+  }): Promise<DeltaExtractionResponse> {
+    const { data, error } = await supabase.functions.invoke("caseIntelligence", {
+      body: {
+        action: "extract_delta",
+        deal_id: input.dealId,
+        source_kind: input.sourceKind,
+        source_id: input.sourceId,
+      },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { status: "failed", error: "The source analysis service returned no response." }) as DeltaExtractionResponse;
+  },
+
+  async generateCaseMemo(input: {
+    dealId: string;
+    requestId: string;
+    proposalIds: string[];
+  }): Promise<GeneratedMemoResponse> {
+    const { data, error } = await supabase.functions.invoke("caseIntelligence", {
+      body: {
+        action: "generate_memo",
+        deal_id: input.dealId,
+        request_id: input.requestId,
+        proposal_ids: input.proposalIds,
+      },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { status: "failed", error: "The memo service returned no response." }) as GeneratedMemoResponse;
+  },
+
+  async reviewCaseFactProposal(input: {
+    proposalId: string;
+    action: "accept" | "edit" | "reject";
+    patch: Record<string, unknown>;
+    expectedUpdatedAt: string;
+    note: string;
+  }): Promise<FactProposalReviewResponse> {
+    const { data, error } = await supabase.rpc("apply_case_fact_proposal", {
+      p_proposal_id: input.proposalId,
+      p_action: input.action,
+      p_patch: input.patch as Json,
+      p_expected_updated_at: input.expectedUpdatedAt,
+      p_note: input.note,
+    });
+    if (error) throw new Error(error.message || "Could not review this proposed fact.");
+    return (data ?? { status: "failed" }) as unknown as FactProposalReviewResponse;
   },
 
   async addCaseDocument(input: {

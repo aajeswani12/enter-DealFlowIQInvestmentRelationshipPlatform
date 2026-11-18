@@ -1,13 +1,14 @@
-import { FileText, Mail, MessageSquare, Mic, Paperclip, Sparkles } from "lucide-react";
+import { ArrowUpRight, FileText, Mail, MessageSquare, Mic, Paperclip, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatShortDate } from "@/lib/format";
 import type { Capture, CaseDocument, ImportBatch, Interaction, Investor } from "@/lib/types";
 
 interface EvidenceTimelineProps {
+  dealId: string;
   documents: CaseDocument[];
   captures: Capture[];
   batches: ImportBatch[];
@@ -20,7 +21,7 @@ type Entry =
   | { kind: "document"; date: string; document: CaseDocument }
   | { kind: "interaction"; date: string; interaction: Interaction };
 
-export function EvidenceTimeline({ documents, captures, batches, interactions, investors }: EvidenceTimelineProps) {
+export function EvidenceTimeline({ dealId, documents, captures, batches, interactions, investors }: EvidenceTimelineProps) {
   const [opening, setOpening] = useState<string | null>(null);
   const entries: Entry[] = [
     ...captures.map((capture) => ({ kind: "capture" as const, date: capture.sourceDate, capture })),
@@ -43,7 +44,24 @@ export function EvidenceTimeline({ documents, captures, batches, interactions, i
   };
 
   if (entries.length === 0) {
-    return null;
+    return (
+      <section className="panel p-5" aria-labelledby="evidence-timeline-heading">
+        <h2 id="evidence-timeline-heading" className="text-[13.5px] font-semibold tracking-tight">
+          Case reconstruction
+        </h2>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          No historical source is linked yet. Import a supported document or transcript, or add a voice update.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline" className="h-7 text-[10px]">
+            <Link to="/imports">Import historical sources</Link>
+          </Button>
+          <Button asChild size="sm" variant="ghost" className="h-7 text-[10px]">
+            <Link to={`/inbox/capture?deal=${dealId}`}>Add update</Link>
+          </Button>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -51,13 +69,20 @@ export function EvidenceTimeline({ documents, captures, batches, interactions, i
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 id="evidence-timeline-heading" className="text-[15px] font-semibold tracking-tight">
-            Evidence timeline
+            Case reconstruction
           </h2>
           <p className="text-[11.5px] text-muted-foreground">
-            Chronological source history. Imported originals remain private and link back to this case.
+            Source history in historical date order. Source date is distinct from import or capture time; originals stay private.
           </p>
         </div>
-        <span className="text-[10px] text-muted-foreground">{entries.length} source{entries.length === 1 ? "" : "s"}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">{entries.length} source{entries.length === 1 ? "" : "s"}</span>
+          <Button asChild size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]">
+            <Link to="/imports" className="inline-flex items-center gap-1">
+              Import <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <ol className="mt-4 space-y-0">
@@ -105,11 +130,18 @@ export function EvidenceTimeline({ documents, captures, batches, interactions, i
                         ? `${investors.find((investor) => investor.id === entry.interaction.investorId)?.name ?? "Investor"} · ${entry.interaction.kind}`
                         : entry.document.title}
                   </p>
-                  <span className="text-[10px] text-muted-foreground">{formatDate(entry.date)}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {entry.kind === "document" ? `Source date ${formatDate(entry.date)}` : entry.kind === "capture" ? `Source date ${formatDate(entry.date)}` : formatDate(entry.date)}
+                  </span>
                   {entry.kind === "document" ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand-soft px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-brand-strong">
                       <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
-                      Imported {entry.document.documentType}
+                      {entry.document.documentType.toUpperCase()} · imported {formatShortDate(entry.document.createdAt)}
+                    </span>
+                  ) : null}
+                  {entry.kind === "capture" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+                      {entry.capture.source === "voice" ? "Voice" : "Note"} · added {formatShortDate(entry.capture.createdAt)}
                     </span>
                   ) : null}
                   {entry.kind === "interaction" ? (

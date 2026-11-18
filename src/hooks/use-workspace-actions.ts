@@ -28,6 +28,20 @@ export function useWorkspaceActions() {
         api.updateDealMemo(id, input),
       onSuccess: invalidate,
     }),
+    extractCaseDelta: useMutation({
+      mutationFn: api.extractCaseDelta,
+      onSuccess: invalidate,
+      onError: invalidate,
+    }),
+    generateCaseMemo: useMutation({
+      mutationFn: api.generateCaseMemo,
+      onSuccess: invalidate,
+    }),
+    reviewCaseFactProposal: useMutation({
+      mutationFn: api.reviewCaseFactProposal,
+      onSuccess: invalidate,
+      onError: invalidate,
+    }),
     addCaseDocument: useMutation({ mutationFn: api.addCaseDocument, onSuccess: invalidate }),
     createDealPerson: useMutation({
       mutationFn: ({ dealId, input }: { dealId: string; input: Parameters<typeof api.createDealPerson>[1] }) =>

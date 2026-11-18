@@ -10,6 +10,18 @@ export interface DemoImportFile {
 /** Clearly synthetic, text-extractable fixtures served from /import-samples. */
 export const MUSEFLOW_DEMO_FILES: DemoImportFile[] = [
   {
+    name: "museflow-founder-intro.txt",
+    path: "/import-samples/museflow-founder-intro.txt",
+    type: "txt",
+    mime: "text/plain",
+  },
+  {
+    name: "museflow-pitch-deck.pdf",
+    path: "/import-samples/museflow-pitch-deck.pdf",
+    type: "pdf",
+    mime: "application/pdf",
+  },
+  {
     name: "museflow-deal-memo.pdf",
     path: "/import-samples/museflow-deal-memo.pdf",
     type: "pdf",
@@ -40,6 +52,13 @@ export const MUSEFLOW_DEMO_FILES: DemoImportFile[] = [
     mime: "message/rfc822",
   },
 ];
+
+export const MUSEFLOW_PILOT_UPDATE_FILE: DemoImportFile = {
+  name: "museflow-pilot-update.txt",
+  path: "/import-samples/museflow-pilot-update.txt",
+  type: "txt",
+  mime: "text/plain",
+};
 
 export const MUSEFLOW_FOLLOWUP_FILE: DemoImportFile = {
   name: "museflow-followup-transcript.txt",

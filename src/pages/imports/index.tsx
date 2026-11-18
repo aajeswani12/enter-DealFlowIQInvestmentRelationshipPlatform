@@ -32,6 +32,7 @@ import {
   fetchDemoFile,
   MUSEFLOW_DEMO_FILES,
   MUSEFLOW_FOLLOWUP_FILE,
+  MUSEFLOW_PILOT_UPDATE_FILE,
 } from "./demo";
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -260,6 +261,18 @@ const ImportsPage = () => {
     }
   };
 
+  const loadPilotClarification = async () => {
+    setProcessing(true);
+    try {
+      const loaded = await fetchDemoFile(MUSEFLOW_PILOT_UPDATE_FILE);
+      setProcessing(false);
+      await runBatch("MuseFlow pilot clarification transcript (synthetic)", true, [loaded]);
+    } catch (caught) {
+      setProcessing(false);
+      toast.error(caught instanceof Error ? caught.message : "Could not load the pilot clarification transcript.");
+    }
+  };
+
   const selectedBatch = batches.find((batch) => batch.id === selectedBatchId) ?? null;
   const selectedFiles = workspace.importFiles.filter(
     (file) => !selectedBatchId || file.batchId === selectedBatchId,
@@ -456,17 +469,20 @@ const ImportsPage = () => {
                   Synthetic MuseFlow demo
                 </p>
                 <p className="mt-0.5 max-w-lg text-[10.5px] leading-relaxed text-warning">
-                  Load five clearly labelled synthetic files (PDF, CSV, CSV, DOCX, EML) through the real pipeline, then
-                  import a new MuseFlow transcript. Both use private storage, extraction and persistence; no success is
-                  simulated.
+                  Load seven clearly labelled synthetic files (founder introduction, parseable pitch deck, historical deal
+                  memo, funding CSV, investor CSV, meeting notes DOCX and EML) through the real pipeline, then import a
+                  pilot clarification transcript. Both use private storage, extraction and persistence; no success is simulated.
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 <Button size="sm" variant="outline" className="h-7 text-[10.5px]" disabled={!canWrite || processing} onClick={() => void loadDemoPack()}>
-                  Load 5 demo files
+                  Load 7 demo files
                 </Button>
                 <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" disabled={!canWrite || processing} onClick={() => void loadFollowup()}>
-                  Import follow-up transcript
+                  Import ARR follow-up transcript
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" disabled={!canWrite || processing} onClick={() => void loadPilotClarification()}>
+                  Import pilot clarification
                 </Button>
               </div>
             </div>

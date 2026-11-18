@@ -192,6 +192,7 @@ export interface DealClaim {
   normalizedValue: number | null;
   currency: string;
   reportingPeriod: string;
+  metricDefinition: string;
   verificationStatus: VerificationStatus;
   sourceId: string | null;
   documentId: string | null;
@@ -593,14 +594,92 @@ export interface DealInvestor {
   updatedAt: string;
 }
 
+export type MemoOrigin = "manual" | "template" | "ai_generated" | "ai_delta";
+
 export interface DealMemo {
   id: string;
   dealId: string;
   title: string;
   content: string;
   status: "draft" | "approved";
+  origin: MemoOrigin;
+  generationModel: string;
+  sourceIds: string[];
+  approvedProposalIds: string[];
+  humanEdited: boolean;
+  editedBy: string | null;
   createdBy: string | null;
   updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DealMemoVersion {
+  id: string;
+  memoId: string;
+  dealId: string;
+  versionNumber: number;
+  title: string;
+  content: string;
+  origin: MemoOrigin;
+  generationModel: string;
+  sourceIds: string[];
+  approvedProposalIds: string[];
+  humanEdited: boolean;
+  editedBy: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export type FactProposalRelation = "new" | "changed" | "clarification" | "conflict";
+export type FactProposalStatus = "pending" | "accepted" | "rejected";
+
+export interface CaseFactProposal {
+  id: string;
+  dealId: string;
+  sourceKey: string;
+  sourceKind: "capture" | "document";
+  sourceCaptureId: string | null;
+  sourceDocumentId: string | null;
+  sourceTitle: string;
+  sourceDate: string;
+  sourceExcerpt: string;
+  sourceReference: string;
+  relation: FactProposalRelation;
+  previousClaimId: string | null;
+  previousValueText: string;
+  previousPeriod: string;
+  previousCurrency: string;
+  claimType: ClaimType;
+  label: string;
+  valueText: string;
+  normalizedValue: number | null;
+  currency: string;
+  reportingPeriod: string;
+  metricDefinition: string;
+  reason: string;
+  attribution: "founder" | "third_party" | "unknown";
+  confidence: "high" | "medium" | "low";
+  status: FactProposalStatus;
+  edited: boolean;
+  reviewNote: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  appliedClaimId: string | null;
+  generationModel: string;
+  fingerprint: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CaseFactReview {
+  id: string;
+  proposalId: string;
+  action: "accept" | "edit" | "reject";
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  note: string;
+  reviewer: string | null;
+  createdAt: string;
 }

@@ -303,6 +303,9 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
                     {item.reportingPeriod ? <span className="font-normal text-muted-foreground"> · {item.reportingPeriod}</span> : null}
                   </p>
                 ) : null}
+                {item.metricDefinition ? (
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">Definition: {item.metricDefinition}</p>
+                ) : null}
                 {item.supportingExcerpt ? (
                   <blockquote className="mt-1 border-l-2 border-border pl-2 text-[11.5px] leading-relaxed text-muted-foreground">
                     “{item.supportingExcerpt}”
@@ -379,6 +382,9 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
                         {item.valueText}
                         {item.reportingPeriod ? <span className="font-normal text-muted-foreground"> · {item.reportingPeriod}</span> : null}
                       </p>
+                    ) : null}
+                    {item.metricDefinition ? (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">Definition: {item.metricDefinition}</p>
                     ) : null}
                     {item.supportingExcerpt ? (
                       <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{item.supportingExcerpt}</p>

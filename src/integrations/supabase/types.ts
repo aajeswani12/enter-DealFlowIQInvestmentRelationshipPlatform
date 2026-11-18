@@ -3373,6 +3373,200 @@ export type Database = {
           },
         ]
       }
+      case_fact_proposals: {
+        Row: {
+          applied_claim_id: string | null
+          attribution: string
+          claim_type: string
+          confidence: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          deal_id: string
+          edited: boolean
+          fingerprint: string
+          generation_model: string
+          id: string
+          label: string
+          metric_definition: string
+          normalized_value: number | null
+          previous_claim_id: string | null
+          previous_currency: string
+          previous_period: string
+          previous_value_text: string
+          reason: string
+          relation: string
+          reporting_period: string
+          review_note: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_capture_id: string | null
+          source_date: string
+          source_document_id: string | null
+          source_excerpt: string
+          source_key: string
+          source_kind: string
+          source_reference: string
+          source_title: string
+          status: string
+          updated_at: string
+          value_text: string
+        }
+        Insert: {
+          applied_claim_id?: string | null
+          attribution?: string
+          claim_type: string
+          confidence?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deal_id: string
+          edited?: boolean
+          fingerprint: string
+          generation_model?: string
+          id?: string
+          label: string
+          metric_definition?: string
+          normalized_value?: number | null
+          previous_claim_id?: string | null
+          previous_currency?: string
+          previous_period?: string
+          previous_value_text?: string
+          reason?: string
+          relation: string
+          reporting_period?: string
+          review_note?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_capture_id?: string | null
+          source_date: string
+          source_document_id?: string | null
+          source_excerpt: string
+          source_key: string
+          source_kind: string
+          source_reference?: string
+          source_title?: string
+          status?: string
+          updated_at?: string
+          value_text: string
+        }
+        Update: {
+          applied_claim_id?: string | null
+          attribution?: string
+          claim_type?: string
+          confidence?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deal_id?: string
+          edited?: boolean
+          fingerprint?: string
+          generation_model?: string
+          id?: string
+          label?: string
+          metric_definition?: string
+          normalized_value?: number | null
+          previous_claim_id?: string | null
+          previous_currency?: string
+          previous_period?: string
+          previous_value_text?: string
+          reason?: string
+          relation?: string
+          reporting_period?: string
+          review_note?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_capture_id?: string | null
+          source_date?: string
+          source_document_id?: string | null
+          source_excerpt?: string
+          source_key?: string
+          source_kind?: string
+          source_reference?: string
+          source_title?: string
+          status?: string
+          updated_at?: string
+          value_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_fact_proposals_applied_claim_id_fkey"
+            columns: ["applied_claim_id"]
+            isOneToOne: false
+            referencedRelation: "deal_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_fact_proposals_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_fact_proposals_previous_claim_id_fkey"
+            columns: ["previous_claim_id"]
+            isOneToOne: false
+            referencedRelation: "deal_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_fact_proposals_source_capture_id_fkey"
+            columns: ["source_capture_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_fact_proposals_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_fact_reviews: {
+        Row: {
+          action: string
+          after: Json
+          before: Json
+          created_at: string
+          id: string
+          note: string
+          proposal_id: string
+          reviewer: string | null
+        }
+        Insert: {
+          action: string
+          after?: Json
+          before?: Json
+          created_at?: string
+          id?: string
+          note?: string
+          proposal_id: string
+          reviewer?: string | null
+        }
+        Update: {
+          action?: string
+          after?: Json
+          before?: Json
+          created_at?: string
+          id?: string
+          note?: string
+          proposal_id?: string
+          reviewer?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_fact_reviews_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "case_fact_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_analysis_runs: {
         Row: {
           completed_at: string | null
@@ -3514,6 +3708,7 @@ export type Database = {
           file_path: string | null
           id: string
           label: string
+          metric_definition: string
           normalized_value: number | null
           proposed_change_to: string | null
           reporting_period: string
@@ -3542,6 +3737,7 @@ export type Database = {
           file_path?: string | null
           id?: string
           label: string
+          metric_definition?: string
           normalized_value?: number | null
           proposed_change_to?: string | null
           reporting_period?: string
@@ -3570,6 +3766,7 @@ export type Database = {
           file_path?: string | null
           id?: string
           label?: string
+          metric_definition?: string
           normalized_value?: number | null
           proposed_change_to?: string | null
           reporting_period?: string
@@ -3752,35 +3949,122 @@ export type Database = {
           },
         ]
       }
-      deal_memos: {
+      deal_memo_versions: {
         Row: {
+          approved_proposal_ids: string[]
           content: string
           created_at: string
           created_by: string | null
           deal_id: string
+          edited_by: string | null
+          generation_model: string
+          human_edited: boolean
           id: string
+          memo_id: string
+          origin: string
+          source_ids: string[]
+          title: string
+          version_number: number
+        }
+        Insert: {
+          approved_proposal_ids?: string[]
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          edited_by?: string | null
+          generation_model?: string
+          human_edited?: boolean
+          id?: string
+          memo_id: string
+          origin?: string
+          source_ids?: string[]
+          title?: string
+          version_number: number
+        }
+        Update: {
+          approved_proposal_ids?: string[]
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          edited_by?: string | null
+          generation_model?: string
+          human_edited?: boolean
+          id?: string
+          memo_id?: string
+          origin?: string
+          source_ids?: string[]
+          title?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_memo_versions_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_memo_versions_memo_id_fkey"
+            columns: ["memo_id"]
+            isOneToOne: false
+            referencedRelation: "deal_memos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_memos: {
+        Row: {
+          approved_proposal_ids: string[]
+          content: string
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          edited_by: string | null
+          generation_model: string
+          generation_request_id: string | null
+          human_edited: boolean
+          id: string
+          origin: string
+          source_ids: string[]
           status: string
           title: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          approved_proposal_ids?: string[]
           content?: string
           created_at?: string
           created_by?: string | null
           deal_id: string
+          edited_by?: string | null
+          generation_model?: string
+          generation_request_id?: string | null
+          human_edited?: boolean
           id?: string
+          origin?: string
+          source_ids?: string[]
           status?: string
           title?: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          approved_proposal_ids?: string[]
           content?: string
           created_at?: string
           created_by?: string | null
           deal_id?: string
+          edited_by?: string | null
+          generation_model?: string
+          generation_request_id?: string | null
+          human_edited?: boolean
           id?: string
+          origin?: string
+          source_ids?: string[]
           status?: string
           title?: string
           updated_at?: string
@@ -5016,6 +5300,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_case_fact_proposal: {
+        Args: {
+          p_action: string
+          p_expected_updated_at?: string
+          p_note?: string
+          p_patch?: Json
+          p_proposal_id: string
+        }
+        Returns: Json
+      }
       approve_outreach: { Args: { p_id: string }; Returns: Json }
       assign_outreach_owner: {
         Args: { p_id: string; p_owner_user_id: string }

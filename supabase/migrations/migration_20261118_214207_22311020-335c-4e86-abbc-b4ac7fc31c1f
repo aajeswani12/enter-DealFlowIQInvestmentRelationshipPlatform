@@ -1,0 +1,1 @@
+alter table public.case_fact_proposals add column if not exists reason text not null default '';

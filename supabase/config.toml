@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.matchInvestorsToDeal]
 verify_jwt = false
+
+[functions.caseIntelligence]
+verify_jwt = false
