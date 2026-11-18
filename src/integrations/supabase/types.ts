@@ -3302,7 +3302,7 @@ export type Database = {
       }
       case_documents: {
         Row: {
-          batch_id: string
+          batch_id: string | null
           created_at: string
           created_by: string | null
           deal_id: string
@@ -3311,14 +3311,14 @@ export type Database = {
           extracted_text: string
           file_name: string
           id: string
-          import_file_id: string
+          import_file_id: string | null
           mime_type: string
           source_date: string
           storage_path: string
           title: string
         }
         Insert: {
-          batch_id: string
+          batch_id?: string | null
           created_at?: string
           created_by?: string | null
           deal_id: string
@@ -3327,14 +3327,14 @@ export type Database = {
           extracted_text?: string
           file_name: string
           id?: string
-          import_file_id: string
+          import_file_id?: string | null
           mime_type?: string
           source_date?: string
           storage_path: string
           title: string
         }
         Update: {
-          batch_id?: string
+          batch_id?: string | null
           created_at?: string
           created_by?: string | null
           deal_id?: string
@@ -3343,7 +3343,7 @@ export type Database = {
           extracted_text?: string
           file_name?: string
           id?: string
-          import_file_id?: string
+          import_file_id?: string | null
           mime_type?: string
           source_date?: string
           storage_path?: string
@@ -3700,6 +3700,98 @@ export type Database = {
             columns: ["investor_id"]
             isOneToOne: false
             referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_investors: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          id: string
+          investor_id: string
+          notes: string
+          relationship_status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          id?: string
+          investor_id: string
+          notes?: string
+          relationship_status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          id?: string
+          investor_id?: string
+          notes?: string
+          relationship_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_investors_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_investors_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_memos: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_memos_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
             referencedColumns: ["id"]
           },
         ]

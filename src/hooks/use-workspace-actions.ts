@@ -15,6 +15,20 @@ export function useWorkspaceActions() {
       onSuccess: invalidate,
     }),
     createCase: useMutation({ mutationFn: api.createCase, onSuccess: invalidate }),
+    addDealInvestor: useMutation({ mutationFn: api.addDealInvestor, onSuccess: invalidate }),
+    updateDealInvestor: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateDealInvestor>[1] }) =>
+        api.updateDealInvestor(id, patch),
+      onSuccess: invalidate,
+    }),
+    removeDealInvestor: useMutation({ mutationFn: api.removeDealInvestor, onSuccess: invalidate }),
+    createDealMemo: useMutation({ mutationFn: api.createDealMemo, onSuccess: invalidate }),
+    updateDealMemo: useMutation({
+      mutationFn: ({ id, input }: { id: string; input: Parameters<typeof api.updateDealMemo>[1] }) =>
+        api.updateDealMemo(id, input),
+      onSuccess: invalidate,
+    }),
+    addCaseDocument: useMutation({ mutationFn: api.addCaseDocument, onSuccess: invalidate }),
     createDealPerson: useMutation({
       mutationFn: ({ dealId, input }: { dealId: string; input: Parameters<typeof api.createDealPerson>[1] }) =>
         api.createDealPerson(dealId, input),

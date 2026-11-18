@@ -13,6 +13,8 @@ import type {
   CaseDocument,
   CaseStatus,
   DealPerson,
+  DealInvestor,
+  DealMemo,
   FollowUpTask,
   ImportBatch,
   ImportCandidate,
@@ -72,6 +74,8 @@ type RunRow = Tables["deal_analysis_runs"]["Row"];
 type BriefRow = Tables["deal_briefs"]["Row"];
 type CaseDocumentRow = Tables["case_documents"]["Row"];
 type DealPersonRow = Tables["deal_people"]["Row"];
+type DealInvestorRow = Tables["deal_investors"]["Row"];
+type DealMemoRow = Tables["deal_memos"]["Row"];
 type FollowUpTaskRow = Tables["follow_up_tasks"]["Row"];
 type ImportBatchRow = Tables["import_batches"]["Row"];
 type ImportFileRow = Tables["import_files"]["Row"];
@@ -323,6 +327,32 @@ function mapDealPerson(row: DealPersonRow): DealPerson {
     role: row.role as DealPerson["role"],
     sourceDocumentId: row.source_document_id,
     sourceExcerpt: row.source_excerpt,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapDealInvestor(row: DealInvestorRow): DealInvestor {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    investorId: row.investor_id,
+    relationshipStatus: row.relationship_status as RelationshipStatus,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapDealMemo(row: DealMemoRow): DealMemo {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    title: row.title,
+    content: row.content,
+    status: row.status as DealMemo["status"],
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -780,7 +810,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, dealPeople, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, dealPeople, dealInvestors, dealMemos, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -799,6 +829,8 @@ export const api = {
         supabase.from("outreach_events").select("*").order("created_at", { ascending: false }).limit(1000),
         supabase.from("case_documents").select("*").order("source_date", { ascending: true }).limit(1000),
         supabase.from("deal_people").select("*").order("name", { ascending: true }).limit(1000),
+        supabase.from("deal_investors").select("*").order("created_at", { ascending: false }).limit(1000),
+        supabase.from("deal_memos").select("*").order("updated_at", { ascending: false }).limit(500),
         supabase.from("follow_up_tasks").select("*").order("created_at", { ascending: false }).limit(500),
         supabase.from("import_batches").select("*").order("created_at", { ascending: false }).limit(100),
         supabase.from("import_files").select("*").order("created_at", { ascending: false }).limit(500),
@@ -823,6 +855,8 @@ export const api = {
     if (outreachEvents.error) fail("Could not load outreach activity", outreachEvents.error);
     if (caseDocuments.error) fail("Could not load case documents", caseDocuments.error);
     if (dealPeople.error) fail("Could not load deal people", dealPeople.error);
+    if (dealInvestors.error) fail("Could not load deal investors", dealInvestors.error);
+    if (dealMemos.error) fail("Could not load deal memos", dealMemos.error);
     if (followUpTasks.error) fail("Could not load follow-up tasks", followUpTasks.error);
     if (importBatches.error) fail("Could not load import batches", importBatches.error);
     if (importFiles.error) fail("Could not load import files", importFiles.error);
@@ -857,6 +891,8 @@ export const api = {
       outreachEvents: (outreachEvents.data ?? []).map(mapOutreachEvent),
       caseDocuments: (caseDocuments.data ?? []).map(mapCaseDocument),
       dealPeople: (dealPeople.data ?? []).map(mapDealPerson),
+      dealInvestors: (dealInvestors.data ?? []).map(mapDealInvestor),
+      dealMemos: (dealMemos.data ?? []).map(mapDealMemo),
       followUpTasks: (followUpTasks.data ?? []).map(mapFollowUpTask),
       importBatches: (importBatches.data ?? []).map(mapImportBatch),
       importFiles: (importFiles.data ?? []).map(mapImportFile),
@@ -1359,6 +1395,135 @@ export const api = {
       created_by: userId,
     });
     if (error) fail("Could not save this person", error);
+  },
+
+  async addDealInvestor(input: {
+    dealId: string;
+    investorId: string;
+    relationshipStatus: RelationshipStatus;
+    notes: string;
+  }): Promise<DealInvestor> {
+    const userId = await currentUserId();
+    const { data, error } = await supabase
+      .from("deal_investors")
+      .insert({
+        deal_id: input.dealId,
+        investor_id: input.investorId,
+        relationship_status: input.relationshipStatus,
+        notes: input.notes.trim().slice(0, 1000),
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) fail("Could not link this investor to the deal", error);
+    return mapDealInvestor(data);
+  },
+
+  async updateDealInvestor(
+    id: string,
+    patch: Partial<Pick<DealInvestor, "relationshipStatus" | "notes">>,
+  ): Promise<void> {
+    const update: Tables["deal_investors"]["Update"] = {};
+    if (patch.relationshipStatus !== undefined) update.relationship_status = patch.relationshipStatus;
+    if (patch.notes !== undefined) update.notes = patch.notes.trim().slice(0, 1000);
+    const { error } = await supabase.from("deal_investors").update(update).eq("id", id);
+    if (error) fail("Could not update this investor association", error);
+  },
+
+  async removeDealInvestor(id: string): Promise<void> {
+    const { error } = await supabase.from("deal_investors").delete().eq("id", id);
+    if (error) fail("Could not remove this investor association", error);
+  },
+
+  async createDealMemo(input: {
+    dealId: string;
+    title: string;
+    content: string;
+  }): Promise<DealMemo> {
+    const userId = await currentUserId();
+    const { data, error } = await supabase
+      .from("deal_memos")
+      .insert({
+        deal_id: input.dealId,
+        title: input.title.trim().slice(0, 200),
+        content: input.content.slice(0, 100000),
+        status: "draft",
+        created_by: userId,
+        updated_by: userId,
+      })
+      .select()
+      .single();
+    if (error) fail("Could not save this memo", error);
+    return mapDealMemo(data);
+  },
+
+  async updateDealMemo(id: string, input: { title: string; content: string }): Promise<void> {
+    const userId = await currentUserId();
+    const { error } = await supabase
+      .from("deal_memos")
+      .update({
+        title: input.title.trim().slice(0, 200),
+        content: input.content.slice(0, 100000),
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) fail("Could not update this memo", error);
+  },
+
+  async addCaseDocument(input: {
+    dealId: string;
+    title: string;
+    file: File;
+    sourceDate: string;
+  }): Promise<CaseDocument> {
+    const userId = await currentUserId();
+    const extension = input.file.name.toLowerCase().split(".").pop() ?? "";
+    const documentType =
+      extension === "pdf"
+        ? "pdf"
+        : extension === "docx"
+          ? "docx"
+          : extension === "csv"
+            ? "csv"
+            : extension === "eml"
+              ? "email"
+              : extension === "txt"
+                ? "txt"
+                : null;
+    if (!documentType || !["pdf", "docx", "csv", "txt", "email"].includes(documentType)) {
+      throw new Error("Unsupported document type. Use PDF, DOCX, CSV, TXT or EML.");
+    }
+    if (input.file.size > 20 * 1024 * 1024) {
+      throw new Error("This document is larger than 20 MB.");
+    }
+    const safeName = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
+    const path = `${userId}/manual/${input.dealId}/${crypto.randomUUID()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage.from("imports").upload(path, input.file, {
+      contentType: input.file.type || "application/octet-stream",
+      upsert: false,
+    });
+    if (uploadError) fail("Could not store this document", uploadError);
+    const { data, error } = await supabase
+      .from("case_documents")
+      .insert({
+        deal_id: input.dealId,
+        import_file_id: null,
+        batch_id: null,
+        title: (input.title.trim() || input.file.name).slice(0, 240),
+        document_type: documentType,
+        source_date: input.sourceDate,
+        storage_path: path,
+        file_name: input.file.name.slice(0, 240),
+        mime_type: input.file.type || "application/octet-stream",
+        extracted_text: "",
+        excerpt: "",
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) fail("Could not attach this document to the case", error);
+    return mapCaseDocument(data);
   },
 
   async updateCase(id: string, patch: Partial<Omit<InvestmentCase, "id" | "createdAt">>): Promise<void> {

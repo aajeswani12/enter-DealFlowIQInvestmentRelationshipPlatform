@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
-import { ACTIVE_CASE_STATUSES, CASE_STATUS_LABEL, CASE_STATUS_OPTIONS } from "@/lib/constants";
+import { ACTIVE_CASE_STATUSES, CASE_STATUS_LABEL, ROUND_STAGES } from "@/lib/constants";
 import { dueLabel, isOverdue, pluralize, relativeDays } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -75,9 +75,13 @@ const Dashboard = () => {
     isOverdue(item.nextStepDue),
   ).length;
 
-  const pipeline = CASE_STATUS_OPTIONS.map((option) => ({
-    ...option,
-    count: workspace.cases.filter((item) => item.status === option.value).length,
+  const pipeline = [...ROUND_STAGES, "Not recorded"].map((stage) => ({
+    value: stage,
+    label: stage,
+    count:
+      stage === "Not recorded"
+        ? workspace.cases.filter((item) => !item.roundStage).length
+        : workspace.cases.filter((item) => item.roundStage === stage).length,
   }));
   const pipelineMax = Math.max(1, ...pipeline.map((item) => item.count));
 
@@ -207,7 +211,7 @@ const Dashboard = () => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 id="pipeline-heading" className="text-[15px] font-semibold tracking-tight">
-                  Case pipeline
+                  Cases by funding stage
                 </h2>
                 <p className="text-[11.5px] text-muted-foreground">
                   {workspace.cases.length === 0

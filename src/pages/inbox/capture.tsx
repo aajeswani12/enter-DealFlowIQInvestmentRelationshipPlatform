@@ -143,6 +143,7 @@ const VoiceCapture = () => {
   const [saveError, setSaveError] = useState("");
   const [saved, setSaved] = useState<SavedCapture | null>(null);
 
+  const requestedDealRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pasteRef = useRef<HTMLTextAreaElement | null>(null);
   const processedClipRef = useRef<string | null>(null);
@@ -160,7 +161,19 @@ const VoiceCapture = () => {
 
   useEffect(() => {
     if (searchParams.get("mode") === "paste") setPasteOpen(true);
-  }, [searchParams]);
+    const requestedDeal = searchParams.get("deal");
+    if (
+      requestedDeal &&
+      requestedDeal !== requestedDealRef.current &&
+      workspace.cases.some((item) => item.id === requestedDeal)
+    ) {
+      requestedDealRef.current = requestedDeal;
+      setTargetMode("existing");
+      setDealId(requestedDeal);
+      setSaveError("");
+    }
+    // Run again when the workspace arrives, but do not overwrite a later user choice.
+  }, [searchParams, workspace.cases]);
 
   useEffect(() => {
     if (!pasteOpen) return;

@@ -538,8 +538,8 @@ export interface ImportReview {
 export interface CaseDocument {
   id: string;
   dealId: string;
-  importFileId: string;
-  batchId: string;
+  importFileId: string | null;
+  batchId: string | null;
   title: string;
   documentType: ImportFileType;
   sourceDate: string;
@@ -578,6 +578,29 @@ export interface DealPerson {
   role: "founder" | "contact" | "other";
   sourceDocumentId: string | null;
   sourceExcerpt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+export interface DealInvestor {
+  id: string;
+  dealId: string;
+  investorId: string;
+  relationshipStatus: RelationshipStatus;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DealMemo {
+  id: string;
+  dealId: string;
+  title: string;
+  content: string;
+  status: "draft" | "approved";
+  createdBy: string | null;
+  updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
