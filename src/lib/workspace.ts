@@ -11,6 +11,7 @@ import type {
   InvestmentCase,
   Investor,
   Outreach,
+  OutreachEvent,
   WorkspaceMember,
 } from "./types";
 
@@ -23,6 +24,7 @@ export interface WorkspaceData {
   investors: Investor[];
   interactions: Interaction[];
   outreach: Outreach[];
+  outreachEvents: OutreachEvent[];
   matches: DealInvestorMatch[];
   analysisRuns: DealAnalysisRun[];
   briefs: DealBrief[];
@@ -39,6 +41,7 @@ export const EMPTY_WORKSPACE: WorkspaceData = {
   investors: [],
   interactions: [],
   outreach: [],
+  outreachEvents: [],
   matches: [],
   analysisRuns: [],
   briefs: [],

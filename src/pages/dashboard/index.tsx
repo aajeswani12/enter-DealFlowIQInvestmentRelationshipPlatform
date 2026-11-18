@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   Briefcase,
+  CalendarClock,
   CircleAlert,
   CircleHelp,
   Clock3,
@@ -34,6 +35,15 @@ const Dashboard = () => {
   const activeCases = workspace.cases.filter((item) => ACTIVE_CASE_STATUSES.includes(item.status));
   const openGaps = workspace.gaps.filter((item) => item.status === "open" || item.status === "needs_review");
   const pendingOutreach = workspace.outreach.filter((item) => item.status === "draft");
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  const followupsDue = workspace.outreach.filter(
+    (item) =>
+      Boolean(item.nextFollowupAt) &&
+      item.status !== "rejected" &&
+      item.status !== "not_interested" &&
+      new Date(item.nextFollowupAt as string).getTime() <= endOfToday.getTime(),
+  );
 
   const nextSteps = useMemo(() => {
     const caseSteps = workspace.cases
@@ -118,7 +128,7 @@ const Dashboard = () => {
       {isLoading ? (
         <StatGridSkeleton />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <StatCard
             label="Active cases"
             value={activeCases.length}
@@ -145,6 +155,13 @@ const Dashboard = () => {
             value={pendingOutreach.length}
             hint="Outreach drafts a human still has to approve."
             icon={Send}
+            to="/matches?tab=outreach"
+          />
+          <StatCard
+            label="Follow-ups due"
+            value={followupsDue.length}
+            hint="Manual outreach tasks with a persisted due date."
+            icon={CalendarClock}
             to="/matches?tab=outreach"
           />
         </div>

@@ -18,7 +18,7 @@ import { ACTIVE_CASE_STATUSES, INVESTOR_STATUS_LABEL } from "@/lib/constants";
 import { formatCurrency } from "@/lib/format";
 import { primaryContact } from "@/lib/investors";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
-import type { DealInvestorMatch, Investor, MatchWeights } from "@/lib/types";
+import type { DealInvestorMatch, Investor, MatchWeights, Outreach } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MATCH_STATUS_META } from "@/lib/match-status";
 import { MatchResultCard } from "./match-result-card";
@@ -72,6 +72,8 @@ const Matches = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerInvestor, setComposerInvestor] = useState<Investor | null>(null);
+  const [composerMatch, setComposerMatch] = useState<DealInvestorMatch | null>(null);
+  const [composerOutreach, setComposerOutreach] = useState<Outreach | null>(null);
   const [decisionFilter, setDecisionFilter] = useState("all");
   const [weights, setWeights] = useState<MatchWeights>(DEFAULT_WEIGHTS);
   const [runResult, setRunResult] = useState<MatchRun | null>(null);
@@ -86,7 +88,9 @@ const Matches = () => {
   const selectedCase = workspace.cases.find((item) => item.id === caseParam) ?? selectable[0] ?? null;
 
   const drafts = workspace.outreach.filter((item) => item.status === "draft");
-  const awaitingApproval = workspace.outreach.filter((item) => item.status === "approved");
+  const openOutreach = workspace.outreach.filter((item) =>
+    ["draft", "approved", "follow_up_needed"].includes(item.status),
+  );
 
   const config = workspace.matchWeights;
 
@@ -204,8 +208,17 @@ const Matches = () => {
     }
   };
 
-  const openComposer = (investor: Investor) => {
+  const openComposer = (investor: Investor, match?: DealInvestorMatch) => {
     setComposerInvestor(investor);
+    setComposerMatch(match ?? null);
+    setComposerOutreach(null);
+    setComposerOpen(true);
+  };
+
+  const editOutreach = (item: Outreach) => {
+    setComposerOutreach(item);
+    setComposerInvestor(investorById.get(item.investorId) ?? null);
+    setComposerMatch(workspace.matches.find((match) => match.id === item.matchId) ?? null);
     setComposerOpen(true);
   };
 
@@ -250,7 +263,7 @@ const Matches = () => {
             <div className="inline-flex rounded-lg border border-border bg-secondary/50 p-1">
               {[
                 { value: "matches", label: "Matches", count: savedMatches.length },
-                { value: "outreach", label: "Outreach queue", count: drafts.length + awaitingApproval.length },
+                { value: "outreach", label: "Outreach queue", count: openOutreach.length },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -415,10 +428,10 @@ const Matches = () => {
                             (item) =>
                               item.dealId === match.dealId &&
                               item.investorId === match.investorId &&
-                              item.status !== "sent",
+                              !["rejected", "not_interested"].includes(item.status),
                           )}
                           onDecision={(status) => void decide(match, status)}
-                          onDraft={() => openComposer(investor)}
+                          onDraft={() => openComposer(investor, match)}
                         />
                       );
                     })}
@@ -572,33 +585,17 @@ const Matches = () => {
               <div className="flex items-start gap-2 rounded-lg border border-brand/20 bg-brand-soft/50 px-3.5 py-2.5 text-[11px] leading-relaxed text-brand-strong">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <p>
-                  A draft only moves forward with a human decision: approve it, send it yourself, then record it as sent.
-                  {drafts.length > 0
-                    ? ` ${drafts.length} draft${drafts.length === 1 ? "" : "s"} still need approval.`
-                    : ""}
+                  A draft only moves forward with a human decision: approve it, copy it, send it from your own inbox, then
+                  record the contact and responses. {drafts.length > 0
+                    ? `${drafts.length} draft${drafts.length === 1 ? "" : "s"} still need approval.`
+                    : ""} Follow-ups are manual tasks with persisted dates.
                 </p>
               </div>
               <OutreachQueue
                 outreach={workspace.outreach}
                 cases={workspace.cases}
                 investors={workspace.investors}
-                pending={actions.updateOutreach.isPending}
-                onApprove={async (item) => {
-                  try {
-                    await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "approved" } });
-                    toast.success("Approved. Send it from your inbox, then record it as sent.");
-                  } catch {
-                    toast.error("Could not approve this draft.");
-                  }
-                }}
-                onRecordSent={async (item) => {
-                  try {
-                    await actions.updateOutreach.mutateAsync({ id: item.id, patch: { status: "sent" } });
-                    toast.success("Recorded as sent");
-                  } catch {
-                    toast.error("Could not record this as sent.");
-                  }
-                }}
+                onEdit={editOutreach}
               />
             </>
           )}
@@ -607,9 +604,21 @@ const Matches = () => {
 
       <OutreachComposer
         open={composerOpen}
-        onOpenChange={setComposerOpen}
-        caseItem={selectedCase}
+        onOpenChange={(open) => {
+          setComposerOpen(open);
+          if (!open) {
+            setComposerOutreach(null);
+            setComposerMatch(null);
+          }
+        }}
+        caseItem={
+          composerOutreach
+            ? workspace.cases.find((item) => item.id === composerOutreach.dealId) ?? selectedCase
+            : selectedCase
+        }
         investor={composerInvestor}
+        match={composerMatch}
+        initial={composerOutreach}
       />
     </div>
   );

@@ -85,6 +85,12 @@ export function RelationshipPill({ status, label }: { status: string; label: str
 const OUTREACH_TONES: Record<string, Tone> = {
   draft: "neutral",
   approved: "brand",
+  contacted: "success",
+  replied: "brand",
+  interested: "success",
+  not_interested: "danger",
+  follow_up_needed: "warning",
+  rejected: "danger",
   sent: "success",
 };
 

@@ -1,0 +1,200 @@
+drop trigger if exists outreach_actions_log on public.outreach_actions;
+create trigger outreach_actions_log_after
+after update on public.outreach_actions
+for each row execute function public.log_outreach_event();
+
+create or replace function public.approve_outreach(p_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_row public.outreach_actions%rowtype;
+begin
+  if v_uid is null then raise exception 'Authentication required' using errcode = '42501'; end if;
+  if not public.can_write_project() then raise exception 'You do not have write access' using errcode = '42501'; end if;
+  select * into v_row from public.outreach_actions where id = p_id;
+  if not found then raise exception 'Outreach not found' using errcode = 'P0002'; end if;
+  if not (v_row.owner_user_id = v_uid or public.is_project_admin()) then
+    raise exception 'Only the outreach owner or an admin can approve this draft' using errcode = '42501';
+  end if;
+  if v_row.status not in ('draft') then
+    raise exception 'Only draft outreach can be approved' using errcode = '22023';
+  end if;
+  if btrim(v_row.draft_subject) = '' or btrim(v_row.draft_body) = '' then
+    raise exception 'The draft needs a subject and body before approval' using errcode = '22023';
+  end if;
+  perform set_config('dealflow.outreach_transition', '1', true);
+  update public.outreach_actions
+  set status = 'approved', approved_by = v_uid, approved_at = now(),
+      rejected_by = null, rejected_at = null, rejection_reason = ''
+  where id = p_id;
+  perform set_config('dealflow.outreach_transition', '', true);
+  return jsonb_build_object('id', p_id, 'status', 'approved', 'approved_by', v_uid);
+end;
+$$;
+
+create or replace function public.reject_outreach(p_id uuid, p_reason text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_row public.outreach_actions%rowtype;
+  v_reason text := btrim(coalesce(p_reason, ''));
+begin
+  if v_uid is null then raise exception 'Authentication required' using errcode = '42501'; end if;
+  if not public.can_write_project() then raise exception 'You do not have write access' using errcode = '42501'; end if;
+  select * into v_row from public.outreach_actions where id = p_id;
+  if not found then raise exception 'Outreach not found' using errcode = 'P0002'; end if;
+  if not (v_row.owner_user_id = v_uid or public.is_project_admin()) then
+    raise exception 'Only the outreach owner or an admin can reject this draft' using errcode = '42501';
+  end if;
+  if v_row.status not in ('draft','approved') then
+    raise exception 'Only a draft or approved outreach can be rejected' using errcode = '22023';
+  end if;
+  if v_reason = '' then
+    raise exception 'A rejection reason is required' using errcode = '22023';
+  end if;
+  perform set_config('dealflow.outreach_transition', '1', true);
+  update public.outreach_actions
+  set status = 'rejected', rejected_by = v_uid, rejected_at = now(), rejection_reason = v_reason
+  where id = p_id;
+  perform set_config('dealflow.outreach_transition', '', true);
+  return jsonb_build_object('id', p_id, 'status', 'rejected');
+end;
+$$;
+
+create or replace function public.record_outreach_progress(
+  p_id uuid,
+  p_status text,
+  p_note text default '',
+  p_interaction_at timestamptz default null,
+  p_next_followup_at timestamptz default null,
+  p_followup_note text default ''
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_row public.outreach_actions%rowtype;
+  v_interaction_at timestamptz := coalesce(p_interaction_at, now());
+  v_note text := left(btrim(coalesce(p_note, '')), 2000);
+  v_followup_note text := left(btrim(coalesce(p_followup_note, '')), 1000);
+begin
+  if v_uid is null then raise exception 'Authentication required' using errcode = '42501'; end if;
+  if not public.can_write_project() then raise exception 'You do not have write access' using errcode = '42501'; end if;
+  select * into v_row from public.outreach_actions where id = p_id;
+  if not found then raise exception 'Outreach not found' using errcode = 'P0002'; end if;
+  if not (v_row.owner_user_id = v_uid or public.is_project_admin()) then
+    raise exception 'Only the outreach owner or an admin can record this activity' using errcode = '42501';
+  end if;
+  if p_status not in ('contacted','replied','interested','not_interested','follow_up_needed') then
+    raise exception 'Invalid outreach progress status' using errcode = '22023';
+  end if;
+
+  if p_status = 'contacted' then
+    if v_row.status not in ('approved','follow_up_needed') then
+      raise exception 'Mark contacted only after approval' using errcode = '22023';
+    end if;
+  elsif p_status in ('replied','interested','not_interested') then
+    if v_row.status not in ('contacted','replied','interested','follow_up_needed') then
+      raise exception 'Record a response only after the outreach was sent' using errcode = '22023';
+    end if;
+  elsif p_status = 'follow_up_needed' then
+    if v_row.status not in ('approved','contacted','replied','interested') then
+      raise exception 'A follow-up can only be scheduled for active outreach' using errcode = '22023';
+    end if;
+    if p_next_followup_at is null then
+      raise exception 'A follow-up date is required' using errcode = '22023';
+    end if;
+  end if;
+
+  perform set_config('dealflow.outreach_transition', '1', true);
+  update public.outreach_actions
+  set status = p_status,
+      sent_at = case when p_status = 'contacted' then coalesce(sent_at, now()) else sent_at end,
+      replied_at = case when p_status in ('replied','interested','not_interested') then coalesce(replied_at, v_interaction_at) else replied_at end,
+      response_summary = case when v_note <> '' then v_note else response_summary end,
+      next_followup_at = coalesce(p_next_followup_at, next_followup_at),
+      followup_note = case when v_followup_note <> '' then v_followup_note else followup_note end
+  where id = p_id;
+  perform set_config('dealflow.outreach_transition', '', true);
+
+  if p_status in ('contacted','replied','interested','not_interested') then
+    insert into public.investor_interactions (
+      investor_id, deal_id, kind, summary, occurred_at, next_step, next_step_due, created_by
+    ) values (
+      v_row.investor_id,
+      v_row.deal_id,
+      'email',
+      case when p_status = 'contacted'
+        then 'Outreach email sent: ' || left(v_row.draft_subject, 180)
+        else 'Response recorded (' || p_status || '): ' || left(coalesce(nullif(v_note, ''), 'No response note'), 500)
+      end,
+      v_interaction_at,
+      v_followup_note,
+      p_next_followup_at,
+      v_uid
+    );
+
+    update public.investors
+    set last_contact_at = v_interaction_at,
+        next_step = case when v_followup_note <> '' then v_followup_note else next_step end,
+        next_step_due = coalesce(p_next_followup_at, next_step_due)
+    where id = v_row.investor_id;
+  end if;
+
+  return jsonb_build_object('id', p_id, 'status', p_status);
+end;
+$$;
+
+create or replace function public.assign_outreach_owner(p_id uuid, p_owner_user_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_row public.outreach_actions%rowtype;
+  v_member uuid;
+begin
+  if v_uid is null then raise exception 'Authentication required' using errcode = '42501'; end if;
+  if not public.can_write_project() then raise exception 'You do not have write access' using errcode = '42501'; end if;
+  select * into v_row from public.outreach_actions where id = p_id;
+  if not found then raise exception 'Outreach not found' using errcode = 'P0002'; end if;
+  if not (v_row.owner_user_id = v_uid or public.is_project_admin()) then
+    raise exception 'Only the outreach owner or an admin can reassign this outreach' using errcode = '42501';
+  end if;
+  select user_id into v_member from public.workspace_members
+  where user_id = p_owner_user_id and status = 'active' limit 1;
+  if v_member is null then
+    raise exception 'The assigned owner must be an active workspace member' using errcode = '22023';
+  end if;
+  perform set_config('dealflow.outreach_transition', '1', true);
+  update public.outreach_actions set owner_user_id = p_owner_user_id where id = p_id;
+  perform set_config('dealflow.outreach_transition', '', true);
+  return jsonb_build_object('id', p_id, 'owner_user_id', p_owner_user_id);
+end;
+$$;
+
+revoke all on function public.approve_outreach(uuid) from public, anon;
+revoke all on function public.reject_outreach(uuid, text) from public, anon;
+revoke all on function public.record_outreach_progress(uuid, text, text, timestamptz, timestamptz, text) from public, anon;
+revoke all on function public.assign_outreach_owner(uuid, uuid) from public, anon;
+grant execute on function public.approve_outreach(uuid) to authenticated;
+grant execute on function public.reject_outreach(uuid, text) to authenticated;
+grant execute on function public.record_outreach_progress(uuid, text, text, timestamptz, timestamptz, text) to authenticated;
+grant execute on function public.assign_outreach_owner(uuid, uuid) to authenticated;
+
+revoke all on function public.outreach_force_draft() from public, anon, authenticated;
+revoke all on function public.outreach_guard() from public, anon, authenticated;
+revoke all on function public.log_outreach_event() from public, anon, authenticated;

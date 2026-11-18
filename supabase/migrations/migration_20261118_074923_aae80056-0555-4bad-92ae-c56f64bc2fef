@@ -1,0 +1,185 @@
+alter table public.outreach_actions
+  add column match_id uuid references public.deal_investor_matches(id) on delete set null,
+  add column approved_by uuid,
+  add column rejected_at timestamptz,
+  add column rejected_by uuid,
+  add column rejection_reason text not null default '',
+  add column replied_at timestamptz,
+  add column response_summary text not null default '',
+  add column followup_note text not null default '',
+  add column generation_status text not null default 'manual'
+    check (generation_status in ('manual','generated','unavailable')),
+  add column grounding jsonb not null default '[]'::jsonb,
+  add column missing_information jsonb not null default '[]'::jsonb,
+  add column generation_model text not null default '',
+  add column edited_at timestamptz;
+
+alter table public.outreach_actions drop constraint outreach_messages_status_check;
+alter table public.outreach_actions add constraint outreach_actions_status_check check (
+  status in ('draft','approved','contacted','replied','interested','not_interested','follow_up_needed','rejected','sent')
+);
+
+create index outreach_actions_match_idx on public.outreach_actions (match_id);
+
+create table public.outreach_events (
+  id uuid primary key default gen_random_uuid(),
+  outreach_id uuid not null references public.outreach_actions(id) on delete cascade,
+  investor_id uuid not null references public.investors(id) on delete cascade,
+  deal_id uuid references public.deals(id) on delete set null,
+  event_type text not null check (event_type in (
+    'drafted','edited','approved','approval_revoked','rejected','contacted','replied',
+    'interested','not_interested','followup_needed','followup_scheduled','owner_assigned'
+  )),
+  note text not null default '',
+  actor_user_id uuid,
+  created_at timestamptz not null default now()
+);
+
+create index outreach_events_outreach_idx on public.outreach_events (outreach_id, created_at desc);
+create index outreach_events_investor_idx on public.outreach_events (investor_id, created_at desc);
+
+alter table public.outreach_events enable row level security;
+create policy outreach_events_select on public.outreach_events
+for select to authenticated using (public.is_project_member());
+
+insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id, created_at)
+select id, investor_id, deal_id, 'drafted', draft_subject, created_by, created_at from public.outreach_actions;
+
+create or replace function public.outreach_force_draft()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.status := 'draft';
+  new.approved_by := null;
+  new.approved_at := null;
+  new.rejected_by := null;
+  new.rejected_at := null;
+  new.rejection_reason := '';
+  if new.owner_user_id is null then
+    new.owner_user_id := auth.uid();
+  end if;
+  return new;
+end;
+$$;
+
+create trigger outreach_actions_force_draft
+before insert on public.outreach_actions
+for each row execute function public.outreach_force_draft();
+
+create or replace function public.outreach_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_content_changed boolean := (
+    new.draft_subject is distinct from old.draft_subject
+    or new.draft_body is distinct from old.draft_body
+  );
+  v_flag text := coalesce(current_setting('dealflow.outreach_transition', true), '');
+begin
+  if v_content_changed then
+    new.edited_at := now();
+    if old.status = 'approved' and new.status = old.status then
+      new.status := 'draft';
+      new.approved_by := null;
+      new.approved_at := null;
+    end if;
+  end if;
+
+  if new.status is distinct from old.status
+     and v_flag <> '1'
+     and not (old.status = 'approved' and new.status = 'draft' and v_content_changed) then
+    raise exception 'Outreach status changes must go through the outreach functions' using errcode = '42501';
+  end if;
+
+  if new.owner_user_id is distinct from old.owner_user_id and v_flag <> '1' then
+    raise exception 'Outreach owner changes must go through assign_outreach_owner' using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger outreach_actions_guard
+before update on public.outreach_actions
+for each row execute function public.outreach_guard();
+
+create or replace function public.log_outreach_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_content_changed boolean := (
+    new.draft_subject is distinct from old.draft_subject
+    or new.draft_body is distinct from old.draft_body
+  );
+  v_note text;
+begin
+  if tg_op = 'INSERT' then
+    insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+    values (new.id, new.investor_id, new.deal_id, 'drafted', left(new.draft_subject, 300), v_actor);
+    return new;
+  end if;
+
+  v_note := case
+    when new.response_summary <> '' then left(new.response_summary, 500)
+    when new.rejection_reason <> '' then left(new.rejection_reason, 500)
+    else left(new.draft_subject, 300)
+  end;
+
+  if v_content_changed then
+    insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+    values (new.id, new.investor_id, new.deal_id, 'edited', left(new.draft_subject, 300), v_actor);
+  end if;
+
+  if new.status is distinct from old.status then
+    if new.status = 'approved' then
+      insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+      values (new.id, new.investor_id, new.deal_id, 'approved', left(new.draft_subject, 300), v_actor);
+    elsif new.status = 'contacted' or new.status = 'sent' then
+      insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+      values (new.id, new.investor_id, new.deal_id, 'contacted', v_note, v_actor);
+    elsif new.status in ('replied','interested','not_interested') then
+      insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+      values (new.id, new.investor_id, new.deal_id, new.status, v_note, v_actor);
+    elsif new.status = 'follow_up_needed' then
+      insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+      values (new.id, new.investor_id, new.deal_id, 'followup_needed', v_note, v_actor);
+    elsif new.status = 'rejected' then
+      insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+      values (new.id, new.investor_id, new.deal_id, 'rejected', v_note, v_actor);
+    elsif new.status = 'draft' and old.status = 'approved' then
+      insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+      values (new.id, new.investor_id, new.deal_id, 'approval_revoked', 'Approval reset after the draft was edited', v_actor);
+    end if;
+  end if;
+
+  if new.owner_user_id is distinct from old.owner_user_id then
+    insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+    values (new.id, new.investor_id, new.deal_id, 'owner_assigned', '', v_actor);
+  end if;
+
+  if new.next_followup_at is distinct from old.next_followup_at and new.next_followup_at is not null then
+    insert into public.outreach_events (outreach_id, investor_id, deal_id, event_type, note, actor_user_id)
+    values (new.id, new.investor_id, new.deal_id, 'followup_scheduled', left(coalesce(new.followup_note, ''), 300), v_actor);
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger outreach_actions_log
+before update on public.outreach_actions
+for each row execute function public.log_outreach_event();
+
+create trigger outreach_actions_log_insert
+after insert on public.outreach_actions
+for each row execute function public.log_outreach_event();

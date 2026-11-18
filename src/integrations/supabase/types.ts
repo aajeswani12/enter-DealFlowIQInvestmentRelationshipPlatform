@@ -4037,6 +4037,7 @@ export type Database = {
       outreach_actions: {
         Row: {
           approved_at: string | null
+          approved_by: string | null
           channel: string
           contact_id: string | null
           created_at: string
@@ -4044,16 +4045,29 @@ export type Database = {
           deal_id: string
           draft_body: string
           draft_subject: string
+          edited_at: string | null
+          followup_note: string
+          generation_model: string
+          generation_status: string
+          grounding: Json
           id: string
           investor_id: string
+          match_id: string | null
+          missing_information: Json
           next_followup_at: string | null
           owner_user_id: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string
+          replied_at: string | null
+          response_summary: string
           sent_at: string | null
           status: string
           updated_at: string
         }
         Insert: {
           approved_at?: string | null
+          approved_by?: string | null
           channel?: string
           contact_id?: string | null
           created_at?: string
@@ -4061,16 +4075,29 @@ export type Database = {
           deal_id: string
           draft_body: string
           draft_subject: string
+          edited_at?: string | null
+          followup_note?: string
+          generation_model?: string
+          generation_status?: string
+          grounding?: Json
           id?: string
           investor_id: string
+          match_id?: string | null
+          missing_information?: Json
           next_followup_at?: string | null
           owner_user_id?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string
+          replied_at?: string | null
+          response_summary?: string
           sent_at?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           approved_at?: string | null
+          approved_by?: string | null
           channel?: string
           contact_id?: string | null
           created_at?: string
@@ -4078,10 +4105,22 @@ export type Database = {
           deal_id?: string
           draft_body?: string
           draft_subject?: string
+          edited_at?: string | null
+          followup_note?: string
+          generation_model?: string
+          generation_status?: string
+          grounding?: Json
           id?: string
           investor_id?: string
+          match_id?: string | null
+          missing_information?: Json
           next_followup_at?: string | null
           owner_user_id?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string
+          replied_at?: string | null
+          response_summary?: string
           sent_at?: string | null
           status?: string
           updated_at?: string
@@ -4092,6 +4131,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "investor_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_actions_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "deal_investor_matches"
             referencedColumns: ["id"]
           },
           {
@@ -4113,6 +4159,61 @@ export type Database = {
             columns: ["investor_id"]
             isOneToOne: false
             referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outreach_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          deal_id: string | null
+          event_type: string
+          id: string
+          investor_id: string
+          note: string
+          outreach_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          event_type: string
+          id?: string
+          investor_id: string
+          note?: string
+          outreach_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          deal_id?: string | null
+          event_type?: string
+          id?: string
+          investor_id?: string
+          note?: string
+          outreach_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_events_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_events_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_events_outreach_id_fkey"
+            columns: ["outreach_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_actions"
             referencedColumns: ["id"]
           },
         ]
@@ -4269,6 +4370,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_outreach: { Args: { p_id: string }; Returns: Json }
+      assign_outreach_owner: {
+        Args: { p_id: string; p_owner_user_id: string }
+        Returns: Json
+      }
       can_write_project: { Args: never; Returns: boolean }
       claim_workspace: { Args: never; Returns: string }
       current_member_role: { Args: never; Returns: string }
@@ -4279,6 +4385,21 @@ export type Database = {
       import_investors: { Args: { p_rows: Json }; Returns: Json }
       is_project_admin: { Args: never; Returns: boolean }
       is_project_member: { Args: never; Returns: boolean }
+      record_outreach_progress: {
+        Args: {
+          p_followup_note?: string
+          p_id: string
+          p_interaction_at?: string
+          p_next_followup_at?: string
+          p_note?: string
+          p_status: string
+        }
+        Returns: Json
+      }
+      reject_outreach: {
+        Args: { p_id: string; p_reason: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

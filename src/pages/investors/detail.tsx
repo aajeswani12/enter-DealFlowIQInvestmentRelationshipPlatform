@@ -13,6 +13,7 @@ import {
   INTERACTION_KIND_LABEL,
   INVESTOR_STATUS_LABEL,
   INVESTOR_TYPE_LABEL,
+  OUTREACH_EVENT_LABEL,
   OUTREACH_PERMISSION_LABEL,
   OUTREACH_STATUS_LABEL,
   RELATIONSHIP_STRENGTH_LABEL,
@@ -79,6 +80,9 @@ const InvestorDetail = () => {
     .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
   const outreach = workspace.outreach
     .filter((item) => item.investorId === investor.id)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const outreachEvents = workspace.outreachEvents
+    .filter((event) => event.investorId === investor.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const investorMatches = workspace.matches
@@ -275,6 +279,34 @@ const InvestorDetail = () => {
             ) : null}
           </section>
 
+          <section className="panel p-5" aria-labelledby="outreach-activity-heading">
+            <h2 id="outreach-activity-heading" className="text-[15px] font-semibold tracking-tight">
+              Outreach activity
+            </h2>
+            <p className="text-[11.5px] text-muted-foreground">
+              Approval, contact and response events persisted by the outreach workflow.
+            </p>
+            {outreachEvents.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-border px-3 py-5 text-center text-[12px] text-muted-foreground">
+                No outreach activity recorded yet. Draft from a saved match on the Matches page.
+              </p>
+            ) : (
+              <ol className="mt-3 space-y-2.5">
+                {outreachEvents.map((event) => (
+                  <li key={event.id} className="flex items-start justify-between gap-3 border-b border-border/60 pb-2.5 last:border-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium">{OUTREACH_EVENT_LABEL[event.eventType] ?? event.eventType}</p>
+                      {event.note ? (
+                        <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{event.note}</p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-[10.5px] text-muted-foreground">{formatShortDate(event.createdAt)}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
           <section className="panel p-5" aria-labelledby="interactions-heading">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -407,6 +439,7 @@ const InvestorDetail = () => {
                     </div>
                     <p className="mt-1 text-[10.5px] text-muted-foreground">
                       {formatShortDate(item.sentAt ?? item.approvedAt ?? item.createdAt)}
+                      {item.nextFollowupAt ? ` · follow-up ${formatShortDate(item.nextFollowupAt)}` : ""}
                     </p>
                   </li>
                 ))}

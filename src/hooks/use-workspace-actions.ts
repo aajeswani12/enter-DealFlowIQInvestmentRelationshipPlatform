@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { WorkspaceData } from "@/lib/workspace";
 
 /** Mutations invalidate the single workspace snapshot so every view stays honest. */
 export function useWorkspaceActions() {
@@ -57,31 +56,32 @@ export function useWorkspaceActions() {
     deleteContact: useMutation({ mutationFn: api.deleteContact, onSuccess: invalidate }),
     createInteraction: useMutation({ mutationFn: api.createInteraction, onSuccess: invalidate }),
     createOutreach: useMutation({ mutationFn: api.createOutreach, onSuccess: invalidate }),
-    updateOutreach: useMutation({
-      mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateOutreach>[1] }) =>
-        api.updateOutreach(id, patch),
+    updateOutreachContent: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateOutreachContent>[1] }) =>
+        api.updateOutreachContent(id, patch),
       onSuccess: invalidate,
-      onMutate: async ({ id, patch }) => {
-        await queryClient.cancelQueries({ queryKey: ["workspace"] });
-        queryClient.setQueryData<WorkspaceData>(["workspace"], (current) =>
-          current
-            ? {
-                ...current,
-                outreach: current.outreach.map((item) =>
-                  item.id === id
-                    ? {
-                        ...item,
-                        ...patch,
-                        approvedAt: patch.status === "approved" ? new Date().toISOString() : item.approvedAt,
-                        sentAt: patch.status === "sent" ? new Date().toISOString() : item.sentAt,
-                      }
-                    : item,
-                ),
-              }
-            : current,
-        );
-      },
     }),
+    approveOutreach: useMutation({ mutationFn: (id: string) => api.approveOutreach(id), onSuccess: invalidate }),
+    rejectOutreach: useMutation({
+      mutationFn: ({ id, reason }: { id: string; reason: string }) => api.rejectOutreach(id, reason),
+      onSuccess: invalidate,
+    }),
+    recordOutreachProgress: useMutation({
+      mutationFn: ({
+        id,
+        input,
+      }: {
+        id: string;
+        input: Parameters<typeof api.recordOutreachProgress>[1];
+      }) => api.recordOutreachProgress(id, input),
+      onSuccess: invalidate,
+    }),
+    assignOutreachOwner: useMutation({
+      mutationFn: ({ id, ownerUserId }: { id: string; ownerUserId: string }) =>
+        api.assignOutreachOwner(id, ownerUserId),
+      onSuccess: invalidate,
+    }),
+    generateOutreachDraft: useMutation({ mutationFn: api.generateOutreachDraft }),
     saveMatch: useMutation({ mutationFn: api.saveMatch, onSuccess: invalidate }),
     runInvestorMatching: useMutation({
       mutationFn: (dealId: string) => api.runInvestorMatching(dealId),

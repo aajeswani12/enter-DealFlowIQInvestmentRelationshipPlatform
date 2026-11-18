@@ -70,7 +70,30 @@ export type RelationshipStatus = "new" | "warm" | "active" | "dormant";
 export type RelationshipStrength = "unknown" | "weak" | "warm" | "strong";
 export type OutreachPermission = "unknown" | "permitted" | "requires_intro" | "do_not_contact";
 
-export type OutreachStatus = "draft" | "approved" | "sent";
+export type OutreachStatus =
+  | "draft"
+  | "approved"
+  | "contacted"
+  | "replied"
+  | "interested"
+  | "not_interested"
+  | "follow_up_needed"
+  | "rejected"
+  | "sent";
+
+export type OutreachEventType =
+  | "drafted"
+  | "edited"
+  | "approved"
+  | "approval_revoked"
+  | "rejected"
+  | "contacted"
+  | "replied"
+  | "interested"
+  | "not_interested"
+  | "followup_needed"
+  | "followup_scheduled"
+  | "owner_assigned";
 export type OutreachChannel = "email" | "linkedin" | "intro";
 export type MatchStatus =
   | "suggested"
@@ -324,6 +347,7 @@ export interface Outreach {
   dealId: string;
   investorId: string;
   contactId: string | null;
+  matchId: string | null;
   subject: string;
   body: string;
   channel: OutreachChannel;
@@ -332,7 +356,30 @@ export interface Outreach {
   nextFollowupAt: string | null;
   createdAt: string;
   approvedAt: string | null;
+  approvedBy: string | null;
   sentAt: string | null;
+  repliedAt: string | null;
+  rejectedAt: string | null;
+  rejectedBy: string | null;
+  rejectionReason: string;
+  responseSummary: string;
+  followupNote: string;
+  generationStatus: "manual" | "generated" | "unavailable";
+  grounding: string[];
+  missingInformation: string[];
+  generationModel: string;
+  editedAt: string | null;
+}
+
+export interface OutreachEvent {
+  id: string;
+  outreachId: string;
+  investorId: string;
+  dealId: string | null;
+  eventType: OutreachEventType;
+  note: string;
+  actorUserId: string | null;
+  createdAt: string;
 }
 
 export type RuleOutcome = "pass" | "partial" | "fail";

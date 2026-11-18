@@ -33,6 +33,7 @@ import type {
   MatchWeights,
   Outreach,
   OutreachChannel,
+  OutreachEvent,
   OutreachPermission,
   OutreachStatus,
   QuestionStatus,
@@ -260,9 +261,35 @@ function mapOutreach(row: OutreachRow): Outreach {
     status: row.status as OutreachStatus,
     ownerUserId: row.owner_user_id,
     nextFollowupAt: row.next_followup_at,
+    matchId: row.match_id,
     createdAt: row.created_at,
     approvedAt: row.approved_at,
+    approvedBy: row.approved_by,
     sentAt: row.sent_at,
+    repliedAt: row.replied_at,
+    rejectedAt: row.rejected_at,
+    rejectedBy: row.rejected_by,
+    rejectionReason: row.rejection_reason,
+    responseSummary: row.response_summary,
+    followupNote: row.followup_note,
+    generationStatus: row.generation_status as Outreach["generationStatus"],
+    grounding: (row.grounding as unknown as string[]) ?? [],
+    missingInformation: (row.missing_information as unknown as string[]) ?? [],
+    generationModel: row.generation_model,
+    editedAt: row.edited_at,
+  };
+}
+
+function mapOutreachEvent(row: Tables["outreach_events"]["Row"]): OutreachEvent {
+  return {
+    id: row.id,
+    outreachId: row.outreach_id,
+    investorId: row.investor_id,
+    dealId: row.deal_id,
+    eventType: row.event_type as OutreachEvent["eventType"],
+    note: row.note,
+    actorUserId: row.actor_user_id,
+    createdAt: row.created_at,
   };
 }
 
@@ -483,11 +510,17 @@ export interface OutreachInput {
   dealId: string;
   investorId: string;
   contactId: string | null;
+  matchId: string | null;
   subject: string;
   body: string;
   channel: OutreachChannel;
   status: OutreachStatus;
+  ownerUserId: string | null;
   nextFollowupAt: string | null;
+  generationStatus: "manual" | "generated" | "unavailable";
+  grounding: string[];
+  missingInformation: string[];
+  generationModel: string;
 }
 
 export interface ClaimInput {
@@ -567,7 +600,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -583,6 +616,7 @@ export const api = {
         supabase.from("deal_analysis_runs").select("*").order("created_at", { ascending: false }).limit(200),
         supabase.from("deal_briefs").select("*").order("created_at", { ascending: false }).limit(200),
         supabase.from("match_weight_configs").select("*").order("updated_at", { ascending: false }).limit(1),
+        supabase.from("outreach_events").select("*").order("created_at", { ascending: false }).limit(1000),
       ]);
 
     if (deals.error) fail("Could not load deals", deals.error);
@@ -599,6 +633,7 @@ export const api = {
     if (runs.error) fail("Could not load analysis runs", runs.error);
     if (briefs.error) fail("Could not load deal briefs", briefs.error);
     if (weightConfigs.error) fail("Could not load matching settings", weightConfigs.error);
+    if (outreachEvents.error) fail("Could not load outreach activity", outreachEvents.error);
 
     const sourceRows = sources.data ?? [];
     const audioPaths = sourceRows
@@ -625,6 +660,7 @@ export const api = {
       investors: (investors.data ?? []).map((row) => mapInvestor(row, contactList)),
       interactions: (interactions.data ?? []).map(mapInteraction),
       outreach: (outreach.data ?? []).map(mapOutreach),
+      outreachEvents: (outreachEvents.data ?? []).map(mapOutreachEvent),
       matches: (matches.data ?? []).map(mapMatch),
       members: (members.data ?? []).map(mapMember),
       audit: (audit.data ?? []).map(mapAudit),
@@ -1180,12 +1216,17 @@ export const api = {
         deal_id: input.dealId,
         investor_id: input.investorId,
         contact_id: input.contactId,
+        match_id: input.matchId,
         draft_subject: input.subject,
         draft_body: input.body,
         channel: input.channel,
         status: input.status,
-        owner_user_id: userId,
+        owner_user_id: input.ownerUserId ?? userId,
         next_followup_at: input.nextFollowupAt,
+        generation_status: input.generationStatus,
+        grounding: input.grounding as unknown as Json,
+        missing_information: input.missingInformation as unknown as Json,
+        generation_model: input.generationModel,
         created_by: userId,
       })
       .select()
@@ -1194,9 +1235,9 @@ export const api = {
     return mapOutreach(data);
   },
 
-  async updateOutreach(
+  async updateOutreachContent(
     id: string,
-    patch: Partial<Pick<Outreach, "subject" | "body" | "status" | "channel" | "contactId" | "nextFollowupAt">>,
+    patch: Partial<Pick<Outreach, "subject" | "body" | "channel" | "contactId" | "nextFollowupAt">>,
   ): Promise<void> {
     const update: Tables["outreach_actions"]["Update"] = {};
     if (patch.subject !== undefined) update.draft_subject = patch.subject;
@@ -1204,14 +1245,71 @@ export const api = {
     if (patch.channel !== undefined) update.channel = patch.channel;
     if (patch.contactId !== undefined) update.contact_id = patch.contactId;
     if (patch.nextFollowupAt !== undefined) update.next_followup_at = patch.nextFollowupAt;
-    if (patch.status !== undefined) {
-      update.status = patch.status;
-      const now = new Date().toISOString();
-      if (patch.status === "approved") update.approved_at = now;
-      if (patch.status === "sent") update.sent_at = now;
-    }
     const { error } = await supabase.from("outreach_actions").update(update).eq("id", id);
     if (error) fail("Could not update this outreach", error);
+  },
+
+  async approveOutreach(id: string): Promise<void> {
+    const { error } = await supabase.rpc("approve_outreach", { p_id: id });
+    if (error) fail("Could not approve this outreach", error);
+  },
+
+  async rejectOutreach(id: string, reason: string): Promise<void> {
+    const { error } = await supabase.rpc("reject_outreach", { p_id: id, p_reason: reason });
+    if (error) fail("Could not reject this outreach", error);
+  },
+
+  async recordOutreachProgress(
+    id: string,
+    input: {
+      status: "contacted" | "replied" | "interested" | "not_interested" | "follow_up_needed";
+      note: string;
+      interactionAt: string | null;
+      nextFollowupAt: string | null;
+      followupNote: string;
+    },
+  ): Promise<void> {
+    const { error } = await supabase.rpc("record_outreach_progress", {
+      p_id: id,
+      p_status: input.status,
+      p_note: input.note,
+      p_interaction_at: input.interactionAt,
+      p_next_followup_at: input.nextFollowupAt,
+      p_followup_note: input.followupNote,
+    });
+    if (error) fail("Could not record this outreach activity", error);
+  },
+
+  async assignOutreachOwner(id: string, ownerUserId: string): Promise<void> {
+    const { error } = await supabase.rpc("assign_outreach_owner", {
+      p_id: id,
+      p_owner_user_id: ownerUserId,
+    });
+    if (error) fail("Could not assign this outreach owner", error);
+  },
+
+  async generateOutreachDraft(matchId: string): Promise<{
+    configured: boolean;
+    subject?: string;
+    body?: string;
+    grounding?: string[];
+    missingInformation?: string[];
+    model?: string;
+    reason?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke("generateOutreachDraft", {
+      body: { match_id: matchId },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { configured: false, reason: "The generation service returned no response." }) as {
+      configured: boolean;
+      subject?: string;
+      body?: string;
+      grounding?: string[];
+      missingInformation?: string[];
+      model?: string;
+      reason?: string;
+    };
   },
 
   async saveMatch(input: {

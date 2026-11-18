@@ -143,7 +143,12 @@ export const OUTREACH_CHANNEL_OPTIONS: { value: OutreachChannel; label: string }
 export const OUTREACH_STATUS_OPTIONS: { value: OutreachStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
   { value: "approved", label: "Approved" },
-  { value: "sent", label: "Sent" },
+  { value: "contacted", label: "Contacted" },
+  { value: "replied", label: "Replied" },
+  { value: "interested", label: "Interested" },
+  { value: "not_interested", label: "Not Interested" },
+  { value: "follow_up_needed", label: "Follow-up Needed" },
+  { value: "rejected", label: "Rejected" },
 ];
 
 export const MEMBER_ROLE_OPTIONS: { value: MemberRole; label: string }[] = [
@@ -264,7 +269,28 @@ export const INTERACTION_KIND_LABEL: Record<InteractionKind, string> = {
 export const OUTREACH_STATUS_LABEL: Record<OutreachStatus, string> = {
   draft: "Draft",
   approved: "Approved",
-  sent: "Sent",
+  contacted: "Contacted",
+  replied: "Replied",
+  interested: "Interested",
+  not_interested: "Not Interested",
+  follow_up_needed: "Follow-up Needed",
+  rejected: "Rejected",
+  sent: "Contacted (legacy)",
+};
+
+export const OUTREACH_EVENT_LABEL: Record<string, string> = {
+  drafted: "Draft created",
+  edited: "Draft edited",
+  approved: "Approved by a human",
+  approval_revoked: "Approval reset after edit",
+  rejected: "Rejected",
+  contacted: "Marked contacted",
+  replied: "Reply recorded",
+  interested: "Marked interested",
+  not_interested: "Marked not interested",
+  followup_needed: "Follow-up needed",
+  followup_scheduled: "Follow-up scheduled",
+  owner_assigned: "Outreach owner changed",
 };
 
 export const OUTREACH_CHANNEL_LABEL: Record<OutreachChannel, string> = {
