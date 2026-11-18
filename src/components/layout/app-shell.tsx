@@ -48,6 +48,9 @@ function Wordmark({ tone = "dark" }: { tone?: "dark" | "light" }) {
           )}
         >
           DealFlow IQ
+          <span className="ml-2 whitespace-nowrap text-[9px] font-semibold tracking-tight text-brand-strong">
+            DealFlow IQ — UI v3
+          </span>
         </span>
         <span
           className={cn(
