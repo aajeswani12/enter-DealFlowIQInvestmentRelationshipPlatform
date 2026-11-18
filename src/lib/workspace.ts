@@ -1,6 +1,8 @@
 import type {
   AuditEvent,
   Capture,
+  DealAnalysisRun,
+  DealBrief,
   DealClaim,
   DealInvestorMatch,
   DecisionGap,
@@ -21,6 +23,8 @@ export interface WorkspaceData {
   interactions: Interaction[];
   outreach: Outreach[];
   matches: DealInvestorMatch[];
+  analysisRuns: DealAnalysisRun[];
+  briefs: DealBrief[];
   members: WorkspaceMember[];
   audit: AuditEvent[];
 }
@@ -34,6 +38,8 @@ export const EMPTY_WORKSPACE: WorkspaceData = {
   interactions: [],
   outreach: [],
   matches: [],
+  analysisRuns: [],
+  briefs: [],
   members: [],
   audit: [],
 };

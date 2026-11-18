@@ -1,0 +1,115 @@
+-- Analysis history and snapshots
+create table public.deal_analysis_runs (
+  id uuid primary key default gen_random_uuid(),
+  deal_id uuid not null references public.deals(id) on delete cascade,
+  source_id uuid not null references public.sources(id) on delete cascade,
+  model text not null default '',
+  status text not null default 'running' check (status in ('running','completed','failed','unavailable')),
+  error text not null default '',
+  warnings jsonb not null default '[]'::jsonb,
+  extracted jsonb not null default '{}'::jsonb,
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index deal_analysis_runs_deal_idx on public.deal_analysis_runs (deal_id, created_at desc);
+create index deal_analysis_runs_source_idx on public.deal_analysis_runs (source_id);
+
+alter table public.deal_analysis_runs enable row level security;
+
+create policy deal_analysis_runs_select on public.deal_analysis_runs
+for select to authenticated using (public.is_project_member());
+create policy deal_analysis_runs_insert on public.deal_analysis_runs
+for insert to authenticated with check (public.can_write_project());
+create policy deal_analysis_runs_update on public.deal_analysis_runs
+for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy deal_analysis_runs_delete on public.deal_analysis_runs
+for delete to authenticated using (public.is_project_admin());
+
+create table public.deal_briefs (
+  id uuid primary key default gen_random_uuid(),
+  deal_id uuid not null references public.deals(id) on delete cascade,
+  analysis_run_id uuid references public.deal_analysis_runs(id) on delete set null,
+  summary text not null default '',
+  scope_note text not null default 'AI-assisted analysis of source evidence. Not an investment recommendation.',
+  known_facts jsonb not null default '[]'::jsonb,
+  unknowns jsonb not null default '[]'::jsonb,
+  risks jsonb not null default '[]'::jsonb,
+  follow_ups jsonb not null default '[]'::jsonb,
+  evidence jsonb not null default '[]'::jsonb,
+  status text not null default 'draft' check (status in ('draft','approved')),
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  reviewed_by uuid,
+  reviewed_at timestamptz
+);
+
+create index deal_briefs_deal_idx on public.deal_briefs (deal_id, created_at desc);
+
+alter table public.deal_briefs enable row level security;
+
+create policy deal_briefs_select on public.deal_briefs
+for select to authenticated using (public.is_project_member());
+create policy deal_briefs_insert on public.deal_briefs
+for insert to authenticated with check (public.can_write_project());
+create policy deal_briefs_update on public.deal_briefs
+for update to authenticated using (public.can_write_project()) with check (public.can_write_project());
+create policy deal_briefs_delete on public.deal_briefs
+for delete to authenticated using (public.is_project_admin());
+
+-- Claim review and provenance
+ alter table public.deal_claims
+  add column review_status text not null default 'approved'
+    check (review_status in ('draft','approved','rejected')),
+  add column reviewed_by uuid,
+  add column reviewed_at timestamptz,
+  add column analysis_run_id uuid references public.deal_analysis_runs(id) on delete set null,
+  add column superseded_by uuid references public.deal_claims(id) on delete set null,
+  add column proposed_change_to uuid references public.deal_claims(id) on delete set null,
+  add column claim_key text not null default '',
+  add column verification_note text not null default '',
+  add column attribution text not null default 'unknown'
+    check (attribution in ('founder','third_party','unknown'));
+
+alter table public.deal_claims drop constraint case_evidence_kind_check;
+alter table public.deal_claims add constraint deal_claims_claim_type_check check (
+  claim_type in (
+    'metric','document','call_note','reference',
+    'traction','revenue','financial','founder','investor_mention',
+    'product','funding','ownership','next_action','company','sector','stage'
+  )
+);
+
+alter table public.deal_claims drop constraint deal_claims_verification_status_check;
+alter table public.deal_claims add constraint deal_claims_verification_status_check check (
+  verification_status in ('unverified','founder_reported','corroborated','disputed')
+);
+
+create index deal_claims_deal_key_idx on public.deal_claims (deal_id, claim_key);
+create index deal_claims_run_idx on public.deal_claims (analysis_run_id);
+
+-- Decision readiness checklist
+ alter table public.decision_gaps
+  add column why_it_matters text not null default '',
+  add column evidence text not null default '',
+  add column suggested_action text not null default '',
+  add column source_id uuid references public.sources(id) on delete set null,
+  add column analysis_run_id uuid references public.deal_analysis_runs(id) on delete set null,
+  add column gap_key text not null default '',
+  add column origin text not null default 'manual' check (origin in ('manual','analysis'));
+
+alter table public.decision_gaps drop constraint case_questions_status_check;
+alter table public.decision_gaps add constraint decision_gaps_status_check check (
+  status in ('open','answered','needs_review','resolved')
+);
+
+create unique index decision_gaps_deal_key_key on public.decision_gaps (deal_id, gap_key) where gap_key <> '';
+create index decision_gaps_run_idx on public.decision_gaps (analysis_run_id);
+create index decision_gaps_source_idx on public.decision_gaps (source_id);
+
+-- Audit the new records and review changes
+create trigger deal_analysis_runs_audit after insert or update or delete on public.deal_analysis_runs
+for each row execute function public.record_audit_event();
+create trigger deal_briefs_audit after insert or update or delete on public.deal_briefs
+for each row execute function public.record_audit_event();

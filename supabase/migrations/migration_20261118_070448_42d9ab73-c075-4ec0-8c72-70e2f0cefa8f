@@ -1,0 +1,34 @@
+insert into public.deals (
+  id, company_name, summary, sector, geography, stage, status, target_raise, cheque_sought,
+  pre_money_valuation, ownership_target, lead_required, thesis, next_step, is_synthetic, website
+) values (
+  '44444444-4444-4444-8444-444444444444',
+  'MuseFlow (synthetic analysis test)',
+  'Synthetic analysis fixture: workflow analytics for product teams. Not a real company.',
+  'Enterprise SaaS', 'US & Canada', 'Seed', 'sourcing', null, null, null, null, false,
+  'Synthetic case for testing evidence analysis, reporting-period discrepancies and reviewed-fact protection. All content is fictional.',
+  '', true, ''
+)
+on conflict (id) do nothing;
+
+insert into public.sources (
+  id, deal_id, title, source_type, raw_text, source_date, triage_status,
+  transcription_status, extraction_status, duration_seconds
+) values
+(
+  '55555555-5555-4555-8555-555555555551',
+  '44444444-4444-4444-8444-444444444444',
+  'MuseFlow founder call — Jan 2026 (synthetic)',
+  'text',
+  'MuseFlow is a workflow analytics platform for product teams. We are raising a $2.5M seed round at a $12M pre-money valuation. ARR was $420k as of December 2025, growing 18% month over month. The team is 11 people. Sam Ortega is the founder and was previously head of product at a logistics software company. Two public SaaS companies are paying customers. The advisor equity allocation is still unresolved.',
+  '2026-01-15T15:00:00Z', 'promoted', 'manual', 'not_requested', null
+),
+(
+  '55555555-5555-4555-8555-555555555552',
+  '44444444-4444-4444-8444-444444444444',
+  'MuseFlow update — Apr 2026 (synthetic)',
+  'text',
+  'MuseFlow update for Q1 2026. ARR reached $780k in March 2026, up from $420k at December 2025, driven by annual prepay. We are now raising a $3.0M seed round. The team is 14 people. One investor asked about gross margin; we track 78% gross margin for March 2026. The advisor allocation is still unresolved. Next step: send the cohort file and close the advisor allocation before the round close.',
+  '2026-04-20T15:00:00Z', 'promoted', 'manual', 'not_requested', null
+)
+on conflict (id) do nothing;

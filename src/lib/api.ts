@@ -1,13 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import type { WorkspaceData } from "./workspace";
 import type {
   AuditEvent,
+  BriefEvidence,
+  BriefFact,
+  BriefRisk,
+  BriefUnknown,
   Capture,
   CaptureSource,
   CaptureStatus,
   CaseStatus,
   ClaimType,
+  DealAnalysisRun,
+  DealBrief,
   DealClaim,
   DealInvestorMatch,
   DecisionGap,
@@ -49,6 +55,8 @@ type OutreachRow = Tables["outreach_actions"]["Row"];
 type MatchRow = Tables["deal_investor_matches"]["Row"];
 type MemberRow = Tables["workspace_members"]["Row"];
 type AuditRow = Tables["audit_events"]["Row"];
+type RunRow = Tables["deal_analysis_runs"]["Row"];
+type BriefRow = Tables["deal_briefs"]["Row"];
 
 const VOICE_BUCKET = "voice-notes";
 const EVIDENCE_BUCKET = "case-evidence";
@@ -145,6 +153,15 @@ function mapClaim(row: ClaimRow): DealClaim {
     sourceId: row.source_id,
     fileName: row.file_name,
     filePath: row.file_path,
+    reviewStatus: row.review_status as DealClaim["reviewStatus"],
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    analysisRunId: row.analysis_run_id,
+    supersededBy: row.superseded_by,
+    proposedChangeTo: row.proposed_change_to,
+    claimKey: row.claim_key,
+    verificationNote: row.verification_note,
+    attribution: row.attribution as DealClaim["attribution"],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -161,6 +178,13 @@ function mapGap(row: GapRow): DecisionGap {
     severity: row.severity as GapSeverity,
     blockingDecision: row.blocking_decision,
     dueDate: row.due_date,
+    whyItMatters: row.why_it_matters,
+    evidence: row.evidence,
+    suggestedAction: row.suggested_action,
+    sourceId: row.source_id,
+    analysisRunId: row.analysis_run_id,
+    gapKey: row.gap_key,
+    origin: row.origin as DecisionGap["origin"],
     createdAt: row.created_at,
     resolvedAt: row.resolved_at,
   };
@@ -264,6 +288,38 @@ function mapMember(row: MemberRow): WorkspaceMember {
     role: row.role as MemberRole,
     status: row.status as MemberStatus,
     invitedBy: row.invited_by,
+    createdAt: row.created_at,
+  };
+}
+
+function mapRun(row: RunRow): DealAnalysisRun {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    sourceId: row.source_id,
+    model: row.model,
+    status: row.status as DealAnalysisRun["status"],
+    error: row.error,
+    warnings: (row.warnings as unknown as string[]) ?? [],
+    extracted: (row.extracted as Record<string, unknown>) ?? {},
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
+  };
+}
+
+function mapBrief(row: BriefRow): DealBrief {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    analysisRunId: row.analysis_run_id,
+    summary: row.summary,
+    scopeNote: row.scope_note,
+    knownFacts: (row.known_facts as unknown as BriefFact[]) ?? [],
+    unknowns: (row.unknowns as unknown as BriefUnknown[]) ?? [],
+    risks: (row.risks as unknown as BriefRisk[]) ?? [],
+    followUps: (row.follow_ups as unknown as string[]) ?? [],
+    evidence: (row.evidence as unknown as BriefEvidence[]) ?? [],
+    status: row.status as DealBrief["status"],
     createdAt: row.created_at,
   };
 }
@@ -490,7 +546,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -503,6 +559,8 @@ export const api = {
         supabase.from("deal_investor_matches").select("*").order("updated_at", { ascending: false }),
         supabase.from("workspace_members").select("*").order("created_at", { ascending: true }),
         supabase.from("audit_events").select("*").order("created_at", { ascending: false }).limit(40),
+        supabase.from("deal_analysis_runs").select("*").order("created_at", { ascending: false }).limit(200),
+        supabase.from("deal_briefs").select("*").order("created_at", { ascending: false }).limit(200),
       ]);
 
     if (deals.error) fail("Could not load deals", deals.error);
@@ -516,6 +574,8 @@ export const api = {
     if (matches.error) fail("Could not load saved matches", matches.error);
     if (members.error) fail("Could not load workspace members", members.error);
     if (audit.error) fail("Could not load the audit trail", audit.error);
+    if (runs.error) fail("Could not load analysis runs", runs.error);
+    if (briefs.error) fail("Could not load deal briefs", briefs.error);
 
     const sourceRows = sources.data ?? [];
     const audioPaths = sourceRows
@@ -545,6 +605,8 @@ export const api = {
       matches: (matches.data ?? []).map(mapMatch),
       members: (members.data ?? []).map(mapMember),
       audit: (audit.data ?? []).map(mapAudit),
+      analysisRuns: (runs.data ?? []).map(mapRun),
+      briefs: (briefs.data ?? []).map(mapBrief),
     };
   },
 
@@ -647,6 +709,52 @@ export const api = {
     });
     if (error && error.code !== "23505") fail("Could not create the deal", error);
     return { dealId: input.clientCaptureId, created: !error };
+  },
+
+  async analyzeDealSource(sourceId: string, dealId: string): Promise<{
+    configured: boolean;
+    runId?: string;
+    briefId?: string | null;
+    claims?: number;
+    gaps?: number;
+    warnings?: string[];
+    reason?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke("analyzeDealSource", {
+      body: { source_id: sourceId, deal_id: dealId },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { configured: false, reason: "The analysis service returned no response." }) as {
+      configured: boolean;
+      runId?: string;
+      briefId?: string | null;
+      claims?: number;
+      gaps?: number;
+      warnings?: string[];
+      reason?: string;
+    };
+  },
+
+  async reviewClaim(id: string, decision: "approved" | "rejected", proposedChangeTo: string | null): Promise<void> {
+    const userId = await currentUserId();
+    const { error } = await supabase
+      .from("deal_claims")
+      .update({
+        review_status: decision,
+        reviewed_by: userId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) fail("Could not review this fact", error);
+
+    if (decision === "approved" && proposedChangeTo) {
+      const { error: supersedeError } = await supabase
+        .from("deal_claims")
+        .update({ superseded_by: id })
+        .eq("id", proposedChangeTo)
+        .is("superseded_by", null);
+      if (supersedeError) fail("The new fact was approved but the prior fact was not superseded", supersedeError);
+    }
   },
 
   async createCapture(input: CaptureInput): Promise<Capture> {
@@ -855,7 +963,8 @@ export const api = {
     if (patch.blockingDecision !== undefined) update.blocking_decision = patch.blockingDecision;
     if (patch.status !== undefined) {
       update.status = patch.status;
-      update.resolved_at = patch.status === "answered" ? new Date().toISOString() : null;
+      update.resolved_at =
+        patch.status === "answered" || patch.status === "resolved" ? new Date().toISOString() : null;
     }
     const { error } = await supabase.from("decision_gaps").update(update).eq("id", id);
     if (error) fail("Could not update this decision gap", error);
@@ -1085,7 +1194,7 @@ export const api = {
   },
 
   async importInvestors(rows: Record<string, unknown>[]): Promise<ImportSummary> {
-    const { data, error } = await supabase.rpc("import_investors", { p_rows: rows });
+    const { data, error } = await supabase.rpc("import_investors", { p_rows: rows as unknown as Json });
     if (error) fail("Could not import investors", error);
     const summary = (data ?? {}) as Partial<ImportSummary>;
     return {

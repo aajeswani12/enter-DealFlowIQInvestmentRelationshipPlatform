@@ -32,7 +32,7 @@ const Dashboard = () => {
   const [caseFormOpen, setCaseFormOpen] = useState(false);
 
   const activeCases = workspace.cases.filter((item) => ACTIVE_CASE_STATUSES.includes(item.status));
-  const openGaps = workspace.gaps.filter((item) => item.status === "open");
+  const openGaps = workspace.gaps.filter((item) => item.status === "open" || item.status === "needs_review");
   const pendingOutreach = workspace.outreach.filter((item) => item.status === "draft");
 
   const nextSteps = useMemo(() => {

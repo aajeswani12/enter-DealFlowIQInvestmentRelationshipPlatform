@@ -95,6 +95,18 @@ export const OUTREACH_PERMISSION_OPTIONS: { value: OutreachPermission; label: st
 
 export const CLAIM_TYPE_OPTIONS: { value: ClaimType; label: string }[] = [
   { value: "metric", label: "Metric" },
+  { value: "traction", label: "Traction" },
+  { value: "revenue", label: "Revenue" },
+  { value: "financial", label: "Financial" },
+  { value: "funding", label: "Funding" },
+  { value: "founder", label: "Founder" },
+  { value: "investor_mention", label: "Investor mention" },
+  { value: "product", label: "Product" },
+  { value: "ownership", label: "Ownership" },
+  { value: "next_action", label: "Next action" },
+  { value: "company", label: "Company" },
+  { value: "sector", label: "Sector" },
+  { value: "stage", label: "Stage" },
   { value: "document", label: "Document" },
   { value: "call_note", label: "Call note" },
   { value: "reference", label: "Reference" },
@@ -102,6 +114,7 @@ export const CLAIM_TYPE_OPTIONS: { value: ClaimType; label: string }[] = [
 
 export const VERIFICATION_OPTIONS: { value: VerificationStatus; label: string }[] = [
   { value: "unverified", label: "Unverified" },
+  { value: "founder_reported", label: "Founder reported" },
   { value: "corroborated", label: "Corroborated" },
   { value: "disputed", label: "Disputed" },
 ];
@@ -193,6 +206,18 @@ export const OUTREACH_PERMISSION_LABEL: Record<OutreachPermission, string> = {
 
 export const CLAIM_TYPE_LABEL: Record<ClaimType, string> = {
   metric: "Metric",
+  traction: "Traction",
+  revenue: "Revenue",
+  financial: "Financial",
+  funding: "Funding",
+  founder: "Founder",
+  investor_mention: "Investor mention",
+  product: "Product",
+  ownership: "Ownership",
+  next_action: "Next action",
+  company: "Company",
+  sector: "Sector",
+  stage: "Stage",
   document: "Document",
   call_note: "Call note",
   reference: "Reference",
@@ -200,6 +225,7 @@ export const CLAIM_TYPE_LABEL: Record<ClaimType, string> = {
 
 export const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
   unverified: "Unverified",
+  founder_reported: "Founder reported",
   corroborated: "Corroborated",
   disputed: "Disputed",
 };
@@ -213,8 +239,16 @@ export const SEVERITY_LABEL: Record<GapSeverity, string> = {
 
 export const QUESTION_STATUS_LABEL: Record<QuestionStatus, string> = {
   open: "Open",
-  answered: "Answered",
+  answered: "Resolved",
+  needs_review: "Needs Review",
+  resolved: "Resolved",
 };
+
+export const QUESTION_STATUS_OPTIONS: { value: QuestionStatus; label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "needs_review", label: "Needs Review" },
+  { value: "resolved", label: "Resolved" },
+];
 
 export const INTERACTION_KIND_LABEL: Record<InteractionKind, string> = {
   intro: "Intro",

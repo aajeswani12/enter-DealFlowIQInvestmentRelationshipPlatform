@@ -48,6 +48,14 @@ const DealInbox = () => {
     navigate(`/inbox/capture${legacy === "text" ? "?mode=paste" : ""}`, { replace: true });
   }, [navigate, searchParams]);
 
+  useEffect(() => {
+    if (!data) return;
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const target = document.getElementById(hash);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [data]);
+
   const counts = useMemo(() => {
     const map = new Map<string, number>();
     workspace.captures.forEach((capture) => {
@@ -159,7 +167,7 @@ const DealInbox = () => {
       ) : (
         <ul className="space-y-3">
           {visible.map((capture) => (
-            <li key={capture.id} className="panel p-4 sm:p-5">
+            <li key={capture.id} id={`source-${capture.id}`} className="panel scroll-mt-24 p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

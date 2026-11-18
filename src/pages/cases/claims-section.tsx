@@ -1,5 +1,6 @@
-import { ExternalLink, FileText, Loader2, Paperclip, Plus, Trash2 } from "lucide-react";
+import { Check, ExternalLink, FileText, Loader2, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Pill } from "@/components/common/status-pill";
 import { Field } from "@/components/forms/form-field";
@@ -13,7 +14,12 @@ import { CLAIM_TYPE_LABEL, CLAIM_TYPE_OPTIONS, VERIFICATION_LABEL, VERIFICATION_
 import { formatShortDate } from "@/lib/format";
 import type { ClaimType, DealClaim, VerificationStatus } from "@/lib/types";
 
-const VERIFICATION_TONE = { unverified: "warning", corroborated: "success", disputed: "danger" } as const;
+const VERIFICATION_TONE = {
+  unverified: "neutral",
+  founder_reported: "brand",
+  corroborated: "success",
+  disputed: "danger",
+} as const;
 
 export function ClaimsSection({ dealId, items }: { dealId: string; items: DealClaim[] }) {
   const actions = useWorkspaceActions();
@@ -29,6 +35,23 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [openingId, setOpeningId] = useState<string | null>(null);
+
+  const drafts = items.filter((item) => item.reviewStatus === "draft");
+  const active = items.filter((item) => item.reviewStatus === "approved" && !item.supersededBy);
+  const preserved = items.filter((item) => Boolean(item.supersededBy)).length;
+
+  const handleReview = async (item: DealClaim, decision: "approved" | "rejected") => {
+    try {
+      await actions.reviewClaim.mutateAsync({
+        id: item.id,
+        decision,
+        proposedChangeTo: item.proposedChangeTo,
+      });
+      toast.success(decision === "approved" ? "Fact approved" : "Draft rejected");
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not review this fact.");
+    }
+  };
 
   const reset = () => {
     setClaimType("metric");
@@ -104,7 +127,11 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
             Claims &amp; evidence
           </h2>
           <p className="text-[11.5px] text-muted-foreground">
-            {items.length === 0 ? "Assertions, metrics and documents collected so far." : `${items.length} claim${items.length === 1 ? "" : "s"} on file`}
+            {active.length === 0 && drafts.length === 0
+              ? "Assertions, metrics and documents collected so far."
+              : `${active.length} reviewed claim${active.length === 1 ? "" : "s"}${
+                  drafts.length ? ` · ${drafts.length} awaiting review` : ""
+                }`}
           </p>
         </div>
         {!adding ? (
@@ -235,13 +262,92 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
         </div>
       ) : null}
 
-      {items.length === 0 && !adding ? (
+      {drafts.length > 0 ? (
+        <div className="mt-4 rounded-lg border border-warning/25 bg-warning-soft/40 p-3.5">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="label-caps">AI-extracted · awaiting human review</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-warning">
+                Draft facts do not change the reviewed case until approved. Approving a proposal supersedes the prior
+                reviewed claim, which remains in the audit history.
+              </p>
+            </div>
+            <Pill tone="warning">{drafts.length}</Pill>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {drafts.map((item) => (
+              <li key={item.id} className="rounded-lg border border-border bg-card p-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="text-[13px] font-medium">{item.label}</p>
+                  <Pill tone="neutral">{CLAIM_TYPE_LABEL[item.claimType]}</Pill>
+                  <Pill tone={VERIFICATION_TONE[item.verificationStatus]}>
+                    {VERIFICATION_LABEL[item.verificationStatus]}
+                  </Pill>
+                  <Pill tone="warning">Draft fact</Pill>
+                  {item.proposedChangeTo ? <Pill tone="danger">Proposed change</Pill> : null}
+                </div>
+                {item.valueText || item.reportingPeriod ? (
+                  <p className="mt-1 text-[12px] font-medium text-foreground/90">
+                    {item.valueText}
+                    {item.reportingPeriod ? <span className="font-normal text-muted-foreground"> · {item.reportingPeriod}</span> : null}
+                  </p>
+                ) : null}
+                {item.supportingExcerpt ? (
+                  <blockquote className="mt-1 border-l-2 border-border pl-2 text-[11.5px] leading-relaxed text-muted-foreground">
+                    “{item.supportingExcerpt}”
+                  </blockquote>
+                ) : null}
+                {item.proposedChangeTo ? (
+                  <p className="mt-1 text-[10.5px] text-destructive">
+                    This differs from a reviewed fact. Approval will supersede the prior claim without deleting it.
+                  </p>
+                ) : null}
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    {item.sourceId ? (
+                      <Link to={`/inbox#source-${item.sourceId}`} className="font-medium text-brand-strong hover:underline">
+                        Source evidence
+                      </Link>
+                    ) : (
+                      <span>No source link</span>
+                    )}
+                    <span>{formatShortDate(item.createdAt)}</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-[11px]"
+                      onClick={() => handleReview(item, "approved")}
+                      disabled={actions.reviewClaim.isPending}
+                    >
+                      <Check className="h-3 w-3" aria-hidden="true" />
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1 px-2 text-[11px] text-muted-foreground"
+                      onClick={() => handleReview(item, "rejected")}
+                      disabled={actions.reviewClaim.isPending}
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {active.length === 0 && drafts.length === 0 && !adding ? (
         <p className="mt-4 rounded-lg border border-dashed border-border px-3 py-6 text-center text-[12px] text-muted-foreground">
-          No claims recorded yet. Add the first metric or document and mark how well it is verified.
+          No claims recorded yet. Add a manual claim, or analyse a source to extract evidence drafts.
         </p>
-      ) : (
+      ) : active.length > 0 ? (
         <ul className="mt-4 space-y-2">
-          {items.map((item) => (
+          {active.map((item) => (
             <li key={item.id} className="rounded-lg border border-border bg-card p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-2.5">
@@ -255,6 +361,7 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
                       <Pill tone={VERIFICATION_TONE[item.verificationStatus]}>
                         {VERIFICATION_LABEL[item.verificationStatus]}
                       </Pill>
+                      <Pill tone="success">Reviewed</Pill>
                     </div>
                     {item.valueText || item.reportingPeriod ? (
                       <p className="mt-1 text-[12px] font-medium text-foreground/90">
@@ -265,7 +372,15 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
                     {item.supportingExcerpt ? (
                       <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{item.supportingExcerpt}</p>
                     ) : null}
+                    {item.verificationNote ? (
+                      <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground/80">{item.verificationNote}</p>
+                    ) : null}
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[10.5px] text-muted-foreground/80">
+                      {item.sourceId ? (
+                        <Link to={`/inbox#source-${item.sourceId}`} className="font-medium text-brand-strong hover:underline">
+                          Source
+                        </Link>
+                      ) : null}
                       <span>{formatShortDate(item.createdAt)}</span>
                       {item.fileName ? (
                         item.filePath ? (
@@ -288,19 +403,27 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
                     </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(item)}
-                  aria-label={`Remove claim: ${item.label}`}
-                  className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 transition-colors hover:bg-danger-soft hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
+                {!item.analysisRunId ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item)}
+                    aria-label={`Remove claim: ${item.label}`}
+                    className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 transition-colors hover:bg-danger-soft hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
+
+      {preserved > 0 ? (
+        <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+          {preserved} prior claim{preserved === 1 ? "" : "s"} preserved and superseded by a human-approved change.
+        </p>
+      ) : null}
     </section>
   );
 }

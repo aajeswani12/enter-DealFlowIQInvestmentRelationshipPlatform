@@ -3300,8 +3300,137 @@ export type Database = {
         }
         Relationships: []
       }
+      deal_analysis_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          error: string
+          extracted: Json
+          id: string
+          model: string
+          source_id: string
+          status: string
+          warnings: Json
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          error?: string
+          extracted?: Json
+          id?: string
+          model?: string
+          source_id: string
+          status?: string
+          warnings?: Json
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          error?: string
+          extracted?: Json
+          id?: string
+          model?: string
+          source_id?: string
+          status?: string
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_analysis_runs_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_analysis_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_briefs: {
+        Row: {
+          analysis_run_id: string | null
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          evidence: Json
+          follow_ups: Json
+          id: string
+          known_facts: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          risks: Json
+          scope_note: string
+          status: string
+          summary: string
+          unknowns: Json
+        }
+        Insert: {
+          analysis_run_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          evidence?: Json
+          follow_ups?: Json
+          id?: string
+          known_facts?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risks?: Json
+          scope_note?: string
+          status?: string
+          summary?: string
+          unknowns?: Json
+        }
+        Update: {
+          analysis_run_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          evidence?: Json
+          follow_ups?: Json
+          id?: string
+          known_facts?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          risks?: Json
+          scope_note?: string
+          status?: string
+          summary?: string
+          unknowns?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_briefs_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "deal_analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_briefs_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_claims: {
         Row: {
+          analysis_run_id: string | null
+          attribution: string
+          claim_key: string
           claim_type: string
           created_at: string
           created_by: string | null
@@ -3312,14 +3441,23 @@ export type Database = {
           id: string
           label: string
           normalized_value: number | null
+          proposed_change_to: string | null
           reporting_period: string
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           source_id: string | null
+          superseded_by: string | null
           supporting_excerpt: string
           updated_at: string
           value_text: string
+          verification_note: string
           verification_status: string
         }
         Insert: {
+          analysis_run_id?: string | null
+          attribution?: string
+          claim_key?: string
           claim_type?: string
           created_at?: string
           created_by?: string | null
@@ -3330,14 +3468,23 @@ export type Database = {
           id?: string
           label: string
           normalized_value?: number | null
+          proposed_change_to?: string | null
           reporting_period?: string
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_id?: string | null
+          superseded_by?: string | null
           supporting_excerpt?: string
           updated_at?: string
           value_text?: string
+          verification_note?: string
           verification_status?: string
         }
         Update: {
+          analysis_run_id?: string | null
+          attribution?: string
+          claim_key?: string
           claim_type?: string
           created_at?: string
           created_by?: string | null
@@ -3348,11 +3495,17 @@ export type Database = {
           id?: string
           label?: string
           normalized_value?: number | null
+          proposed_change_to?: string | null
           reporting_period?: string
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           source_id?: string | null
+          superseded_by?: string | null
           supporting_excerpt?: string
           updated_at?: string
           value_text?: string
+          verification_note?: string
           verification_status?: string
         }
         Relationships: [
@@ -3364,10 +3517,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "deal_claims_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "deal_analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_claims_proposed_change_to_fkey"
+            columns: ["proposed_change_to"]
+            isOneToOne: false
+            referencedRelation: "deal_claims"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "deal_claims_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_claims_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "deal_claims"
             referencedColumns: ["id"]
           },
         ]
@@ -3517,49 +3691,70 @@ export type Database = {
       }
       decision_gaps: {
         Row: {
+          analysis_run_id: string | null
           answer: string
           blocking_decision: boolean
           created_at: string
           created_by: string | null
           deal_id: string
           due_date: string | null
+          evidence: string
+          gap_key: string
           id: string
+          origin: string
           owner: string
           question: string
           resolved_at: string | null
           severity: string
+          source_id: string | null
           status: string
+          suggested_action: string
           updated_at: string
+          why_it_matters: string
         }
         Insert: {
+          analysis_run_id?: string | null
           answer?: string
           blocking_decision?: boolean
           created_at?: string
           created_by?: string | null
           deal_id: string
           due_date?: string | null
+          evidence?: string
+          gap_key?: string
           id?: string
+          origin?: string
           owner?: string
           question: string
           resolved_at?: string | null
           severity?: string
+          source_id?: string | null
           status?: string
+          suggested_action?: string
           updated_at?: string
+          why_it_matters?: string
         }
         Update: {
+          analysis_run_id?: string | null
           answer?: string
           blocking_decision?: boolean
           created_at?: string
           created_by?: string | null
           deal_id?: string
           due_date?: string | null
+          evidence?: string
+          gap_key?: string
           id?: string
+          origin?: string
           owner?: string
           question?: string
           resolved_at?: string | null
           severity?: string
+          source_id?: string | null
           status?: string
+          suggested_action?: string
           updated_at?: string
+          why_it_matters?: string
         }
         Relationships: [
           {
@@ -3567,6 +3762,20 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decision_gaps_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "deal_analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decision_gaps_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
             referencedColumns: ["id"]
           },
         ]

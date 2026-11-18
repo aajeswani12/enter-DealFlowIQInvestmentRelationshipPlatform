@@ -14,6 +14,7 @@ import { CASE_STATUS_LABEL, CASE_STATUS_OPTIONS } from "@/lib/constants";
 import { dueLabel, formatCurrency, formatDate, isOverdue } from "@/lib/format";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import type { CaseStatus } from "@/lib/types";
+import { AnalysisSection } from "./analysis-section";
 import { ClaimsSection } from "./claims-section";
 import { DecisionGapsSection } from "./gaps-section";
 
@@ -53,8 +54,11 @@ const CaseDetail = () => {
 
   const claims = workspace.claims.filter((item) => item.dealId === caseItem.id);
   const gaps = workspace.gaps.filter((item) => item.dealId === caseItem.id);
-  const source = workspace.captures.find((item) => item.dealId === caseItem.id);
-  const openGaps = gaps.filter((item) => item.status === "open");
+  const sources = workspace.captures.filter((item) => item.dealId === caseItem.id);
+  const source = sources[0];
+  const analysisRuns = workspace.analysisRuns.filter((item) => item.dealId === caseItem.id);
+  const briefs = workspace.briefs.filter((item) => item.dealId === caseItem.id);
+  const openGaps = gaps.filter((item) => item.status === "open" || item.status === "needs_review");
 
   const handleStatus = async (status: string) => {
     try {
@@ -128,7 +132,7 @@ const CaseDetail = () => {
         ) : null}
         {source ? (
           <span className="text-[11px] text-muted-foreground">
-            Sourced from a {source.source === "voice" ? "voice" : "typed"} note on {formatDate(source.createdAt)}
+            Sourced from a {source.source === "voice" ? "voice" : "typed"} note on {formatDate(source.sourceDate)}
           </span>
         ) : null}
       </div>
@@ -154,6 +158,7 @@ const CaseDetail = () => {
             )}
           </section>
 
+          <AnalysisSection deal={caseItem} sources={sources} runs={analysisRuns} briefs={briefs} />
           <ClaimsSection dealId={caseItem.id} items={claims} />
           <DecisionGapsSection dealId={caseItem.id} items={gaps} />
         </div>

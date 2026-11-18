@@ -1,4 +1,5 @@
 import { CircleHelp, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Pill } from "@/components/common/status-pill";
@@ -8,11 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
-import { SEVERITY_LABEL, SEVERITY_OPTIONS } from "@/lib/constants";
+import { QUESTION_STATUS_LABEL, QUESTION_STATUS_OPTIONS, SEVERITY_LABEL, SEVERITY_OPTIONS } from "@/lib/constants";
 import { formatShortDate, fromDateInputValue } from "@/lib/format";
-import type { DecisionGap, GapSeverity } from "@/lib/types";
+import type { DecisionGap, GapSeverity, QuestionStatus } from "@/lib/types";
 
 const SEVERITY_TONE = { low: "neutral", medium: "brand", high: "warning", critical: "danger" } as const;
+
+const STATUS_TONE: Record<string, "neutral" | "brand" | "success" | "warning" | "danger"> = {
+  open: "warning",
+  needs_review: "brand",
+  resolved: "success",
+  answered: "success",
+};
 
 export function DecisionGapsSection({ dealId, items }: { dealId: string; items: DecisionGap[] }) {
   const actions = useWorkspaceActions();
@@ -26,8 +34,17 @@ export function DecisionGapsSection({ dealId, items }: { dealId: string; items: 
   const [answeringId, setAnsweringId] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
 
-  const open = items.filter((item) => item.status === "open");
-  const answered = items.filter((item) => item.status === "answered");
+  const open = items.filter((item) => item.status === "open" || item.status === "needs_review");
+  const answered = items.filter((item) => item.status === "answered" || item.status === "resolved");
+
+  const handleStatus = async (item: DecisionGap, status: QuestionStatus) => {
+    try {
+      await actions.updateGap.mutateAsync({ id: item.id, patch: { status } });
+      toast.success(`Checklist item marked ${QUESTION_STATUS_LABEL[status].toLowerCase()}`);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not update this checklist item.");
+    }
+  };
 
   const handleAdd = async () => {
     if (!question.trim()) {
@@ -86,7 +103,9 @@ export function DecisionGapsSection({ dealId, items }: { dealId: string; items: 
           <p className="text-[11.5px] text-muted-foreground">
             {open.length === 0
               ? "Nothing open on this deal."
-              : `${open.length} open · ${open.filter((item) => item.blockingDecision).length} blocking · ${answered.length} closed`}
+              : `${open.length} open${open.some((item) => item.status === "needs_review") ? " (incl. needs review)" : ""} · ${
+                  open.filter((item) => item.blockingDecision).length
+                } blocking · ${answered.length} resolved`}
           </p>
         </div>
         {!adding ? (
@@ -176,7 +195,11 @@ export function DecisionGapsSection({ dealId, items }: { dealId: string; items: 
             <li key={item.id} className="py-3 first:pt-1 last:pb-0">
               <div className="flex items-start gap-2.5">
                 <CircleHelp
-                  className={item.status === "open" ? "mt-0.5 h-4 w-4 shrink-0 text-warning" : "mt-0.5 h-4 w-4 shrink-0 text-success"}
+                  className={
+                    item.status === "open" || item.status === "needs_review"
+                      ? "mt-0.5 h-4 w-4 shrink-0 text-warning"
+                      : "mt-0.5 h-4 w-4 shrink-0 text-success"
+                  }
                   aria-hidden="true"
                 />
                 <div className="min-w-0 flex-1">
@@ -185,9 +208,8 @@ export function DecisionGapsSection({ dealId, items }: { dealId: string; items: 
                     <div className="flex flex-wrap gap-1.5">
                       <Pill tone={SEVERITY_TONE[item.severity]}>{SEVERITY_LABEL[item.severity]}</Pill>
                       {item.blockingDecision ? <Pill tone="danger">Blocking</Pill> : null}
-                      <Pill tone={item.status === "open" ? "warning" : "success"}>
-                        {item.status === "open" ? "Open" : "Closed"}
-                      </Pill>
+                      <Pill tone={STATUS_TONE[item.status] ?? "neutral"}>{QUESTION_STATUS_LABEL[item.status]}</Pill>
+                      {item.origin === "analysis" ? <Pill tone="neutral">AI analysis</Pill> : null}
                     </div>
                   </div>
                   <p className="mt-1 text-[10.5px] text-muted-foreground">
@@ -195,9 +217,49 @@ export function DecisionGapsSection({ dealId, items }: { dealId: string; items: 
                     {item.dueDate ? ` · due ${formatShortDate(item.dueDate)}` : ""}
                   </p>
 
-                  {item.status === "answered" ? (
+                  {item.whyItMatters ? (
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                      <span className="font-medium text-foreground">Why it matters: </span>
+                      {item.whyItMatters}
+                    </p>
+                  ) : null}
+                  {item.evidence ? (
+                    <blockquote className="mt-1.5 border-l-2 border-border pl-2 text-[10.5px] leading-relaxed text-muted-foreground">
+                      {item.evidence}
+                    </blockquote>
+                  ) : null}
+                  {item.suggestedAction ? (
+                    <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
+                      <span className="font-medium text-foreground">Suggested next action: </span>
+                      {item.suggestedAction}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="w-[148px]">
+                      <SelectField
+                        value={item.status === "answered" ? "resolved" : item.status}
+                        onChange={(value) => void handleStatus(item, value as QuestionStatus)}
+                        options={QUESTION_STATUS_OPTIONS}
+                        ariaLabel="Checklist status"
+                        className="h-8 text-[11.5px]"
+                      />
+                    </div>
+                    {item.sourceId ? (
+                      <Link
+                        to={`/inbox#source-${item.sourceId}`}
+                        className="text-[10.5px] font-medium text-brand-strong hover:underline"
+                      >
+                        Source evidence
+                      </Link>
+                    ) : null}
+                  </div>
+
+                  {item.status === "answered" || item.status === "resolved" ? (
                     <div className="mt-2 rounded-md border border-success/20 bg-success-soft/50 px-3 py-2">
-                      <p className="text-[12px] leading-relaxed text-foreground/90">{item.answer || "No answer recorded."}</p>
+                      <p className="text-[12px] leading-relaxed text-foreground/90">
+                        {item.answer || "Marked resolved by a human reviewer."}
+                      </p>
                       <button
                         type="button"
                         onClick={() => handleReopen(item.id)}

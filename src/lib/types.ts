@@ -36,10 +36,26 @@ export type CaseStatus =
   | "invested"
   | "passed";
 
-export type ClaimType = "metric" | "document" | "call_note" | "reference";
-export type VerificationStatus = "unverified" | "corroborated" | "disputed";
+export type ClaimType =
+  | "metric"
+  | "document"
+  | "call_note"
+  | "reference"
+  | "traction"
+  | "revenue"
+  | "financial"
+  | "founder"
+  | "investor_mention"
+  | "product"
+  | "funding"
+  | "ownership"
+  | "next_action"
+  | "company"
+  | "sector"
+  | "stage";
+export type VerificationStatus = "unverified" | "founder_reported" | "corroborated" | "disputed";
 export type GapSeverity = "low" | "medium" | "high" | "critical";
-export type QuestionStatus = "open" | "answered";
+export type QuestionStatus = "open" | "answered" | "needs_review" | "resolved";
 
 export type InvestorType = "vc" | "angel" | "family_office" | "corporate";
 export type InvestorStatus = "active" | "prospect" | "watchlist" | "archived";
@@ -133,6 +149,15 @@ export interface DealClaim {
   sourceId: string | null;
   fileName: string | null;
   filePath: string | null;
+  reviewStatus: "draft" | "approved" | "rejected";
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  analysisRunId: string | null;
+  supersededBy: string | null;
+  proposedChangeTo: string | null;
+  claimKey: string;
+  verificationNote: string;
+  attribution: "founder" | "third_party" | "unknown";
   createdAt: string;
   updatedAt: string;
 }
@@ -147,8 +172,77 @@ export interface DecisionGap {
   severity: GapSeverity;
   blockingDecision: boolean;
   dueDate: string | null;
+  whyItMatters: string;
+  evidence: string;
+  suggestedAction: string;
+  sourceId: string | null;
+  analysisRunId: string | null;
+  gapKey: string;
+  origin: "manual" | "analysis";
   createdAt: string;
   resolvedAt: string | null;
+}
+
+export interface BriefFact {
+  label: string;
+  value: string;
+  period: string;
+  verification: string;
+  reviewStatus: string;
+  sourceId: string | null;
+  sourceTitle: string;
+  sourceDate: string;
+  excerpt: string;
+  proposedChangeTo: string | null;
+}
+
+export interface BriefRisk {
+  title: string;
+  detail: string;
+  sourceId: string | null;
+  excerpt: string;
+}
+
+export interface BriefUnknown {
+  question: string;
+  why: string;
+  status: string;
+  sourceId: string | null;
+}
+
+export interface BriefEvidence {
+  sourceId: string | null;
+  sourceTitle: string;
+  sourceDate: string;
+  excerpt: string;
+}
+
+export interface DealBrief {
+  id: string;
+  dealId: string;
+  analysisRunId: string | null;
+  summary: string;
+  scopeNote: string;
+  knownFacts: BriefFact[];
+  unknowns: BriefUnknown[];
+  risks: BriefRisk[];
+  followUps: string[];
+  evidence: BriefEvidence[];
+  status: "draft" | "approved";
+  createdAt: string;
+}
+
+export interface DealAnalysisRun {
+  id: string;
+  dealId: string;
+  sourceId: string;
+  model: string;
+  status: "running" | "completed" | "failed" | "unavailable";
+  error: string;
+  warnings: string[];
+  extracted: Record<string, unknown>;
+  createdAt: string;
+  completedAt: string | null;
 }
 
 export interface InvestorContact {

@@ -83,6 +83,24 @@ export function useWorkspaceActions() {
       },
     }),
     saveMatch: useMutation({ mutationFn: api.saveMatch, onSuccess: invalidate }),
+    analyzeDealSource: useMutation({
+      mutationFn: ({ sourceId, dealId }: { sourceId: string; dealId: string }) =>
+        api.analyzeDealSource(sourceId, dealId),
+      onSuccess: invalidate,
+      onError: invalidate,
+    }),
+    reviewClaim: useMutation({
+      mutationFn: ({
+        id,
+        decision,
+        proposedChangeTo,
+      }: {
+        id: string;
+        decision: "approved" | "rejected";
+        proposedChangeTo: string | null;
+      }) => api.reviewClaim(id, decision, proposedChangeTo),
+      onSuccess: invalidate,
+    }),
     inviteMember: useMutation({ mutationFn: api.inviteMember, onSuccess: invalidate }),
     updateMember: useMutation({
       mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateMember>[1] }) =>
