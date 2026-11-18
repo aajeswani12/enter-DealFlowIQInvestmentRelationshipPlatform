@@ -22,13 +22,16 @@ import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/", label: "Dashboard", short: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/inbox", label: "Deal Inbox", short: "Inbox", icon: Inbox },
-  { to: "/cases", label: "Investment Cases", short: "Cases", icon: Briefcase },
-  { to: "/decision", label: "Decision Center", short: "Decision", icon: ClipboardCheck },
+  { to: "/", label: "Home", short: "Home", icon: LayoutDashboard, end: true },
+  { to: "/cases", label: "Deals", short: "Deals", icon: Briefcase },
+  { to: "/imports", label: "Import Data", short: "Import", icon: FolderInput },
   { to: "/investors", label: "Investor Network", short: "Investors", icon: Users },
-  { to: "/matches", label: "Matches & Outreach", short: "Matches", icon: Waypoints },
-  { to: "/imports", label: "Import & Organize", short: "Import", icon: FolderInput },
+  { to: "/tasks", label: "Tasks & Outreach", short: "Tasks", icon: ClipboardCheck },
+];
+
+const SECONDARY_NAV = [
+  { to: "/inbox", label: "Deal Inbox", short: "Inbox", icon: Inbox },
+  { to: "/matches", label: "Suggested Investors", short: "Matches", icon: Waypoints },
 ];
 
 function Wordmark({ tone = "dark" }: { tone?: "dark" | "light" }) {
@@ -60,42 +63,45 @@ function Wordmark({ tone = "dark" }: { tone?: "dark" | "light" }) {
 }
 
 function NavItems({ onNavigate, variant }: { onNavigate?: () => void; variant: "sidebar" | "drawer" }) {
+  const renderItem = (item: (typeof NAV)[number] | (typeof SECONDARY_NAV)[number]) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={"end" in item ? item.end : undefined}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        cn(
+          "group flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors",
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <span
+            className={cn(
+              "flex h-[18px] w-[18px] items-center justify-center",
+              isActive ? "text-sidebar-primary" : "text-sidebar-foreground/70",
+            )}
+          >
+            <item.icon className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="truncate">{item.label}</span>
+          {isActive ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary" aria-hidden="true" /> : null}
+        </>
+      )}
+    </NavLink>
+  );
+
   return (
     <nav aria-label="Primary" className="space-y-0.5">
-      {NAV.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              "group flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors",
-              variant === "sidebar" ? "text-sidebar-foreground" : "text-sidebar-foreground",
-              isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <span
-                className={cn(
-                  "flex h-[18px] w-[18px] items-center justify-center",
-                  isActive ? "text-sidebar-primary" : "text-sidebar-foreground/70",
-                )}
-              >
-                <item.icon className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <span className="truncate">{item.label}</span>
-              {isActive ? (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary" aria-hidden="true" />
-              ) : null}
-            </>
-          )}
-        </NavLink>
-      ))}
+      {NAV.map(renderItem)}
+      <p className="px-3 pb-1 pt-4 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45">
+        More
+      </p>
+      {SECONDARY_NAV.map(renderItem)}
     </nav>
   );
 }
@@ -138,7 +144,9 @@ export function AppShell() {
   const location = useLocation();
   const { user, signOut, membership } = useAuth();
   const { isError, error, refetch } = useWorkspace();
-  const active = NAV.find((item) => (item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)));
+  const active = [...NAV, ...SECONDARY_NAV].find((item) =>
+    "end" in item && item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
+  );
   const email = user?.email ?? "Signed in";
 
   return (
@@ -162,7 +170,7 @@ export function AppShell() {
           >
             <Link to="/inbox/capture">
               <Mic className="h-4 w-4" aria-hidden="true" />
-              Record update
+              Record Voice Note
             </Link>
           </Button>
         </div>
@@ -210,7 +218,7 @@ export function AppShell() {
             <Wordmark />
             <div className="flex items-center gap-1">
               <Button asChild variant="ghost" size="icon" className="h-9 w-9">
-                <Link to="/inbox/capture" aria-label="Record an update">
+                <Link to="/inbox/capture" aria-label="Record Voice Note">
                   <Mic className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
@@ -276,7 +284,7 @@ export function AppShell() {
               >
                 <Link to="/inbox/capture" onClick={() => setMenuOpen(false)}>
                   <Mic className="h-4 w-4" aria-hidden="true" />
-                  Record update
+                  Record Voice Note
                 </Link>
               </Button>
             </div>

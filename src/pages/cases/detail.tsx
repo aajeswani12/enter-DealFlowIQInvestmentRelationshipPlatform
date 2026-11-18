@@ -43,6 +43,7 @@ import {
   CASE_STATUS_LABEL,
   RELATIONSHIP_LABEL,
   RELATIONSHIP_OPTIONS,
+  VERIFICATION_LABEL,
 } from "@/lib/constants";
 import { dueLabel, formatCurrency, formatDate, formatShortDate, isOverdue } from "@/lib/format";
 import { primaryContact } from "@/lib/investors";
@@ -64,15 +65,23 @@ import { DecisionGapsSection } from "./gaps-section";
 import { EvidenceTimeline } from "./evidence-timeline";
 import { FollowUpTasks } from "./follow-up-tasks";
 
-type CaseTab = "overview" | "documents" | "activity" | "memo" | "investors";
+type CaseTab = "overview" | "timeline" | "documents" | "investorMatches" | "actions";
 
 const TABS: { id: CaseTab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "timeline", label: "Timeline" },
   { id: "documents", label: "Documents" },
-  { id: "activity", label: "Activity" },
-  { id: "memo", label: "Memo" },
-  { id: "investors", label: "Investors" },
+  { id: "investorMatches", label: "Investor Matches" },
+  { id: "actions", label: "Actions" },
 ];
+
+type ReadinessStatus = "Available" | "Needs Review" | "Missing";
+
+const READINESS_TONE: Record<ReadinessStatus, "success" | "warning" | "neutral"> = {
+  Available: "success",
+  "Needs Review": "warning",
+  Missing: "neutral",
+};
 
 function firstSentences(value: string, count = 3): string {
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -144,7 +153,15 @@ const CaseDetail = () => {
   useEffect(() => {
     if (!id) return;
     if (location.hash === "#claims-heading" || location.hash === "#gaps-heading") {
-      setActiveTab("memo");
+      setActiveTab("actions");
+    } else if (location.hash === "#timeline") {
+      setActiveTab("timeline");
+    } else if (location.hash === "#documents") {
+      setActiveTab("documents");
+    } else if (location.hash === "#investor-matches") {
+      setActiveTab("investorMatches");
+    } else if (location.hash === "#actions") {
+      setActiveTab("actions");
     }
   }, [id, location.hash]);
 
@@ -231,8 +248,66 @@ const CaseDetail = () => {
   const briefs = workspace.briefs.filter((item) => item.dealId === caseItem.id);
   const summary = caseItem.summary ? firstSentences(caseItem.summary, 3) : "";
   const funding = caseItem.raiseAmount ?? caseItem.chequeSought;
+  const approvedClaims = claims.filter(
+    (claim) => claim.reviewStatus === "approved" && !claim.supersededBy,
+  );
+  const openGaps = gaps.filter((gap) => gap.status === "open" || gap.status === "needs_review");
+  const latestBrief = [...briefs].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )[0];
+  const executiveSummary = latestBrief?.summary ? firstSentences(latestBrief.summary, 3) : "";
+  const missingFields = [
+    !caseItem.website ? "Website" : "",
+    !caseItem.summary ? "Company description" : "",
+    !caseItem.roundStage ? "Funding stage" : "",
+    !caseItem.sector ? "Sector" : "",
+    funding === null ? "Funding request" : "",
+    people.length === 0 ? "Founders or team" : "",
+    approvedClaims.length === 0 ? "Reviewed facts" : "",
+    manualAssociations.length === 0 ? "Manually associated investors" : "",
+  ].filter(Boolean);
+  const profileFields = [caseItem.summary, caseItem.website, caseItem.sector, caseItem.roundStage].filter(Boolean).length;
+  const readiness: { label: string; status: ReadinessStatus; detail: string }[] = [
+    {
+      label: "Company profile",
+      status: profileFields === 4 ? "Available" : profileFields > 0 ? "Needs Review" : "Missing",
+      detail: "Name, description, website, sector and stage",
+    },
+    {
+      label: "Funding details",
+      status: funding !== null ? "Available" : "Missing",
+      detail: funding !== null ? "A funding request is recorded" : "Round size or cheque sought",
+    },
+    {
+      label: "Founder / team",
+      status: people.length > 0 ? "Available" : "Missing",
+      detail: people.length > 0 ? `${people.length} people recorded` : "No founder or contact recorded",
+    },
+    {
+      label: "Source evidence",
+      status: sources.length + caseDocuments.length > 0 ? "Available" : "Missing",
+      detail: `${sources.length + caseDocuments.length} sources attached`,
+    },
+    {
+      label: "Reviewed facts",
+      status: approvedClaims.length > 0 ? "Available" : draftClaims.length > 0 ? "Needs Review" : "Missing",
+      detail: approvedClaims.length > 0 ? `${approvedClaims.length} approved claims` : draftClaims.length > 0 ? `${draftClaims.length} claims waiting for review` : "No claims reviewed",
+    },
+    {
+      label: "Diligence questions",
+      status: openGaps.length > 0 ? "Needs Review" : gaps.length > 0 ? "Available" : "Missing",
+      detail: openGaps.length > 0 ? `${openGaps.length} open questions` : gaps.length > 0 ? "Recorded questions are resolved" : "No questions recorded",
+    },
+    {
+      label: "Investor view",
+      status: manualAssociations.length > 0 ? "Available" : matches.length > 0 ? "Needs Review" : "Missing",
+      detail: manualAssociations.length > 0 ? `${manualAssociations.length} manually associated` : matches.length > 0 ? "Suggestions only — not confirmed relationships" : "No investors linked or suggested",
+    },
+  ];
+  const readinessAvailable = readiness.filter((item) => item.status === "Available").length;
   const founded = people.filter((person) => person.role === "founder");
   const associatedInvestorIds = new Set(manualAssociations.map((item) => item.investorId));
+  const suggestedMatches = matches.filter(({ investor }) => !associatedInvestorIds.has(investor.id));
   const availableInvestors = workspace.investors.filter((investor) => {
     if (associatedInvestorIds.has(investor.id)) return false;
     const search = investorSearch.trim().toLowerCase();
@@ -302,7 +377,7 @@ const CaseDetail = () => {
       setMemoId(created.id);
       setMemoTitle(created.title);
       setMemoContent(created.content);
-      setActiveTab("memo");
+      setActiveTab("actions");
       toast.success("Memo draft generated from stored case records");
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Could not generate the memo.");
@@ -467,22 +542,18 @@ const CaseDetail = () => {
       <PageHeader
         eyebrow={`${caseItem.sector || "Sector not set"} · ${caseItem.roundStage || "Stage not set"}`}
         title={caseItem.companyName}
-        backTo={{ to: "/cases", label: "Investment Cases" }}
+        backTo={{ to: "/cases", label: "Deals" }}
         actions={
           <>
-            <Button variant="outline" className="gap-1.5" asChild>
+            <Button className="gap-1.5" asChild>
               <Link to={`/inbox/capture?deal=${caseItem.id}`}>
                 <Mic className="h-4 w-4" aria-hidden="true" />
                 Add update
               </Link>
             </Button>
-            <Button className="gap-1.5" onClick={() => void handleGenerateMemo()} disabled={memoBusy}>
-              {memoBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-              Generate memo
-            </Button>
-            <Button variant="outline" className="gap-1.5" onClick={() => setDocOpen(true)}>
-              <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-              Add document
+            <Button variant="outline" className="gap-1.5" onClick={() => setActiveTab("timeline")}>
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              View sources
             </Button>
           </>
         }
@@ -497,10 +568,6 @@ const CaseDetail = () => {
           {funding !== null ? formatCurrency(funding) : "Funding not recorded"}
         </span>
         {caseItem.isSynthetic ? <Pill tone="warning">Synthetic sample</Pill> : null}
-        <Button size="sm" variant="ghost" className="ml-auto h-7 gap-1 px-2 text-[10.5px]" onClick={() => setEditOpen(true)}>
-          <Pencil className="h-3 w-3" aria-hidden="true" />
-          Edit details
-        </Button>
       </div>
 
       <div className="overflow-x-auto border-b border-border">
@@ -521,8 +588,7 @@ const CaseDetail = () => {
               }
             >
               {tab.label}
-              {tab.id === "investors" ? ` · ${manualAssociations.length}` : null}
-              {tab.id === "memo" ? ` · ${caseMemos.length}` : null}
+              {tab.id === "investorMatches" ? ` · ${manualAssociations.length}` : null}
               {tab.id === "documents" ? ` · ${caseDocuments.length}` : null}
             </button>
           ))}
@@ -530,150 +596,158 @@ const CaseDetail = () => {
       </div>
 
       {activeTab === "overview" ? (
-        <section role="tabpanel" id="case-panel-overview" aria-labelledby="case-tab-overview" className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          <div className="space-y-4">
-            <section className="panel p-5" aria-labelledby="company-overview-heading">
-              <h2 id="company-overview-heading" className="text-[15px] font-semibold tracking-tight">Company overview</h2>
-              <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-foreground/90">
-                {summary || "No company summary is recorded yet."}
-              </p>
-              <dl className="mt-4 grid gap-x-5 gap-y-3 sm:grid-cols-2">
-                {[
-                  { label: "Website", value: caseItem.website || "Not recorded" },
-                  { label: "Geography", value: caseItem.geography || "Not recorded" },
-                  { label: "Funding amount", value: funding !== null ? formatCurrency(funding) : "Not recorded" },
-                  { label: "Cheque sought", value: caseItem.chequeSought !== null ? formatCurrency(caseItem.chequeSought) : "Not recorded" },
-                  { label: "Case owner", value: owner },
-                  { label: "Last update", value: formatDate(caseItem.updatedAt) },
-                ].map((row) => (
-                  <div key={row.label} className="border-b border-border/60 pb-2">
-                    <dt className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{row.label}</dt>
-                    <dd className="mt-0.5 text-[12px] font-medium">{row.value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" className="h-7 gap-1 text-[10.5px]" onClick={() => setPersonOpen((open) => !open)}>
-                  <Plus className="h-3 w-3" aria-hidden="true" />
-                  Add founder / contact
-                </Button>
-                <span className="text-[10.5px] text-muted-foreground">
-                  {people.length > 0 ? people.map((person) => `${person.name}${person.title ? ` (${person.title})` : ""}`).join(", ") : "No founders recorded"}
-                </span>
+        <section role="tabpanel" id="case-panel-overview" aria-labelledby="case-tab-overview" className="space-y-4">
+          <section className="panel p-5" aria-labelledby="executive-overview-heading">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 id="executive-overview-heading" className="text-[15px] font-semibold tracking-tight">
+                  Executive overview
+                </h2>
+                <p className="text-[11px] text-muted-foreground">
+                  AI-generated from recorded source evidence, limited to three sentences.
+                </p>
               </div>
-              {personOpen ? (
-                <div className="mt-3 space-y-2 rounded-md border border-border bg-secondary/30 p-2.5">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input value={personName} onChange={(event) => setPersonName(event.target.value)} placeholder="Name" className="h-9 bg-card text-[12px]" aria-label="Person name" />
-                    <Input value={personTitle} onChange={(event) => setPersonTitle(event.target.value)} placeholder="Title" className="h-9 bg-card text-[12px]" aria-label="Person title" />
-                    <Input value={personEmail} onChange={(event) => setPersonEmail(event.target.value)} placeholder="Email (optional)" className="h-9 bg-card text-[12px]" aria-label="Person email" />
-                    <SelectField
-                      value={personRole}
-                      onChange={(value) => setPersonRole(value as "founder" | "contact" | "other")}
-                      options={[
-                        { value: "founder", label: "Founder" },
-                        { value: "contact", label: "Contact" },
-                        { value: "other", label: "Other" },
-                      ]}
-                      ariaLabel="Person role"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" className="h-7 text-[10.5px]" onClick={() => void addPerson()} disabled={actions.createDealPerson.isPending}>Save person</Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" onClick={() => setPersonOpen(false)}>Cancel</Button>
-                  </div>
-                </div>
-              ) : null}
-            </section>
+              {executiveSummary ? <Pill tone="success">AI summary available</Pill> : <Pill tone="warning">AI summary unavailable</Pill>}
+            </div>
+            {executiveSummary ? (
+              <>
+                <p className="mt-3 max-w-4xl text-[14px] leading-relaxed text-foreground/90">{executiveSummary}</p>
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  Generated {latestBrief ? formatShortDate(latestBrief.createdAt) : "from stored sources"}. This is a
+                  working summary, not an investment recommendation.
+                </p>
+              </>
+            ) : (
+              <div className="mt-3 rounded-md border border-dashed border-border bg-secondary/20 px-3 py-3">
+                <p className="text-[12.5px] font-medium">No AI overview is available for this case.</p>
+                <p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
+                  {sources.length + caseDocuments.length > 0
+                    ? "Run source analysis in Documents to generate a grounded executive summary. Until then, this page shows only stored facts; no AI sentence is simulated."
+                    : "Add a source document or voice note first. Until source evidence exists, no AI overview is shown."}
+                </p>
+                <Button size="sm" variant="outline" className="mt-2 h-7 text-[10.5px]" onClick={() => setActiveTab("documents")}>
+                  Open source analysis <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+              <Button size="sm" variant="ghost" className="h-7 px-1.5 text-[10.5px]" onClick={() => setActiveTab("actions")}>Investment memo</Button>
+              <Button size="sm" variant="ghost" className="h-7 px-1.5 text-[10.5px]" onClick={() => setActiveTab("investorMatches")}>Manual investors</Button>
+              <Button size="sm" variant="ghost" className="h-7 px-1.5 text-[10.5px]" onClick={() => setActiveTab("timeline")}>Source timeline</Button>
+              <Button size="sm" variant="ghost" className="ml-auto h-7 px-1.5 text-[10.5px]" onClick={() => setEditOpen(true)}>
+                <Pencil className="h-3 w-3" aria-hidden="true" />
+                Edit details
+              </Button>
+            </div>
+          </section>
 
-            <section className="panel p-5" aria-labelledby="overview-investors-heading">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h2 id="overview-investors-heading" className="text-[15px] font-semibold tracking-tight">Investors on this deal</h2>
-                  <p className="text-[11px] text-muted-foreground">Manually associated investors are distinct from AI-suggested matches.</p>
-                </div>
-                <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" onClick={() => setActiveTab("investors")}>
-                  Manage <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                </Button>
-              </div>
-              {manualRows.length > 0 ? (
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {manualRows.slice(0, 4).map(({ association, investor, contact, lastActivity }) => (
-                    <li key={association.id} className="rounded-md border border-border bg-card px-3 py-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <Link to={`/investors/${investor.id}`} className="text-[12px] font-semibold hover:text-brand-strong">{investor.name}</Link>
-                        <Pill tone="brand">{RELATIONSHIP_LABEL[association.relationshipStatus]}</Pill>
-                      </div>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {contact?.contactName || "No named contact"}{contact?.email ? ` · ${contact.email}` : ""}
-                      </p>
-                      <p className="mt-0.5 text-[9.5px] text-muted-foreground">Last activity: {lastActivity ? formatShortDate(lastActivity) : "Not recorded"}</p>
-                    </li>
-                  ))}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <section className="panel p-4" aria-labelledby="known-heading">
+              <h2 id="known-heading" className="text-[14px] font-semibold tracking-tight">What We Know</h2>
+              <p className="mt-0.5 text-[10.5px] text-muted-foreground">Recorded facts and approved claims only.</p>
+              {!executiveSummary && summary ? <p className="mt-3 text-[11.5px] leading-relaxed text-muted-foreground">{summary}</p> : null}
+              <dl className="mt-3 space-y-2 text-[11px]">
+                <div className="flex justify-between gap-2 border-b border-border/60 pb-1.5"><dt className="text-muted-foreground">Stage / sector</dt><dd className="text-right font-medium">{caseItem.roundStage || "Not recorded"} · {caseItem.sector || "Not recorded"}</dd></div>
+                <div className="flex justify-between gap-2 border-b border-border/60 pb-1.5"><dt className="text-muted-foreground">Funding</dt><dd className="text-right font-medium">{funding !== null ? formatCurrency(funding) : "Not recorded"}</dd></div>
+                <div className="flex justify-between gap-2 border-b border-border/60 pb-1.5"><dt className="text-muted-foreground">Founders / team</dt><dd className="max-w-[170px] text-right font-medium">{founded.length > 0 ? founded.map((person) => person.name).join(", ") : "Not recorded"}</dd></div>
+                <div className="flex justify-between gap-2 border-b border-border/60 pb-1.5"><dt className="text-muted-foreground">Manual investors</dt><dd className="max-w-[170px] text-right font-medium">{manualRows.length > 0 ? manualRows.map((row) => row.investor.name).join(", ") : "None linked"}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Approved claims</dt><dd className="text-right font-medium">{approvedClaims.length}</dd></div>
+              </dl>
+              {approvedClaims.length > 0 ? (
+                <ul className="mt-3 space-y-2">
+                  {approvedClaims.slice(0, 3).map((claim) => {
+                    const document = claim.documentId ? caseDocuments.find((item) => item.id === claim.documentId) : null;
+                    const source = claim.sourceId ? sources.find((item) => item.id === claim.sourceId) : null;
+                    const sourceName = document?.fileName || source?.companyName || claim.fileName || "source recorded";
+                    return (
+                      <li key={claim.id} className="border-t border-border/60 pt-2 text-[10.5px] leading-relaxed">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{claim.label}</span>
+                          <span className="text-muted-foreground">{claim.valueText || claim.normalizedValue || "No value"}{claim.reportingPeriod ? ` · ${claim.reportingPeriod}` : ""}</span>
+                          <Pill tone={claim.verificationStatus === "corroborated" ? "success" : claim.verificationStatus === "internal_opinion" ? "neutral" : "warning"}>{VERIFICATION_LABEL[claim.verificationStatus]}</Pill>
+                        </div>
+                        <p className="mt-0.5 text-muted-foreground">Source: {sourceName}</p>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
-                <p className="mt-3 rounded-md border border-dashed border-border px-3 py-4 text-center text-[11px] text-muted-foreground">
-                  No investors are manually associated with this deal. Link one from the Investors tab.
-                </p>
+                <p className="mt-3 text-[10.5px] text-muted-foreground">No reviewed claims yet. Drafts wait in Actions for human review.</p>
               )}
-              {matches.length > 0 ? (
-                <div className="mt-3 border-t border-border pt-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">AI-suggested matches — not confirmed relationships</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {matches.slice(0, 4).map(({ match, investor }) => (
-                      <span key={match.id} className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary/30 px-2 py-0.5 text-[10px]">
-                        {investor.name}
-                        <span className="text-muted-foreground">{match.needsResearch ? "needs research" : "recorded fit"}</span>
-                      </span>
-                    ))}
-                    <Link to={`/matches?case=${caseItem.id}`} className="text-[10px] font-medium text-brand-strong hover:underline">Open matches</Link>
+              <Button size="sm" variant="ghost" className="mt-2 h-7 px-1 text-[10.5px]" onClick={() => setActiveTab("actions")}>Review evidence <ArrowRight className="h-3 w-3" aria-hidden="true" /></Button>
+              <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                <Button size="sm" variant="ghost" className="h-6 px-1 text-[10px]" onClick={() => setPersonOpen((open) => !open)}>
+                  <Plus className="h-3 w-3" aria-hidden="true" /> Add founder / contact
+                </Button>
+              </div>
+              {personOpen ? (
+                <div className="mt-2 space-y-2 rounded-md border border-border bg-secondary/30 p-2">
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    <Input value={personName} onChange={(event) => setPersonName(event.target.value)} placeholder="Name" className="h-8 bg-card text-[11px]" aria-label="Person name" />
+                    <Input value={personTitle} onChange={(event) => setPersonTitle(event.target.value)} placeholder="Title" className="h-8 bg-card text-[11px]" aria-label="Person title" />
+                    <Input value={personEmail} onChange={(event) => setPersonEmail(event.target.value)} placeholder="Email" className="h-8 bg-card text-[11px]" aria-label="Person email" />
+                    <SelectField value={personRole} onChange={(value) => setPersonRole(value as "founder" | "contact" | "other")} options={[{ value: "founder", label: "Founder" }, { value: "contact", label: "Contact" }, { value: "other", label: "Other" }]} ariaLabel="Person role" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" className="h-7 text-[10px]" onClick={() => void addPerson()} disabled={actions.createDealPerson.isPending}>Save</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => setPersonOpen(false)}>Cancel</Button>
                   </div>
                 </div>
               ) : null}
+              {people.length > 0 ? <p className="mt-2 text-[10px] text-muted-foreground">{people.map((person) => `${person.name}${person.title ? ` (${person.title})` : ""}`).join(" · ")}</p> : null}
+            </section>
+
+            <section className="panel p-4" aria-labelledby="missing-heading">
+              <h2 id="missing-heading" className="text-[14px] font-semibold tracking-tight">What Is Missing</h2>
+              <p className="mt-0.5 text-[10.5px] text-muted-foreground">Open questions and unrecorded inputs.</p>
+              <ul className="mt-3 space-y-1.5 text-[10.5px] leading-relaxed">
+                {missingFields.slice(0, 5).map((field) => <li key={field} className="flex gap-1.5"><span className="text-warning">•</span><span>{field} is not recorded.</span></li>)}
+                {openGaps.slice(0, 4).map((gap) => <li key={gap.id} className="flex gap-1.5"><span className="text-warning">•</span><span>{gap.question}{gap.severity === "high" || gap.severity === "critical" ? <span className="ml-1 font-medium text-destructive">({gap.severity})</span> : null}</span></li>)}
+                {draftClaims.length > 0 ? <li className="flex gap-1.5"><span className="text-warning">•</span><span>{draftClaims.length} draft claims need human review.</span></li> : null}
+                {pendingImports.length > 0 ? <li className="flex gap-1.5"><span className="text-warning">•</span><span>{pendingImports.length} imported records need review.</span></li> : null}
+                {missingFields.length === 0 && openGaps.length === 0 && draftClaims.length === 0 && pendingImports.length === 0 ? <li className="text-muted-foreground">No missing fields or open questions are recorded. This does not imply the deal is ready to invest.</li> : null}
+              </ul>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="ghost" className="h-7 px-1 text-[10.5px]" onClick={() => setActiveTab("actions")}>Review questions <ArrowRight className="h-3 w-3" aria-hidden="true" /></Button>
+                {pendingImports.length > 0 ? <Link to="/imports" className="inline-flex h-7 items-center text-[10.5px] font-medium text-brand-strong hover:underline">Review imports</Link> : null}
+              </div>
+            </section>
+
+            <section className="panel p-4" aria-labelledby="next-action-heading">
+              <h2 id="next-action-heading" className="text-[14px] font-semibold tracking-tight">Recommended Next Action</h2>
+              <p className="mt-0.5 text-[10.5px] text-muted-foreground">One clear human next step, based on stored records.</p>
+              <p className="mt-3 text-[12px] leading-relaxed">{nextAction}</p>
+              {caseItem.nextStepDue ? <p className={isOverdue(caseItem.nextStepDue) ? "mt-1 text-[10.5px] font-semibold text-destructive" : "mt-1 text-[10.5px] text-muted-foreground"}>{dueLabel(caseItem.nextStepDue)}</p> : null}
+              {openTasks[0]?.dueDate ? <p className="mt-1 text-[10px] text-muted-foreground">Open task due {dueLabel(openTasks[0].dueDate)}</p> : null}
+              <Button size="sm" className="mt-3 h-8 text-[10.5px]" onClick={() => setActiveTab("actions")}>
+                Open actions <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Button>
+              <p className="mt-3 border-t border-border pt-2 text-[10px] text-muted-foreground">
+                {approvedClaims.length} approved facts · {openGaps.length} open gaps · owner {owner}
+              </p>
             </section>
           </div>
 
-          <aside className="space-y-4">
-            <section className="panel p-5" aria-labelledby="recent-heading">
-              <h2 id="recent-heading" className="text-[15px] font-semibold tracking-tight">Recent activity</h2>
-              {recentEntries.length > 0 ? (
-                <ul className="mt-3 space-y-2.5">
-                  {recentEntries.slice(0, 4).map((entry) => (
-                    <li key={entry.id} className="border-b border-border/60 pb-2 last:border-0 last:pb-0">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="line-clamp-1 text-[11.5px] font-medium">{entry.title}</p>
-                        <span className="shrink-0 text-[9.5px] text-muted-foreground">{formatShortDate(entry.date)}</span>
-                      </div>
-                      <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">{entry.detail}</p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 text-[11px] text-muted-foreground">No documents, notes or interactions are recorded.</p>
-              )}
-              <Button size="sm" variant="ghost" className="mt-2 h-7 px-0 text-[10.5px]" onClick={() => setActiveTab("activity")}>
-                View all activity <ArrowRight className="h-3 w-3" aria-hidden="true" />
-              </Button>
-            </section>
-
-            <section className="panel p-5" aria-labelledby="next-action-heading">
-              <h2 id="next-action-heading" className="text-[15px] font-semibold tracking-tight">Next action</h2>
-              <p className="mt-2 text-[12px] leading-relaxed">{nextAction}</p>
-              {caseItem.nextStepDue ? (
-                <p className={isOverdue(caseItem.nextStepDue) ? "mt-1 text-[10.5px] font-semibold text-destructive" : "mt-1 text-[10.5px] text-muted-foreground"}>
-                  {dueLabel(caseItem.nextStepDue)}
-                </p>
-              ) : null}
-              {openTasks[0]?.dueDate ? <p className="mt-1 text-[10px] text-muted-foreground">Task due {dueLabel(openTasks[0].dueDate)}</p> : null}
-              <div className="mt-3 border-t border-border pt-2.5 text-[10px] text-muted-foreground">
-                <p>{draftClaims.length} draft claims · {pendingImports.length} pending imports</p>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  <button type="button" className="font-medium text-brand-strong hover:underline" onClick={() => setActiveTab("memo")}>Review evidence</button>
-                  <Link to="/imports" className="font-medium text-brand-strong hover:underline">Open imports</Link>
-                </div>
+          <section className="panel p-4" aria-labelledby="readiness-heading">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 id="readiness-heading" className="text-[14px] font-semibold tracking-tight">Investment readiness</h2>
+                <p className="mt-0.5 text-[10.5px] text-muted-foreground">Available, Needs Review or Missing. This is a completeness checklist, not an investment-success prediction.</p>
               </div>
-            </section>
-          </aside>
+              <Pill tone="neutral">{readinessAvailable} of {readiness.length} available</Pill>
+            </div>
+            <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {readiness.map((item) => (
+                <li key={item.label} className="rounded-md border border-border bg-card px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <span className="text-[11px] font-medium">{item.label}</span>
+                    <Pill tone={READINESS_TONE[item.status]}>{item.status}</Pill>
+                  </div>
+                  <p className="mt-0.5 text-[9.5px] leading-relaxed text-muted-foreground">{item.detail}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
         </section>
       ) : null}
 
@@ -723,12 +797,17 @@ const CaseDetail = () => {
               <p className="mt-1 text-[10.5px] text-muted-foreground">Add a document, or import historical files from Import & Organize.</p>
             </div>
           )}
-          <AnalysisSection deal={caseItem} sources={sources} runs={analysisRuns} briefs={briefs} />
+          <details className="panel p-0">
+            <summary className="cursor-pointer px-4 py-3 text-[12px] font-semibold">AI source analysis &amp; excerpts</summary>
+            <div className="border-t border-border">
+              <AnalysisSection deal={caseItem} sources={sources} runs={analysisRuns} briefs={briefs} />
+            </div>
+          </details>
         </section>
       ) : null}
 
-      {activeTab === "activity" ? (
-        <section role="tabpanel" id="case-panel-activity" aria-labelledby="case-tab-activity" className="space-y-4">
+      {activeTab === "timeline" ? (
+        <section role="tabpanel" id="case-panel-timeline" aria-labelledby="case-tab-timeline" className="space-y-4">
           <EvidenceTimeline
             documents={caseDocuments}
             captures={sources}
@@ -736,12 +815,16 @@ const CaseDetail = () => {
             interactions={workspace.interactions.filter((interaction) => interaction.dealId === caseItem.id)}
             investors={workspace.investors}
           />
-          <FollowUpTasks tasks={followUpTasks} />
         </section>
       ) : null}
 
-      {activeTab === "memo" ? (
-        <section role="tabpanel" id="case-panel-memo" aria-labelledby="case-tab-memo" className="space-y-4">
+      {activeTab === "actions" ? (
+        <section role="tabpanel" id="case-panel-actions" aria-labelledby="case-tab-actions" className="space-y-4">
+          <div>
+            <h2 className="text-[15px] font-semibold tracking-tight">Actions</h2>
+            <p className="text-[11px] text-muted-foreground">Next actions, the persistent memo, evidence review and diligence questions.</p>
+          </div>
+          <FollowUpTasks tasks={followUpTasks} />
           <div className="panel p-5">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -793,8 +876,8 @@ const CaseDetail = () => {
         </section>
       ) : null}
 
-      {activeTab === "investors" ? (
-        <section role="tabpanel" id="case-panel-investors" aria-labelledby="case-tab-investors" className="space-y-4">
+      {activeTab === "investorMatches" ? (
+        <section role="tabpanel" id="case-panel-investorMatches" aria-labelledby="case-tab-investorMatches" className="space-y-4">
           <section className="panel p-5" aria-labelledby="manual-investors-heading">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -880,16 +963,16 @@ const CaseDetail = () => {
           <section className="panel p-5" aria-labelledby="suggested-investors-heading">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h2 id="suggested-investors-heading" className="text-[15px] font-semibold tracking-tight">AI-suggested matches</h2>
-                <p className="text-[11px] text-muted-foreground">Deterministic matches from stored preferences. They are not manual associations or evidence of investor interest.</p>
+                <h2 id="suggested-investors-heading" className="text-[15px] font-semibold tracking-tight">Suggested investors</h2>
+                <p className="text-[11px] text-muted-foreground">Deterministic suggestions from stored preferences. They are not manual associations or evidence of investor interest.</p>
               </div>
               <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" asChild>
                 <Link to={`/matches?case=${caseItem.id}`}>Open matching <ArrowRight className="h-3 w-3" aria-hidden="true" /></Link>
               </Button>
             </div>
-            {matches.length > 0 ? (
+            {suggestedMatches.length > 0 ? (
               <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                {matches.map(({ match, investor }) => (
+                {suggestedMatches.map(({ match, investor }) => (
                   <li key={match.id} className="rounded-md border border-border bg-card px-3 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Link to={`/investors/${investor.id}`} className="text-[12px] font-medium hover:text-brand-strong">{investor.name}</Link>

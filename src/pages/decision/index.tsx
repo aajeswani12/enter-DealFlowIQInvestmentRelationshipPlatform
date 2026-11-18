@@ -157,8 +157,8 @@ export default function DecisionCenter() {
   return (
     <div className="page-enter space-y-6">
       <PageHeader
-        eyebrow="Decision intelligence & action center"
-        title="What needs human judgment now"
+        eyebrow="Decision intelligence"
+        title="Tasks & Outreach"
         description="A single, persisted view of evidence, unknowns, approvals and next actions across the desk. DealFlow IQ never makes invest or reject decisions for you."
         actions={
           <>
@@ -174,7 +174,7 @@ export default function DecisionCenter() {
               className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
             >
               <Sparkles className="h-4 w-4" aria-hidden="true" />
-              Record update
+              Record Voice Note
             </Link>
           </>
         }

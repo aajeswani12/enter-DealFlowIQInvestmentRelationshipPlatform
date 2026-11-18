@@ -1,6 +1,6 @@
 import { Briefcase, ChevronRight, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { EmptyState } from "@/components/common/empty-state";
 import { LoadingPanel } from "@/components/common/loading-panel";
 import { CaseStatusPill } from "@/components/common/status-pill";
@@ -19,9 +19,15 @@ const Cases = () => {
   const { data, isLoading } = useWorkspace();
   const workspace = data ?? EMPTY_WORKSPACE;
   const [formOpen, setFormOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const requestedStage = searchParams.get("stage") ?? "all";
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-  const [stage, setStage] = useState("all");
+  const [stage, setStage] = useState(requestedStage);
+
+  useEffect(() => {
+    setStage(requestedStage);
+  }, [requestedStage]);
 
   const rows = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -57,7 +63,13 @@ const Cases = () => {
     });
     return enriched
       .filter((item) => (status === "all" ? true : item.status === status))
-      .filter((item) => (stage === "all" ? true : item.roundStage === stage))
+      .filter((item) =>
+        stage === "all"
+          ? true
+          : stage === "Not recorded"
+            ? !item.roundStage
+            : item.roundStage === stage,
+      )
       .filter((item) =>
         search
           ? [
@@ -110,7 +122,11 @@ const Cases = () => {
           <SelectField
             value={stage}
             onChange={setStage}
-            options={[{ value: "all", label: "All stages" }, ...ROUND_STAGES.map((value) => ({ value, label: value }))]}
+            options={[
+              { value: "all", label: "All stages" },
+              ...ROUND_STAGES.map((value) => ({ value, label: value })),
+              { value: "Not recorded", label: "Not recorded" },
+            ]}
             ariaLabel="Filter by funding stage"
           />
         </div>

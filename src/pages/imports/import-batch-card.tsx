@@ -91,6 +91,18 @@ export function ImportBatchCard({
       (candidate.entityType === "claim" && candidate.status === "pending"),
   ).length;
   const reviewCount = pendingReview || batch.recordsNeedingReview;
+  const successfullyProcessed = files.filter(
+    (file) => file.processingStatus === "completed" || file.processingStatus === "needs_review",
+  ).length;
+  const companiesIdentified = new Set(
+    candidates
+      .filter((candidate) => candidate.entityType === "deal")
+      .map((candidate) => String(candidate.payload.name ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  ).size;
+  const recordsMatched = candidates.filter(
+    (candidate) => candidate.status === "applied" && Boolean(candidate.dealId || candidate.investorId),
+  ).length;
 
   return (
     <article
@@ -119,19 +131,20 @@ export function ImportBatchCard({
         </Button>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-md border border-border bg-card px-2 py-1.5">
-          <p className="text-[15px] font-semibold tabular-nums">{batch.recordsProcessed}</p>
-          <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">Records</p>
-        </div>
-        <div className="rounded-md border border-border bg-card px-2 py-1.5">
-          <p className="text-[15px] font-semibold tabular-nums">{reviewCount}</p>
-          <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">To review</p>
-        </div>
-        <div className="rounded-md border border-border bg-card px-2 py-1.5">
-          <p className="text-[15px] font-semibold tabular-nums">{batch.errorCount}</p>
-          <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">Errors</p>
-        </div>
+      <div className="mt-3 grid grid-cols-3 gap-1.5 text-center sm:grid-cols-6">
+        {[
+          { label: "Files uploaded", value: files.length },
+          { label: "Successful", value: successfullyProcessed },
+          { label: "Companies", value: companiesIdentified },
+          { label: "Matched", value: recordsMatched },
+          { label: "To review", value: reviewCount },
+          { label: "Errors", value: batch.errorCount },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-md border border-border bg-card px-1.5 py-1.5">
+            <p className="text-[14px] font-semibold tabular-nums">{stat.value}</p>
+            <p className="text-[8.5px] uppercase tracking-[0.08em] text-muted-foreground">{stat.label}</p>
+          </div>
+        ))}
       </div>
 
       <ul className="mt-3 space-y-1.5">

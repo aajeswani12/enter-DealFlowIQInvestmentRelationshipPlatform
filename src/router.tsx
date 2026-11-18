@@ -1,3 +1,4 @@
+import { Navigate } from "react-router-dom";
 import { RequireAuth } from "./components/auth/require-auth";
 import { RequireMember } from "./components/auth/require-member";
 import { AppShell } from "./components/layout/app-shell";
@@ -36,7 +37,8 @@ export const routers = [
       { path: "inbox/capture", name: "voice-capture", element: <VoiceCapture /> },
       { path: "cases", name: "cases", element: <Cases /> },
       { path: "cases/:id", name: "case-detail", element: <CaseDetail /> },
-      { path: "decision", name: "decision-center", element: <DecisionCenter /> },
+      { path: "tasks", name: "tasks-outreach", element: <DecisionCenter /> },
+      { path: "decision", name: "decision-center-redirect", element: <Navigate to="/tasks" replace /> },
       { path: "investors", name: "investors", element: <Investors /> },
       { path: "investors/:id", name: "investor-detail", element: <InvestorDetail /> },
       { path: "matches", name: "matches", element: <Matches /> },
