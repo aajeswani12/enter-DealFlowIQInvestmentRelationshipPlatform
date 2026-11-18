@@ -8,6 +8,7 @@ import { CaseForm } from "@/components/forms/case-form";
 import { SelectField } from "@/components/forms/select-field";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { CASE_STATUS_LABEL, CASE_STATUS_OPTIONS } from "@/lib/constants";
@@ -26,6 +27,11 @@ const CaseDetail = () => {
   const workspace = data ?? EMPTY_WORKSPACE;
   const actions = useWorkspaceActions();
   const [editOpen, setEditOpen] = useState(false);
+  const [personOpen, setPersonOpen] = useState(false);
+  const [personName, setPersonName] = useState("");
+  const [personTitle, setPersonTitle] = useState("");
+  const [personEmail, setPersonEmail] = useState("");
+  const [personRole, setPersonRole] = useState<"founder" | "contact" | "other">("founder");
 
   const caseItem = workspace.cases.find((item) => item.id === id);
 
@@ -62,7 +68,54 @@ const CaseDetail = () => {
   const briefs = workspace.briefs.filter((item) => item.dealId === caseItem.id);
   const caseDocuments = workspace.caseDocuments.filter((item) => item.dealId === caseItem.id);
   const followUpTasks = workspace.followUpTasks.filter((item) => item.dealId === caseItem.id);
+  const caseOwner = workspace.members.find((member) => member.userId === caseItem.ownerUserId);
+  const people = workspace.dealPeople.filter((person) => person.dealId === caseItem.id);
+  const founderNames = [
+    ...people.map((person) => person.name).filter(Boolean),
+    ...sources.map((capture) => capture.founderName || capture.founderEmail).filter(Boolean),
+    ...claims
+      .filter((claim) => claim.claimType === "founder")
+      .map((claim) => claim.valueText || claim.label)
+      .filter(Boolean),
+  ].filter((value, index, all) => all.indexOf(value) === index);
+  const knownInvestors = [
+    ...new Set(
+      workspace.matches
+        .filter((match) => match.dealId === caseItem.id)
+        .map((match) => workspace.investors.find((investor) => investor.id === match.investorId)?.name)
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ];
+  const draftClaimCount = claims.filter((claim) => claim.reviewStatus === "draft").length;
+  const pendingImportCount = workspace.importCandidates.filter(
+    (candidate) =>
+      (candidate.dealId === caseItem.id || candidate.proposedDealId === caseItem.id) &&
+      (candidate.status === "needs_review" ||
+        (candidate.entityType === "claim" && candidate.status === "pending")),
+  ).length;
+  const openTaskCount = followUpTasks.filter((task) => task.status === "open").length;
   const openGaps = gaps.filter((item) => item.status === "open" || item.status === "needs_review");
+
+  const handleAddPerson = async () => {
+    if (!personName.trim()) {
+      toast.error("A person needs a name.");
+      return;
+    }
+    try {
+      await actions.createDealPerson.mutateAsync({
+        dealId: caseItem.id,
+        input: { name: personName, title: personTitle, email: personEmail, role: personRole },
+      });
+      toast.success("Person added to the case memory");
+      setPersonName("");
+      setPersonTitle("");
+      setPersonEmail("");
+      setPersonRole("founder");
+      setPersonOpen(false);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not add this person.");
+    }
+  };
 
   const handleStatus = async (status: string) => {
     try {
@@ -162,7 +215,13 @@ const CaseDetail = () => {
             )}
           </section>
 
-          <EvidenceTimeline documents={caseDocuments} captures={sources} batches={workspace.importBatches} />
+          <EvidenceTimeline
+            documents={caseDocuments}
+            captures={sources}
+            batches={workspace.importBatches}
+            interactions={workspace.interactions.filter((interaction) => interaction.dealId === caseItem.id)}
+            investors={workspace.investors}
+          />
           <FollowUpTasks tasks={followUpTasks} />
           <AnalysisSection deal={caseItem} sources={sources} runs={analysisRuns} briefs={briefs} />
           <ClaimsSection dealId={caseItem.id} items={claims} />
@@ -224,6 +283,102 @@ const CaseDetail = () => {
                 No next step recorded. Deals move faster when the next action is explicit.
               </p>
             )}
+          </section>
+
+          <section className="panel p-5" aria-labelledby="memory-heading">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h2 id="memory-heading" className="text-[15px] font-semibold tracking-tight">
+                  Case memory
+                </h2>
+                <p className="text-[11.5px] text-muted-foreground">
+                  Persistent people, relationships, reviews and actions around this company.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => setPersonOpen((open) => !open)}>
+                  Add person
+                </Button>
+                <Link to="/decision" className="text-[10px] font-medium text-brand-strong hover:underline">
+                  Decision Center
+                </Link>
+              </div>
+            </div>
+            <dl className="mt-3 space-y-2 text-[11.5px]">
+              <div className="flex justify-between gap-3 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Case owner</dt>
+                <dd className="text-right font-medium">{caseOwner?.displayName || caseOwner?.email || "Unassigned"}</dd>
+              </div>
+              <div className="flex justify-between gap-3 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Founders / contacts</dt>
+                <dd className="max-w-[210px] text-right font-medium">
+                  {founderNames.length > 0 ? founderNames.join(", ") : "Not recorded"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Known investors</dt>
+                <dd className="max-w-[210px] text-right font-medium">
+                  {knownInvestors.length > 0 ? knownInvestors.slice(0, 3).join(", ") : "No saved matches"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Pending approvals</dt>
+                <dd className="text-right font-medium">
+                  <a href="#claims-heading" className="text-brand-strong hover:underline">
+                    {draftClaimCount} claims
+                  </a>
+                  {" · "}
+                  <Link to="/imports" className="text-brand-strong hover:underline">
+                    {pendingImportCount} imports
+                  </Link>
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Open tasks</dt>
+                <dd className="text-right font-medium">{openTaskCount}</dd>
+              </div>
+            </dl>
+            {personOpen ? (
+              <div className="mt-3 space-y-2 rounded-md border border-border bg-secondary/30 p-2.5">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input value={personName} onChange={(event) => setPersonName(event.target.value)} placeholder="Name" className="h-9 bg-card text-[12px]" aria-label="Person name" />
+                  <Input value={personTitle} onChange={(event) => setPersonTitle(event.target.value)} placeholder="Title" className="h-9 bg-card text-[12px]" aria-label="Person title" />
+                  <Input value={personEmail} onChange={(event) => setPersonEmail(event.target.value)} placeholder="Email (optional)" className="h-9 bg-card text-[12px]" aria-label="Person email" />
+                  <SelectField
+                    value={personRole}
+                    onChange={(value) => setPersonRole(value as "founder" | "contact" | "other")}
+                    options={[
+                      { value: "founder", label: "Founder" },
+                      { value: "contact", label: "Contact" },
+                      { value: "other", label: "Other" },
+                    ]}
+                    ariaLabel="Person role"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-7 text-[10.5px]" onClick={() => void handleAddPerson()} disabled={actions.createDealPerson.isPending}>
+                    Save person
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" onClick={() => setPersonOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {people.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {people.map((person) => (
+                  <li key={person.id} className="flex flex-wrap items-baseline justify-between gap-2 text-[10.5px]">
+                    <span className="font-medium">{person.name}{person.title ? ` · ${person.title}` : ""}</span>
+                    <span className="text-muted-foreground">{person.email || person.role}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+              Last case update {formatDate(caseItem.updatedAt)}. Reviewed facts remain distinct from drafts and source
+              excerpts.
+            </p>
           </section>
 
           <section className="panel p-5" aria-labelledby="record-heading">

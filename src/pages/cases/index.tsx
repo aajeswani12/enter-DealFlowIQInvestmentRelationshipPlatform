@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { CASE_STATUS_LABEL, CASE_STATUS_OPTIONS } from "@/lib/constants";
+import { CASE_STATUS_LABEL, CASE_STATUS_OPTIONS, ROUND_STAGES } from "@/lib/constants";
 import { formatCurrency, formatShortDate, isOverdue } from "@/lib/format";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
@@ -21,14 +21,54 @@ const Cases = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [stage, setStage] = useState("all");
 
   const rows = useMemo(() => {
     const search = query.trim().toLowerCase();
-    return [...workspace.cases]
+    const enriched = workspace.cases.map((item) => {
+      const dealSources = workspace.captures.filter((capture) => capture.dealId === item.id);
+      const dealPeople = workspace.dealPeople.filter((person) => person.dealId === item.id);
+      const founderClaims = workspace.claims.filter(
+        (claim) => claim.dealId === item.id && claim.claimType === "founder",
+      );
+      const founders = [
+        ...dealPeople.map((person) => person.name || person.email).filter(Boolean),
+        ...dealSources.map((capture) => capture.founderName || capture.founderEmail).filter(Boolean),
+        ...founderClaims.map((claim) => claim.valueText || claim.label).filter(Boolean),
+      ].filter((value, index, all) => all.indexOf(value) === index);
+      const matchInvestors = workspace.matches
+        .filter((match) => match.dealId === item.id)
+        .map((match) => workspace.investors.find((investor) => investor.id === match.investorId)?.name)
+        .filter((name): name is string => Boolean(name));
+      const interactionInvestors = workspace.interactions
+        .filter((interaction) => interaction.dealId === item.id)
+        .map((interaction) => workspace.investors.find((investor) => investor.id === interaction.investorId)?.name)
+        .filter((name): name is string => Boolean(name));
+      const knownInvestors = [...new Set([...matchInvestors, ...interactionInvestors])];
+      return {
+        ...item,
+        founders,
+        knownInvestors,
+        claimCount: workspace.claims.filter((claim) => claim.dealId === item.id).length,
+        openGapCount: workspace.gaps.filter(
+          (gap) => gap.dealId === item.id && gap.status === "open",
+        ).length,
+      };
+    });
+    return enriched
       .filter((item) => (status === "all" ? true : item.status === status))
+      .filter((item) => (stage === "all" ? true : item.roundStage === stage))
       .filter((item) =>
         search
-          ? [item.companyName, item.sector, item.geography, item.leadPartner, item.referredBy]
+          ? [
+              item.companyName,
+              item.sector,
+              item.geography,
+              item.leadPartner,
+              item.referredBy,
+              ...item.founders,
+              ...item.knownInvestors,
+            ]
               .join(" ")
               .toLowerCase()
               .includes(search)
@@ -38,15 +78,8 @@ const Cases = () => {
         const aDue = a.nextStepDue ? new Date(a.nextStepDue).getTime() : Number.MAX_SAFE_INTEGER;
         const bDue = b.nextStepDue ? new Date(b.nextStepDue).getTime() : Number.MAX_SAFE_INTEGER;
         return aDue - bDue || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      })
-      .map((item) => ({
-        ...item,
-        claimCount: workspace.claims.filter((claim) => claim.dealId === item.id).length,
-        openGapCount: workspace.gaps.filter(
-          (gap) => gap.dealId === item.id && gap.status === "open",
-        ).length,
-      }));
-  }, [workspace, query, status]);
+      });
+  }, [workspace, query, status, stage]);
 
   return (
     <div className="page-enter space-y-5">
@@ -68,12 +101,20 @@ const Cases = () => {
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search company, sector, geography"
-            aria-label="Search investment cases"
+            placeholder="Search company, founder, sector or known investor"
+            aria-label="Search investment cases by company, founder, sector or known investor"
             className="bg-card pl-9"
           />
         </div>
-        <div className="sm:w-[190px]">
+        <div className="sm:w-[180px]">
+          <SelectField
+            value={stage}
+            onChange={setStage}
+            options={[{ value: "all", label: "All stages" }, ...ROUND_STAGES.map((value) => ({ value, label: value }))]}
+            ariaLabel="Filter by funding stage"
+          />
+        </div>
+        <div className="sm:w-[180px]">
           <SelectField
             value={status}
             onChange={setStatus}
@@ -138,6 +179,13 @@ const Cases = () => {
                         <p className="mt-1 text-[10.5px] text-muted-foreground/80">
                           {item.claimCount} claims · {item.openGapCount} open gaps{item.isSynthetic ? " · Synthetic sample" : ""}
                         </p>
+                        {item.founders.length > 0 || item.knownInvestors.length > 0 ? (
+                          <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground/75">
+                            {item.founders.length > 0 ? `Founder: ${item.founders.join(", ")}` : ""}
+                            {item.founders.length > 0 && item.knownInvestors.length > 0 ? " · " : ""}
+                            {item.knownInvestors.length > 0 ? `Known investors: ${item.knownInvestors.join(", ")}` : ""}
+                          </p>
+                        ) : null}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-[12.5px] text-muted-foreground">
@@ -196,6 +244,13 @@ const Cases = () => {
                       <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-relaxed text-muted-foreground">
                         {item.summary || `${item.sector || "Sector not set"} · ${item.geography || "Geography not set"}`}
                       </p>
+                      {item.founders.length > 0 || item.knownInvestors.length > 0 ? (
+                        <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground/80">
+                          {item.founders.length > 0 ? `Founder: ${item.founders.join(", ")}` : ""}
+                          {item.founders.length > 0 && item.knownInvestors.length > 0 ? " · " : ""}
+                          {item.knownInvestors.length > 0 ? `Known: ${item.knownInvestors.join(", ")}` : ""}
+                        </p>
+                      ) : null}
                     </div>
                     <CaseStatusPill status={item.status} label={CASE_STATUS_LABEL[item.status]} />
                   </div>

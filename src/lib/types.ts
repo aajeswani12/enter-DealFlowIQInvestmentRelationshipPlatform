@@ -53,7 +53,7 @@ export type ClaimType =
   | "company"
   | "sector"
   | "stage";
-export type VerificationStatus = "unverified" | "founder_reported" | "corroborated" | "disputed";
+export type VerificationStatus = "unverified" | "founder_reported" | "corroborated" | "disputed" | "internal_opinion";
 export type GapSeverity = "low" | "medium" | "high" | "critical";
 export type QuestionStatus = "open" | "answered" | "needs_review" | "resolved";
 
@@ -564,6 +564,20 @@ export interface FollowUpTask {
   importCandidateId: string | null;
   ownerUserId: string | null;
   createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+export interface DealPerson {
+  id: string;
+  dealId: string;
+  name: string;
+  title: string;
+  email: string | null;
+  role: "founder" | "contact" | "other";
+  sourceDocumentId: string | null;
+  sourceExcerpt: string;
   createdAt: string;
   updatedAt: string;
 }

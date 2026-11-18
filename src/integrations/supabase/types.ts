@@ -3704,6 +3704,63 @@ export type Database = {
           },
         ]
       }
+      deal_people: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          email: string | null
+          id: string
+          name: string
+          role: string
+          source_document_id: string | null
+          source_excerpt: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          email?: string | null
+          id?: string
+          name: string
+          role?: string
+          source_document_id?: string | null
+          source_excerpt?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          email?: string | null
+          id?: string
+          name?: string
+          role?: string
+          source_document_id?: string | null
+          source_excerpt?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_people_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_people_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deals: {
         Row: {
           cheque_sought: number | null

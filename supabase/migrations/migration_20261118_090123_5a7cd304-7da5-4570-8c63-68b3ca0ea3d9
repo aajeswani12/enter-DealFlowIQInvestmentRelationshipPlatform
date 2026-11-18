@@ -1,0 +1,4 @@
+alter table public.deal_claims drop constraint deal_claims_verification_status_check;
+alter table public.deal_claims add constraint deal_claims_verification_status_check check (
+  verification_status in ('unverified','founder_reported','corroborated','disputed','internal_opinion')
+);

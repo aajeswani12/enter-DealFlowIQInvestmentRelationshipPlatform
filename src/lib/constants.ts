@@ -116,6 +116,7 @@ export const VERIFICATION_OPTIONS: { value: VerificationStatus; label: string }[
   { value: "unverified", label: "Unverified" },
   { value: "founder_reported", label: "Founder reported" },
   { value: "corroborated", label: "Corroborated" },
+  { value: "internal_opinion", label: "Internal opinion" },
   { value: "disputed", label: "Disputed" },
 ];
 
@@ -235,6 +236,7 @@ export const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
   unverified: "Unverified",
   founder_reported: "Founder reported",
   corroborated: "Corroborated",
+  internal_opinion: "Internal opinion",
   disputed: "Disputed",
 };
 

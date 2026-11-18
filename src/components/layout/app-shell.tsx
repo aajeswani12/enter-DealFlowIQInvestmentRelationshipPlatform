@@ -1,5 +1,6 @@
 import {
   Briefcase,
+  ClipboardCheck,
   FolderInput,
   Inbox,
   LayoutDashboard,
@@ -24,6 +25,7 @@ const NAV = [
   { to: "/", label: "Dashboard", short: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/inbox", label: "Deal Inbox", short: "Inbox", icon: Inbox },
   { to: "/cases", label: "Investment Cases", short: "Cases", icon: Briefcase },
+  { to: "/decision", label: "Decision Center", short: "Decision", icon: ClipboardCheck },
   { to: "/investors", label: "Investor Network", short: "Investors", icon: Users },
   { to: "/matches", label: "Matches & Outreach", short: "Matches", icon: Waypoints },
   { to: "/imports", label: "Import & Organize", short: "Import", icon: FolderInput },

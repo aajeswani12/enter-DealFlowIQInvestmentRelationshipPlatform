@@ -339,8 +339,8 @@ const ImportsPage = () => {
             <UploadCloud className="h-7 w-7 text-brand" aria-hidden="true" />
             <p className="mt-2 text-[12.5px] font-semibold">Drop historical files here</p>
             <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">
-              CSV · PDF with embedded text · DOCX · TXT · EML. Max 20 MB each. Scanned PDFs and image-only DOCX are
-              rejected because OCR is not configured.
+              CSV · PDF with embedded text · DOCX · TXT · EML. Max 20 MB each. XLSX is not enabled; export it as CSV.
+              Scanned PDFs and image-only DOCX are rejected because OCR is not configured.
             </p>
             <input
               ref={fileInputRef}
@@ -429,7 +429,8 @@ const ImportsPage = () => {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[10px] leading-relaxed text-muted-foreground">
-              Supported extraction: CSV rows, TXT/email text, DOCX body text and PDFs with a text layer. No OCR.
+              Supported extraction: CSV rows, TXT/email text, DOCX body text and PDFs with a text layer. No OCR or XLSX;
+              export spreadsheets as CSV.
             </p>
             <Button onClick={() => void startImport()} disabled={!canWrite || processing} className="gap-1.5">
               {processing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <UploadCloud className="h-4 w-4" aria-hidden="true" />}

@@ -5,6 +5,7 @@ import type {
   DealBrief,
   CaseDocument,
   DealClaim,
+  DealPerson,
   FollowUpTask,
   ImportBatch,
   ImportCandidate,
@@ -38,6 +39,7 @@ export interface WorkspaceData {
   members: WorkspaceMember[];
   audit: AuditEvent[];
   caseDocuments: CaseDocument[];
+  dealPeople: DealPerson[];
   followUpTasks: FollowUpTask[];
   importBatches: ImportBatch[];
   importFiles: ImportFileRecord[];
@@ -61,6 +63,7 @@ export const EMPTY_WORKSPACE: WorkspaceData = {
   members: [],
   audit: [],
   caseDocuments: [],
+  dealPeople: [],
   followUpTasks: [],
   importBatches: [],
   importFiles: [],

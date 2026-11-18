@@ -59,6 +59,10 @@ interface SavedCapture {
   extractionStatus: ExtractionStatus;
   extractionError: string;
   fields: Partial<ExtractedDealFields> | null;
+  analysisStatus: "completed" | "failed" | "unavailable" | "not_applicable";
+  analysisMessage: string;
+  analysisClaims: number;
+  analysisGaps: number;
 }
 
 const WAVE_BARS = [34, 58, 22, 76, 44, 88, 30, 68, 50, 82, 26, 60, 40, 72, 32, 64, 46, 86, 24, 56, 42, 70];
@@ -435,6 +439,33 @@ const VoiceCapture = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const loadMuseFlowPilotSample = async () => {
+    const museflow = workspace.cases.find((item) => item.companyName.toLowerCase().includes("museflow"));
+    if (!museflow) {
+      toast.error("No MuseFlow case exists in this workspace.");
+      return;
+    }
+    if (audio) {
+      toast.error("Remove the current recording first; the pilot demo uses the paste fallback.");
+      return;
+    }
+    try {
+      const response = await fetch("/import-samples/museflow-pilot-update.txt");
+      if (!response.ok) throw new Error("The synthetic pilot transcript could not be loaded.");
+      const content = await response.text();
+      setTargetMode("existing");
+      setDealId(museflow.id);
+      setTranscript(content);
+      setOriginalTranscript(content);
+      setTranscription({ status: "manual" });
+      setSourceDate(new Date().toISOString());
+      setSaveError("");
+      toast.success("Synthetic MuseFlow pilot update loaded. Review and edit the transcript before saving.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load the synthetic pilot update.");
+    }
+  };
+
   const handleSave = async () => {
     if (!canSave) {
       setSaveError(
@@ -541,6 +572,32 @@ const VoiceCapture = () => {
         extractedFields: fields,
       });
 
+      let analysisStatus: SavedCapture["analysisStatus"] = finalDealId ? "completed" : "not_applicable";
+      let analysisMessage = "";
+      let analysisClaims = 0;
+      let analysisGaps = 0;
+      if (finalDealId) {
+        setSaveStage("Analyzing evidence and gaps…");
+        try {
+          const analysis = await api.analyzeDealSource(base.id, finalDealId);
+          if (!analysis.configured) {
+            analysisStatus = "unavailable";
+            analysisMessage =
+              analysis.reason || "Evidence analysis is not configured. The source was saved without proposed claims.";
+          } else {
+            analysisClaims = analysis.claims ?? 0;
+            analysisGaps = analysis.gaps ?? 0;
+            analysisMessage = `${analysisClaims} draft claim${analysisClaims === 1 ? "" : "s"} and ${analysisGaps} gap${analysisGaps === 1 ? "" : "s"} proposed. Nothing has been approved automatically.`;
+          }
+        } catch (analysisError) {
+          analysisStatus = "failed";
+          analysisMessage =
+            analysisError instanceof Error
+              ? analysisError.message
+              : "Evidence analysis failed. The source is saved and can be analyzed again from the case.";
+        }
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["workspace"] });
       setSaved({
         sourceId: base.id,
@@ -550,8 +607,16 @@ const VoiceCapture = () => {
         extractionStatus,
         extractionError,
         fields,
+        analysisStatus,
+        analysisMessage,
+        analysisClaims,
+        analysisGaps,
       });
-      toast.success("Capture saved");
+      toast.success(
+        analysisStatus === "completed"
+          ? "Capture saved; draft evidence is awaiting human review"
+          : "Capture saved",
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "The capture could not be saved.";
       setSaveError(
@@ -661,6 +726,45 @@ const VoiceCapture = () => {
                       : "No extraction was requested."}
               </p>
             </div>
+          </div>
+
+          <div className="mt-3 rounded-lg border border-border bg-secondary/20 p-3.5">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="label-caps">Evidence analysis</p>
+                <p className="mt-1 text-[12px] font-medium">
+                  {saved.analysisStatus === "completed"
+                    ? "Draft evidence and gaps proposed"
+                    : saved.analysisStatus === "unavailable"
+                      ? "Not configured"
+                      : saved.analysisStatus === "failed"
+                        ? "Analysis failed"
+                        : "No linked case to analyse"}
+                </p>
+              </div>
+              {saved.dealId ? (
+                <Link
+                  to={`/cases/${saved.dealId}#claims-heading`}
+                  className="text-[10.5px] font-medium text-brand-strong hover:underline"
+                >
+                  Review proposed evidence
+                </Link>
+              ) : null}
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              {saved.analysisMessage
+                ? saved.analysisMessage
+                : saved.analysisStatus === "not_applicable"
+                  ? "The transcript was not linked to a case, so no evidence analysis was run."
+                  : `${saved.analysisClaims} drafts · ${saved.analysisGaps} gaps.`}
+            </p>
+            {saved.analysisStatus === "completed" ? (
+              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                {saved.analysisClaims} draft claim{saved.analysisClaims === 1 ? "" : "s"} and {saved.analysisGaps} open
+                gap{saved.analysisGaps === 1 ? "" : "s"} were proposed. Prior approved facts were preserved; nothing is
+                approved until a human reviews it.
+              </p>
+            ) : null}
           </div>
 
           {saved.extractionStatus === "completed" && hasFields ? (
@@ -1173,6 +1277,27 @@ const VoiceCapture = () => {
                     extracted fields. Retrying a failed save updates the same capture.
                   </p>
                 </div>
+
+                {workspace.cases.some((item) => item.companyName.toLowerCase().includes("museflow")) ? (
+                  <div className="rounded-md border border-warning/25 bg-warning-soft/40 px-3 py-2.5">
+                    <p className="text-[10.5px] font-medium text-warning">Synthetic demo · MuseFlow pilot follow-up</p>
+                    <p className="mt-0.5 text-[10px] leading-relaxed text-warning">
+                      Loads a labelled synthetic transcript for the existing MuseFlow case. It reports 12 historical
+                      pilots, then two paying and ten unpaid. Review it before saving; analysis creates drafts, not
+                      approved facts.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 h-7 text-[10.5px]"
+                      onClick={() => void loadMuseFlowPilotSample()}
+                      disabled={saving}
+                    >
+                      Load synthetic pilot update
+                    </Button>
+                  </div>
+                ) : null}
 
                 {saveError ? (
                   <p role="alert" className="rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[11.5px] leading-relaxed text-destructive">

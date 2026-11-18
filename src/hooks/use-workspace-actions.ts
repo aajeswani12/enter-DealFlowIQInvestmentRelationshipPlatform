@@ -15,6 +15,11 @@ export function useWorkspaceActions() {
       onSuccess: invalidate,
     }),
     createCase: useMutation({ mutationFn: api.createCase, onSuccess: invalidate }),
+    createDealPerson: useMutation({
+      mutationFn: ({ dealId, input }: { dealId: string; input: Parameters<typeof api.createDealPerson>[1] }) =>
+        api.createDealPerson(dealId, input),
+      onSuccess: invalidate,
+    }),
     updateCase: useMutation({
       mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateCase>[1] }) =>
         api.updateCase(id, patch),

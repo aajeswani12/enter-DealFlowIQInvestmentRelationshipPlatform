@@ -20,6 +20,7 @@ const VERIFICATION_TONE = {
   unverified: "neutral",
   founder_reported: "brand",
   corroborated: "success",
+  internal_opinion: "neutral",
   disputed: "danger",
 } as const;
 

@@ -1,27 +1,31 @@
-import { FileText, Mail, Mic, Paperclip, Sparkles } from "lucide-react";
+import { FileText, Mail, MessageSquare, Mic, Paperclip, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import type { Capture, CaseDocument, ImportBatch } from "@/lib/types";
+import type { Capture, CaseDocument, ImportBatch, Interaction, Investor } from "@/lib/types";
 
 interface EvidenceTimelineProps {
   documents: CaseDocument[];
   captures: Capture[];
   batches: ImportBatch[];
+  interactions: Interaction[];
+  investors: Investor[];
 }
 
 type Entry =
   | { kind: "capture"; date: string; capture: Capture }
-  | { kind: "document"; date: string; document: CaseDocument };
+  | { kind: "document"; date: string; document: CaseDocument }
+  | { kind: "interaction"; date: string; interaction: Interaction };
 
-export function EvidenceTimeline({ documents, captures, batches }: EvidenceTimelineProps) {
+export function EvidenceTimeline({ documents, captures, batches, interactions, investors }: EvidenceTimelineProps) {
   const [opening, setOpening] = useState<string | null>(null);
   const entries: Entry[] = [
     ...captures.map((capture) => ({ kind: "capture" as const, date: capture.sourceDate, capture })),
     ...documents.map((document) => ({ kind: "document" as const, date: document.sourceDate, document })),
+    ...interactions.map((interaction) => ({ kind: "interaction" as const, date: interaction.occurredAt, interaction })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const openDocument = async (document: CaseDocument) => {
@@ -64,7 +68,16 @@ export function EvidenceTimeline({ documents, captures, batches }: EvidenceTimel
               ? batches.find((item) => item.id === entry.document.batchId)
               : null;
           return (
-            <li key={entry.kind === "capture" ? entry.capture.id : entry.document.id} className="relative flex gap-3 pb-4 last:pb-0">
+            <li
+              key={
+                entry.kind === "capture"
+                  ? entry.capture.id
+                  : entry.kind === "document"
+                    ? entry.document.id
+                    : entry.interaction.id
+              }
+              className="relative flex gap-3 pb-4 last:pb-0"
+            >
               <div className="flex flex-col items-center">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
                   {entry.kind === "capture" ? (
@@ -73,6 +86,8 @@ export function EvidenceTimeline({ documents, captures, batches }: EvidenceTimel
                     ) : (
                       <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                     )
+                  ) : entry.kind === "interaction" ? (
+                    <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
                   ) : entry.document.documentType === "email" ? (
                     <Mail className="h-3.5 w-3.5" aria-hidden="true" />
                   ) : (
@@ -83,12 +98,23 @@ export function EvidenceTimeline({ documents, captures, batches }: EvidenceTimel
               </div>
               <div className="min-w-0 flex-1 pb-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <p className="text-[12.5px] font-semibold">{entry.kind === "capture" ? entry.capture.companyName || "Deal update" : entry.document.title}</p>
+                  <p className="text-[12.5px] font-semibold">
+                    {entry.kind === "capture"
+                      ? entry.capture.companyName || "Deal update"
+                      : entry.kind === "interaction"
+                        ? `${investors.find((investor) => investor.id === entry.interaction.investorId)?.name ?? "Investor"} · ${entry.interaction.kind}`
+                        : entry.document.title}
+                  </p>
                   <span className="text-[10px] text-muted-foreground">{formatDate(entry.date)}</span>
                   {entry.kind === "document" ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-brand/20 bg-brand-soft px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-brand-strong">
                       <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
                       Imported {entry.document.documentType}
+                    </span>
+                  ) : null}
+                  {entry.kind === "interaction" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      Relationship interaction
                     </span>
                   ) : null}
                   {batch?.isSynthetic ? <span className="text-[9px] uppercase tracking-[0.1em] text-warning">Synthetic</span> : null}
@@ -97,6 +123,15 @@ export function EvidenceTimeline({ documents, captures, batches }: EvidenceTimel
                   <p className="mt-1 line-clamp-3 whitespace-pre-line text-[11.5px] leading-relaxed text-muted-foreground">
                     {entry.capture.notes || entry.capture.originalTranscript || "Captured source note."}
                   </p>
+                ) : entry.kind === "interaction" ? (
+                  <>
+                    <p className="mt-1 whitespace-pre-line text-[11.5px] leading-relaxed text-muted-foreground">
+                      {entry.interaction.summary}
+                    </p>
+                    {entry.interaction.nextStep ? (
+                      <p className="mt-1 text-[10px] text-muted-foreground/80">Next: {entry.interaction.nextStep}</p>
+                    ) : null}
+                  </>
                 ) : (
                   <>
                     <p className="mt-1 line-clamp-3 whitespace-pre-line text-[11.5px] leading-relaxed text-muted-foreground">

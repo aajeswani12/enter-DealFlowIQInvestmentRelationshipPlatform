@@ -1634,6 +1634,33 @@ async function addGaps(
   }
 }
 
+async function addDealPeople(
+  apply: ApplyContext,
+  dealId: string,
+  documentId: string,
+  company: CompanyExtract,
+): Promise<void> {
+  for (const rawName of company.founders) {
+    const name = text(rawName);
+    if (!name) continue;
+    const existing = await getRows<{ id: string }>(
+      apply.ctx,
+      "deal_people",
+      `select=id&deal_id=eq.${encodeURIComponent(dealId)}&name=ilike.${encodeURIComponent(name)}&limit=1`,
+    );
+    if (existing[0]) continue;
+    await insertRows(apply.ctx, "deal_people", [{
+      deal_id: dealId,
+      name,
+      role: "founder",
+      source_document_id: documentId,
+      source_excerpt: company.excerpt.slice(0, 5000),
+      created_by: apply.ctx.userId,
+    }]);
+    apply.records += 1;
+  }
+}
+
 async function applyCompanyExtract(apply: ApplyContext, company: CompanyExtract): Promise<void> {
   const resolution = resolveCompany(company, apply.directory);
   const related = company.related ?? { claims: [], interactions: [], followups: [], gaps: [] };
@@ -1661,6 +1688,7 @@ async function applyCompanyExtract(apply: ApplyContext, company: CompanyExtract)
     deal = await createDeal(apply, company);
   }
   const docId = await ensureDocument(apply, deal.id, company.excerpt, isoDate(apply.file.source_date));
+  await addDealPeople(apply, deal.id, docId, company);
   const candidate = await saveCandidate(apply, {
     entity_type: "deal",
     status: "applied",
@@ -1963,7 +1991,7 @@ async function reviewCandidate(ctx: AuthContext, input: JsonRecord): Promise<Res
       reporting_period: period,
       verification_status: conflict
         ? "disputed"
-        : ["unverified", "founder_reported", "corroborated", "disputed"].includes(text(currentPayload.verification_status))
+        : ["unverified", "founder_reported", "corroborated", "internal_opinion", "disputed"].includes(text(currentPayload.verification_status))
           ? text(currentPayload.verification_status)
           : "founder_reported",
       review_status: "approved",
@@ -2016,6 +2044,7 @@ async function reviewCandidate(ctx: AuthContext, input: JsonRecord): Promise<Res
       return json({ error: "Invalid action for a company candidate." }, 400);
     }
     const docId = await ensureDocument(apply, deal.id, text(candidate.excerpt), isoDate(file.source_date));
+    await addDealPeople(apply, deal.id, docId, extracted);
     await addClaimCandidates(apply, deal.id, docId, candidateId, related.claims ?? [], extracted.name);
     await addInteractions(apply, extracted.name, deal.id, docId, related.interactions ?? []);
     await addFollowups(apply, extracted.name, deal.id, docId, related.followups ?? []);

@@ -12,6 +12,7 @@ import type {
   CaptureStatus,
   CaseDocument,
   CaseStatus,
+  DealPerson,
   FollowUpTask,
   ImportBatch,
   ImportCandidate,
@@ -70,6 +71,7 @@ type AuditRow = Tables["audit_events"]["Row"];
 type RunRow = Tables["deal_analysis_runs"]["Row"];
 type BriefRow = Tables["deal_briefs"]["Row"];
 type CaseDocumentRow = Tables["case_documents"]["Row"];
+type DealPersonRow = Tables["deal_people"]["Row"];
 type FollowUpTaskRow = Tables["follow_up_tasks"]["Row"];
 type ImportBatchRow = Tables["import_batches"]["Row"];
 type ImportFileRow = Tables["import_files"]["Row"];
@@ -308,6 +310,21 @@ function mapCaseDocument(row: CaseDocumentRow): CaseDocument {
     excerpt: row.excerpt,
     createdBy: row.created_by,
     createdAt: row.created_at,
+  };
+}
+
+function mapDealPerson(row: DealPersonRow): DealPerson {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    name: row.name,
+    title: row.title,
+    email: row.email,
+    role: row.role as DealPerson["role"],
+    sourceDocumentId: row.source_document_id,
+    sourceExcerpt: row.source_excerpt,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -763,7 +780,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, dealPeople, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -781,6 +798,7 @@ export const api = {
         supabase.from("match_weight_configs").select("*").order("updated_at", { ascending: false }).limit(1),
         supabase.from("outreach_events").select("*").order("created_at", { ascending: false }).limit(1000),
         supabase.from("case_documents").select("*").order("source_date", { ascending: true }).limit(1000),
+        supabase.from("deal_people").select("*").order("name", { ascending: true }).limit(1000),
         supabase.from("follow_up_tasks").select("*").order("created_at", { ascending: false }).limit(500),
         supabase.from("import_batches").select("*").order("created_at", { ascending: false }).limit(100),
         supabase.from("import_files").select("*").order("created_at", { ascending: false }).limit(500),
@@ -804,6 +822,7 @@ export const api = {
     if (weightConfigs.error) fail("Could not load matching settings", weightConfigs.error);
     if (outreachEvents.error) fail("Could not load outreach activity", outreachEvents.error);
     if (caseDocuments.error) fail("Could not load case documents", caseDocuments.error);
+    if (dealPeople.error) fail("Could not load deal people", dealPeople.error);
     if (followUpTasks.error) fail("Could not load follow-up tasks", followUpTasks.error);
     if (importBatches.error) fail("Could not load import batches", importBatches.error);
     if (importFiles.error) fail("Could not load import files", importFiles.error);
@@ -837,6 +856,7 @@ export const api = {
       outreach: (outreach.data ?? []).map(mapOutreach),
       outreachEvents: (outreachEvents.data ?? []).map(mapOutreachEvent),
       caseDocuments: (caseDocuments.data ?? []).map(mapCaseDocument),
+      dealPeople: (dealPeople.data ?? []).map(mapDealPerson),
       followUpTasks: (followUpTasks.data ?? []).map(mapFollowUpTask),
       importBatches: (importBatches.data ?? []).map(mapImportBatch),
       importFiles: (importFiles.data ?? []).map(mapImportFile),
@@ -1322,6 +1342,23 @@ export const api = {
     }
 
     return mapDeal(data);
+  },
+
+  async createDealPerson(
+    dealId: string,
+    input: { name: string; title: string; email: string; role: "founder" | "contact" | "other" },
+  ): Promise<void> {
+    const userId = await currentUserId();
+    const { error } = await supabase.from("deal_people").insert({
+      deal_id: dealId,
+      name: input.name.trim().slice(0, 160),
+      title: input.title.trim().slice(0, 160),
+      email: input.email.trim() || null,
+      role: input.role,
+      source_excerpt: "Manually recorded by a workspace member.",
+      created_by: userId,
+    });
+    if (error) fail("Could not save this person", error);
   },
 
   async updateCase(id: string, patch: Partial<Omit<InvestmentCase, "id" | "createdAt">>): Promise<void> {
