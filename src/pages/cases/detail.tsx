@@ -17,6 +17,8 @@ import type { CaseStatus } from "@/lib/types";
 import { AnalysisSection } from "./analysis-section";
 import { ClaimsSection } from "./claims-section";
 import { DecisionGapsSection } from "./gaps-section";
+import { EvidenceTimeline } from "./evidence-timeline";
+import { FollowUpTasks } from "./follow-up-tasks";
 
 const CaseDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -58,6 +60,8 @@ const CaseDetail = () => {
   const source = sources[0];
   const analysisRuns = workspace.analysisRuns.filter((item) => item.dealId === caseItem.id);
   const briefs = workspace.briefs.filter((item) => item.dealId === caseItem.id);
+  const caseDocuments = workspace.caseDocuments.filter((item) => item.dealId === caseItem.id);
+  const followUpTasks = workspace.followUpTasks.filter((item) => item.dealId === caseItem.id);
   const openGaps = gaps.filter((item) => item.status === "open" || item.status === "needs_review");
 
   const handleStatus = async (status: string) => {
@@ -158,6 +162,8 @@ const CaseDetail = () => {
             )}
           </section>
 
+          <EvidenceTimeline documents={caseDocuments} captures={sources} batches={workspace.importBatches} />
+          <FollowUpTasks tasks={followUpTasks} />
           <AnalysisSection deal={caseItem} sources={sources} runs={analysisRuns} briefs={briefs} />
           <ClaimsSection dealId={caseItem.id} items={claims} />
           <DecisionGapsSection dealId={caseItem.id} items={gaps} />

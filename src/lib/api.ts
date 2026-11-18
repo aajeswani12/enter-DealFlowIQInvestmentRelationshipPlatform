@@ -10,7 +10,16 @@ import type {
   Capture,
   CaptureSource,
   CaptureStatus,
+  CaseDocument,
   CaseStatus,
+  FollowUpTask,
+  ImportBatch,
+  ImportCandidate,
+  ImportFileRecord,
+  ImportFileType,
+  ImportReview,
+  ImportCandidateStatus,
+  ImportCandidateType,
   ClaimType,
   DealAnalysisRun,
   DealBrief,
@@ -60,6 +69,12 @@ type MemberRow = Tables["workspace_members"]["Row"];
 type AuditRow = Tables["audit_events"]["Row"];
 type RunRow = Tables["deal_analysis_runs"]["Row"];
 type BriefRow = Tables["deal_briefs"]["Row"];
+type CaseDocumentRow = Tables["case_documents"]["Row"];
+type FollowUpTaskRow = Tables["follow_up_tasks"]["Row"];
+type ImportBatchRow = Tables["import_batches"]["Row"];
+type ImportFileRow = Tables["import_files"]["Row"];
+type ImportCandidateRow = Tables["import_candidates"]["Row"];
+type ImportReviewRow = Tables["import_reviews"]["Row"];
 
 const VOICE_BUCKET = "voice-notes";
 const EVIDENCE_BUCKET = "case-evidence";
@@ -67,6 +82,30 @@ const SIGNED_URL_TTL = 60 * 60 * 4;
 
 function fail(context: string, error: { message: string } | null): never {
   throw new Error(`${context}: ${error?.message ?? "unknown error"}`);
+}
+
+function normalizeCompanyName(value: string): string {
+  let raw = value.toLowerCase();
+  raw = raw.replace(/\(([^)]*(sample|synthetic)[^)]*)\)/gi, " ");
+  raw = raw.replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
+  const drop = new Set(["inc", "llc", "ltd", "corp", "corporation", "limited", "gmbh", "plc", "co", "company"]);
+  return raw.split(" ").filter((token) => token && !drop.has(token)).join("");
+}
+
+function normalizedDomain(value: string): string {
+  const raw = value.trim().toLowerCase();
+  if (!raw) return "";
+  return raw.replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0].split(":")[0];
+}
+
+function companySimilarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a))) return 0.85;
+  const as = new Set(a.split(" "));
+  const bs = new Set(b.split(" "));
+  const overlap = [...as].filter((token) => bs.has(token)).length;
+  return overlap / new Set([...as, ...bs]).size;
 }
 
 function extensionFor(mimeType: string, fallback = "webm"): string {
@@ -154,6 +193,7 @@ function mapClaim(row: ClaimRow): DealClaim {
     reportingPeriod: row.reporting_period,
     verificationStatus: row.verification_status as VerificationStatus,
     sourceId: row.source_id,
+    documentId: row.document_id,
     fileName: row.file_name,
     filePath: row.file_path,
     reviewStatus: row.review_status as DealClaim["reviewStatus"],
@@ -185,6 +225,7 @@ function mapGap(row: GapRow): DecisionGap {
     evidence: row.evidence,
     suggestedAction: row.suggested_action,
     sourceId: row.source_id,
+    documentId: row.document_id,
     analysisRunId: row.analysis_run_id,
     gapKey: row.gap_key,
     origin: row.origin as DecisionGap["origin"],
@@ -214,6 +255,7 @@ function mapInvestor(row: InvestorRow, contacts: InvestorContact[]): Investor {
   return {
     id: row.id,
     name: row.name,
+    website: row.website,
     investorType: row.investor_type as InvestorType,
     thesis: row.thesis,
     stages: row.stages ?? [],
@@ -245,6 +287,127 @@ function mapInteraction(row: InteractionRow): Interaction {
     occurredAt: row.occurred_at,
     nextStep: row.next_step,
     nextStepDue: row.next_step_due,
+    documentId: row.document_id,
+    createdAt: row.created_at,
+  };
+}
+
+function mapCaseDocument(row: CaseDocumentRow): CaseDocument {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    importFileId: row.import_file_id,
+    batchId: row.batch_id,
+    title: row.title,
+    documentType: row.document_type as ImportFileType,
+    sourceDate: row.source_date,
+    storagePath: row.storage_path,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    extractedText: row.extracted_text,
+    excerpt: row.excerpt,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function mapFollowUpTask(row: FollowUpTaskRow): FollowUpTask {
+  return {
+    id: row.id,
+    dealId: row.deal_id,
+    investorId: row.investor_id,
+    title: row.title,
+    detail: row.detail,
+    dueDate: row.due_date,
+    status: row.status as FollowUpTask["status"],
+    sourceDocumentId: row.source_document_id,
+    importCandidateId: row.import_candidate_id,
+    ownerUserId: row.owner_user_id,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapImportBatch(row: ImportBatchRow): ImportBatch {
+  return {
+    id: row.id,
+    label: row.label,
+    status: row.status as ImportBatch["status"],
+    isSynthetic: row.is_synthetic,
+    totalFiles: row.total_files,
+    filesProcessed: row.files_processed,
+    recordsProcessed: row.records_processed,
+    recordsNeedingReview: row.records_needing_review,
+    errorCount: row.error_count,
+    notes: row.notes,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapImportFile(row: ImportFileRow): ImportFileRecord {
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    fileName: row.file_name,
+    fileType: row.file_type as ImportFileType,
+    mimeType: row.mime_type,
+    sizeBytes: Number(row.size_bytes),
+    storagePath: row.storage_path,
+    checksum: row.checksum,
+    processingStatus: row.processing_status as ImportFileRecord["processingStatus"],
+    recordsProcessed: row.records_processed,
+    recordsNeedingReview: row.records_needing_review,
+    errorMessage: row.error_message,
+    extractedCharCount: row.extracted_char_count,
+    pageCount: row.page_count,
+    duplicateOf: row.duplicate_of,
+    sourceDate: row.source_date,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapImportCandidate(row: ImportCandidateRow): ImportCandidate {
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    fileId: row.file_id,
+    entityType: row.entity_type as ImportCandidateType,
+    status: row.status as ImportCandidateStatus,
+    dealId: row.deal_id,
+    investorId: row.investor_id,
+    proposedDealId: row.proposed_deal_id,
+    proposedInvestorId: row.proposed_investor_id,
+    parentCandidateId: row.parent_candidate_id,
+    matchConfidence: row.match_confidence as ImportCandidate["matchConfidence"],
+    matchBasis: row.match_basis,
+    payload: (row.payload as Record<string, unknown>) ?? {},
+    excerpt: row.excerpt,
+    sourceDate: row.source_date,
+    fingerprint: row.fingerprint,
+    conflictSummary: row.conflict_summary,
+    reviewNote: row.review_note,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    appliedRecordId: row.applied_record_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapImportReview(row: ImportReviewRow): ImportReview {
+  return {
+    id: row.id,
+    candidateId: row.candidate_id,
+    batchId: row.batch_id,
+    action: row.action as ImportReview["action"],
+    before: (row.before as Record<string, unknown>) ?? {},
+    after: (row.after as Record<string, unknown>) ?? {},
+    note: row.note,
+    reviewer: row.reviewer,
     createdAt: row.created_at,
   };
 }
@@ -600,7 +763,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -617,6 +780,12 @@ export const api = {
         supabase.from("deal_briefs").select("*").order("created_at", { ascending: false }).limit(200),
         supabase.from("match_weight_configs").select("*").order("updated_at", { ascending: false }).limit(1),
         supabase.from("outreach_events").select("*").order("created_at", { ascending: false }).limit(1000),
+        supabase.from("case_documents").select("*").order("source_date", { ascending: true }).limit(1000),
+        supabase.from("follow_up_tasks").select("*").order("created_at", { ascending: false }).limit(500),
+        supabase.from("import_batches").select("*").order("created_at", { ascending: false }).limit(100),
+        supabase.from("import_files").select("*").order("created_at", { ascending: false }).limit(500),
+        supabase.from("import_candidates").select("*").order("created_at", { ascending: false }).limit(1000),
+        supabase.from("import_reviews").select("*").order("created_at", { ascending: false }).limit(1000),
       ]);
 
     if (deals.error) fail("Could not load deals", deals.error);
@@ -634,6 +803,12 @@ export const api = {
     if (briefs.error) fail("Could not load deal briefs", briefs.error);
     if (weightConfigs.error) fail("Could not load matching settings", weightConfigs.error);
     if (outreachEvents.error) fail("Could not load outreach activity", outreachEvents.error);
+    if (caseDocuments.error) fail("Could not load case documents", caseDocuments.error);
+    if (followUpTasks.error) fail("Could not load follow-up tasks", followUpTasks.error);
+    if (importBatches.error) fail("Could not load import batches", importBatches.error);
+    if (importFiles.error) fail("Could not load import files", importFiles.error);
+    if (importCandidates.error) fail("Could not load import candidates", importCandidates.error);
+    if (importReviews.error) fail("Could not load import reviews", importReviews.error);
 
     const sourceRows = sources.data ?? [];
     const audioPaths = sourceRows
@@ -661,6 +836,12 @@ export const api = {
       interactions: (interactions.data ?? []).map(mapInteraction),
       outreach: (outreach.data ?? []).map(mapOutreach),
       outreachEvents: (outreachEvents.data ?? []).map(mapOutreachEvent),
+      caseDocuments: (caseDocuments.data ?? []).map(mapCaseDocument),
+      followUpTasks: (followUpTasks.data ?? []).map(mapFollowUpTask),
+      importBatches: (importBatches.data ?? []).map(mapImportBatch),
+      importFiles: (importFiles.data ?? []).map(mapImportFile),
+      importCandidates: (importCandidates.data ?? []).map(mapImportCandidate),
+      importReviews: (importReviews.data ?? []).map(mapImportReview),
       matches: (matches.data ?? []).map(mapMatch),
       members: (members.data ?? []).map(mapMember),
       audit: (audit.data ?? []).map(mapAudit),
@@ -668,6 +849,132 @@ export const api = {
       briefs: (briefs.data ?? []).map(mapBrief),
       matchWeights: weightConfigs.data && weightConfigs.data[0] ? mapWeightConfig(weightConfigs.data[0]) : null,
     };
+  },
+
+  async createImportBatch(input: {
+    label: string;
+    isSynthetic: boolean;
+    notes?: string;
+  }): Promise<ImportBatch> {
+    const userId = await currentUserId();
+    const { data, error } = await supabase
+      .from("import_batches")
+      .insert({
+        label: input.label.trim().slice(0, 160),
+        is_synthetic: input.isSynthetic,
+        notes: input.notes?.slice(0, 1000) ?? "",
+        status: "uploading",
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) fail("Could not create the import batch", error);
+    return mapImportBatch(data);
+  },
+
+  async uploadImportFile(input: {
+    batchId: string;
+    file: File;
+    fileType: ImportFileType;
+    sourceDate?: string;
+  }): Promise<ImportFileRecord> {
+    const userId = await currentUserId();
+    const safeName = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
+    const fileId = crypto.randomUUID();
+    const path = `${userId}/${input.batchId}/${fileId}-${safeName}`;
+    const { error: uploadError } = await supabase.storage.from("imports").upload(path, input.file, {
+      contentType: input.file.type || "application/octet-stream",
+      upsert: false,
+    });
+    if (uploadError) fail("Could not save the original file", uploadError);
+
+    const { data, error } = await supabase
+      .from("import_files")
+      .insert({
+        id: fileId,
+        batch_id: input.batchId,
+        file_name: input.file.name.slice(0, 240),
+        file_type: input.fileType,
+        mime_type: input.file.type || "application/octet-stream",
+        size_bytes: input.file.size,
+        storage_path: path,
+        processing_status: "pending",
+        source_date: input.sourceDate ?? new Date().toISOString(),
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) fail("Could not register the import file", error);
+    return mapImportFile(data);
+  },
+
+  async processImportFile(fileId: string): Promise<{
+    status: string;
+    records_processed?: number;
+    records_needing_review?: number;
+    warnings?: string[];
+    error?: string;
+  }> {
+    const { data, error } = await supabase.functions.invoke("importHub", {
+      body: { action: "process", file_id: fileId },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { status: "failed", error: "The import service returned no response." }) as {
+      status: string;
+      records_processed?: number;
+      records_needing_review?: number;
+      warnings?: string[];
+      error?: string;
+    };
+  },
+
+  async createPastedImport(input: {
+    batchId: string;
+    title: string;
+    content: string;
+    fileType: "email" | "txt";
+    sourceDate?: string;
+  }): Promise<ImportFileRecord> {
+    const safeTitle = input.title.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "pasted-record";
+    const extension = input.fileType === "email" ? "eml" : "txt";
+    const file = new File([input.content], `${safeTitle}.${extension}`, { type: "text/plain" });
+    return api.uploadImportFile({
+      batchId: input.batchId,
+      file,
+      fileType: input.fileType,
+      sourceDate: input.sourceDate,
+    });
+  },
+
+  async reviewImportCandidate(input: {
+    candidateId: string;
+    reviewAction: "approve" | "edit" | "reject" | "keep_separate";
+    patch?: Record<string, unknown>;
+    note?: string;
+  }): Promise<{ status: string; [key: string]: unknown }> {
+    const { data, error } = await supabase.functions.invoke("importHub", {
+      body: {
+        action: "review",
+        candidate_id: input.candidateId,
+        review_action: input.reviewAction,
+        patch: input.patch ?? {},
+        note: input.note ?? "",
+      },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    return (data ?? { status: "unknown" }) as { status: string; [key: string]: unknown };
+  },
+
+  async updateFollowUpTask(id: string, status: "open" | "done" | "dismissed"): Promise<void> {
+    const { error } = await supabase.from("follow_up_tasks").update({ status }).eq("id", id);
+    if (error) fail("Could not update this follow-up task", error);
+  },
+
+  async getImportDocumentUrl(path: string): Promise<string | null> {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from("imports").createSignedUrl(path, SIGNED_URL_TTL);
+    if (error) return null;
+    return data?.signedUrl ?? null;
   },
 
   async uploadVoiceAudio(
@@ -751,6 +1058,55 @@ export const api = {
     fields: Partial<ExtractedDealFields>;
   }): Promise<{ dealId: string; created: boolean }> {
     const userId = await currentUserId();
+    const normalizedName = normalizeCompanyName(input.companyName);
+    const domain = normalizedDomain(input.fields.website ?? "");
+    const { data: existingDeals, error: readError } = await supabase
+      .from("deals")
+      .select("id,company_name,website,summary,sector,geography,stage,target_raise,cheque_sought,thesis,next_step")
+      .limit(500);
+    if (readError) fail("Could not check for an existing deal", readError);
+
+    const exact = (existingDeals ?? []).filter((deal) => {
+      const dealName = normalizeCompanyName(deal.company_name);
+      const dealDomain = normalizedDomain(deal.website);
+      return (domain && dealDomain === domain) || (normalizedName && dealName === normalizedName);
+    });
+
+    if (exact.length === 1) {
+      const match = exact[0];
+      const patch: Tables["deals"]["Update"] = {};
+      if (!match.website && input.fields.website) patch.website = input.fields.website;
+      if (!match.summary && input.fields.one_liner) patch.summary = input.fields.one_liner;
+      if (!match.sector && input.fields.sector) patch.sector = input.fields.sector;
+      if (!match.geography && input.fields.geography) patch.geography = input.fields.geography;
+      if (!match.stage && input.fields.stage) patch.stage = input.fields.stage;
+      if (match.target_raise === null && input.fields.target_raise) patch.target_raise = input.fields.target_raise;
+      if (match.cheque_sought === null && input.fields.cheque_sought) patch.cheque_sought = input.fields.cheque_sought;
+      if (!match.thesis && input.fields.thesis) patch.thesis = input.fields.thesis;
+      if (!match.next_step && input.fields.next_step) patch.next_step = input.fields.next_step;
+      if (Object.keys(patch).length > 0) {
+        const { error } = await supabase.from("deals").update(patch).eq("id", match.id);
+        if (error) fail("The existing deal could not be updated with the new blanks", error);
+      }
+      return { dealId: match.id, created: false };
+    }
+
+    if (exact.length > 1) {
+      throw new Error(
+        `More than one existing case matches “${input.companyName}”. Choose Existing deal and pick the correct case; nothing was merged automatically.`,
+      );
+    }
+
+    const similar = (existingDeals ?? [])
+      .map((deal) => ({ deal, score: companySimilarity(normalizedName, normalizeCompanyName(deal.company_name)) }))
+      .filter((item) => item.score >= 0.7)
+      .sort((a, b) => b.score - a.score);
+    if (similar[0]) {
+      throw new Error(
+        `Possible existing case “${similar[0].deal.company_name}” (${Math.round(similar[0].score * 100)}% name similarity). Choose Existing deal to link the capture, or use a distinct company name. No duplicate was created.`,
+      );
+    }
+
     const { error } = await supabase.from("deals").insert({
       id: input.clientCaptureId,
       company_name: input.companyName,

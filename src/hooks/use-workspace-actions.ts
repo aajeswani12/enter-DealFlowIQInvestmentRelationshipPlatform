@@ -56,6 +56,19 @@ export function useWorkspaceActions() {
     deleteContact: useMutation({ mutationFn: api.deleteContact, onSuccess: invalidate }),
     createInteraction: useMutation({ mutationFn: api.createInteraction, onSuccess: invalidate }),
     createOutreach: useMutation({ mutationFn: api.createOutreach, onSuccess: invalidate }),
+    createImportBatch: useMutation({ mutationFn: api.createImportBatch, onSuccess: invalidate }),
+    uploadImportFile: useMutation({ mutationFn: api.uploadImportFile, onSuccess: invalidate }),
+    processImportFile: useMutation({ mutationFn: api.processImportFile, onSuccess: invalidate }),
+    createPastedImport: useMutation({ mutationFn: api.createPastedImport, onSuccess: invalidate }),
+    reviewImportCandidate: useMutation({
+      mutationFn: api.reviewImportCandidate,
+      onSuccess: invalidate,
+    }),
+    updateFollowUpTask: useMutation({
+      mutationFn: ({ id, status }: { id: string; status: "open" | "done" | "dismissed" }) =>
+        api.updateFollowUpTask(id, status),
+      onSuccess: invalidate,
+    }),
     updateOutreachContent: useMutation({
       mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof api.updateOutreachContent>[1] }) =>
         api.updateOutreachContent(id, patch),

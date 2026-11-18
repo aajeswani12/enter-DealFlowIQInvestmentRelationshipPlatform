@@ -1,5 +1,6 @@
 import {
   Briefcase,
+  FolderInput,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -25,6 +26,7 @@ const NAV = [
   { to: "/cases", label: "Investment Cases", short: "Cases", icon: Briefcase },
   { to: "/investors", label: "Investor Network", short: "Investors", icon: Users },
   { to: "/matches", label: "Matches & Outreach", short: "Matches", icon: Waypoints },
+  { to: "/imports", label: "Import & Organize", short: "Import", icon: FolderInput },
 ];
 
 function Wordmark({ tone = "dark" }: { tone?: "dark" | "light" }) {

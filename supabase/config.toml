@@ -2,3 +2,6 @@ project_id = "proud-fir-8c1ce9fg"
 
 [functions.generateOutreachDraft]
 verify_jwt = false
+
+[functions.importHub]
+verify_jwt = false

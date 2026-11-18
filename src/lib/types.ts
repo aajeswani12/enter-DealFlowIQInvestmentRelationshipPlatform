@@ -194,6 +194,7 @@ export interface DealClaim {
   reportingPeriod: string;
   verificationStatus: VerificationStatus;
   sourceId: string | null;
+  documentId: string | null;
   fileName: string | null;
   filePath: string | null;
   reviewStatus: "draft" | "approved" | "rejected";
@@ -223,9 +224,10 @@ export interface DecisionGap {
   evidence: string;
   suggestedAction: string;
   sourceId: string | null;
+  documentId: string | null;
   analysisRunId: string | null;
   gapKey: string;
-  origin: "manual" | "analysis";
+  origin: "manual" | "analysis" | "import";
   createdAt: string;
   resolvedAt: string | null;
 }
@@ -310,6 +312,7 @@ export interface InvestorContact {
 export interface Investor {
   id: string;
   name: string;
+  website: string;
   investorType: InvestorType;
   thesis: string;
   stages: string[];
@@ -339,6 +342,7 @@ export interface Interaction {
   occurredAt: string;
   nextStep: string;
   nextStepDue: string | null;
+  documentId: string | null;
   createdAt: string;
 }
 
@@ -441,4 +445,125 @@ export interface AuditEvent {
   entityId: string | null;
   summary: string;
   createdAt: string;
+}
+
+
+export type ImportBatchStatus = "uploading" | "processing" | "review" | "completed" | "failed";
+export type ImportFileType = "csv" | "pdf" | "docx" | "txt" | "email";
+export type ImportProcessingStatus =
+  | "pending"
+  | "extracting"
+  | "needs_review"
+  | "completed"
+  | "failed"
+  | "duplicate";
+export type ImportCandidateType = "deal" | "investor" | "claim";
+export type ImportCandidateStatus = "pending" | "needs_review" | "applied" | "rejected" | "kept_separate";
+
+export interface ImportBatch {
+  id: string;
+  label: string;
+  status: ImportBatchStatus;
+  isSynthetic: boolean;
+  totalFiles: number;
+  filesProcessed: number;
+  recordsProcessed: number;
+  recordsNeedingReview: number;
+  errorCount: number;
+  notes: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportFileRecord {
+  id: string;
+  batchId: string;
+  fileName: string;
+  fileType: ImportFileType;
+  mimeType: string;
+  sizeBytes: number;
+  storagePath: string;
+  checksum: string;
+  processingStatus: ImportProcessingStatus;
+  recordsProcessed: number;
+  recordsNeedingReview: number;
+  errorMessage: string;
+  extractedCharCount: number;
+  pageCount: number;
+  duplicateOf: string | null;
+  sourceDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportCandidate {
+  id: string;
+  batchId: string;
+  fileId: string;
+  entityType: ImportCandidateType;
+  status: ImportCandidateStatus;
+  dealId: string | null;
+  investorId: string | null;
+  proposedDealId: string | null;
+  proposedInvestorId: string | null;
+  parentCandidateId: string | null;
+  matchConfidence: "exact" | "high" | "medium" | "low" | "none";
+  matchBasis: string;
+  payload: Record<string, unknown>;
+  excerpt: string;
+  sourceDate: string | null;
+  fingerprint: string;
+  conflictSummary: string;
+  reviewNote: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  appliedRecordId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportReview {
+  id: string;
+  candidateId: string;
+  batchId: string;
+  action: "approve" | "edit" | "reject" | "keep_separate";
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+  note: string;
+  reviewer: string | null;
+  createdAt: string;
+}
+
+export interface CaseDocument {
+  id: string;
+  dealId: string;
+  importFileId: string;
+  batchId: string;
+  title: string;
+  documentType: ImportFileType;
+  sourceDate: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  extractedText: string;
+  excerpt: string;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface FollowUpTask {
+  id: string;
+  dealId: string;
+  investorId: string | null;
+  title: string;
+  detail: string;
+  dueDate: string | null;
+  status: "open" | "done" | "dismissed";
+  sourceDocumentId: string | null;
+  importCandidateId: string | null;
+  ownerUserId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -1,0 +1,120 @@
+create or replace function public.sync_import_batch_from_file()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_batch uuid := coalesce(new.batch_id, old.batch_id);
+begin
+  update public.import_batches b
+  set total_files = agg.total_files,
+      files_processed = agg.done_files,
+      records_processed = agg.records,
+      records_needing_review = agg.review,
+      error_count = agg.errors,
+      status = case
+        when agg.total_files = 0 then 'uploading'
+        when agg.active > 0 then 'processing'
+        when agg.needs_review > 0 then 'review'
+        when agg.failed > 0 and agg.completedish > 0 then 'review'
+        when agg.failed = agg.total_files then 'failed'
+        when agg.completedish = agg.total_files then 'completed'
+        else 'review'
+      end,
+      updated_at = now()
+  from (
+    select
+      count(*)::int as total_files,
+      count(*) filter (where processing_status in ('completed','needs_review','failed','duplicate'))::int as done_files,
+      coalesce(sum(records_processed), 0)::int as records,
+      coalesce(sum(records_needing_review), 0)::int as review,
+      count(*) filter (where processing_status in ('failed','duplicate'))::int as errors,
+      count(*) filter (where processing_status in ('pending','extracting'))::int as active,
+      count(*) filter (where processing_status = 'needs_review')::int as needs_review,
+      count(*) filter (where processing_status = 'failed')::int as failed,
+      count(*) filter (where processing_status in ('completed','duplicate'))::int as completedish
+    from public.import_files where batch_id = v_batch
+  ) agg
+  where b.id = v_batch;
+  return coalesce(new, old);
+end;
+$$;
+
+create trigger import_files_sync_batch
+after insert or update on public.import_files
+for each row execute function public.sync_import_batch_from_file();
+
+create or replace function public.sync_import_file_from_candidate()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_file uuid := coalesce(new.file_id, old.file_id);
+  v_needs int;
+begin
+  select count(*)::int into v_needs
+  from public.import_candidates
+  where file_id = v_file
+    and (status = 'needs_review' or (entity_type = 'claim' and status = 'pending'));
+
+  update public.import_files
+  set records_needing_review = v_needs,
+      processing_status = case
+        when processing_status in ('completed','needs_review')
+          then case when v_needs > 0 then 'needs_review' else 'completed' end
+        else processing_status
+      end,
+      updated_at = now()
+  where id = v_file;
+  return coalesce(new, old);
+end;
+$$;
+
+create trigger import_candidates_sync_file
+after insert or update on public.import_candidates
+for each row execute function public.sync_import_file_from_candidate();
+
+create or replace function public.log_import_candidate_review()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_action text;
+  v_reviewer uuid := coalesce(new.reviewed_by, auth.uid());
+begin
+  if old.status is not distinct from new.status
+     and old.payload is not distinct from new.payload
+     and old.review_note is not distinct from new.review_note then
+    return new;
+  end if;
+
+  v_action := case
+    when new.status = 'applied' and old.status is distinct from 'applied' then 'approve'
+    when new.status = 'rejected' and old.status is distinct from 'rejected' then 'reject'
+    when new.status = 'kept_separate' and old.status is distinct from 'kept_separate' then 'keep_separate'
+    else 'edit'
+  end;
+
+  insert into public.import_reviews (candidate_id, batch_id, action, before, after, note, reviewer)
+  values (
+    new.id, new.batch_id, v_action,
+    jsonb_build_object('status', old.status, 'payload', old.payload, 'review_note', old.review_note, 'conflict_summary', old.conflict_summary),
+    jsonb_build_object('status', new.status, 'payload', new.payload, 'review_note', new.review_note, 'conflict_summary', new.conflict_summary),
+    left(coalesce(new.review_note, ''), 1000), v_reviewer
+  );
+  return new;
+end;
+$$;
+
+create trigger import_candidates_log_review
+after update on public.import_candidates
+for each row execute function public.log_import_candidate_review();
+
+revoke all on function public.sync_import_batch_from_file() from public, anon, authenticated;
+revoke all on function public.sync_import_file_from_candidate() from public, anon, authenticated;
+revoke all on function public.log_import_candidate_review() from public, anon, authenticated;

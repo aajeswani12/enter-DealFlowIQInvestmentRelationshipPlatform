@@ -1,4 +1,4 @@
-import { ArrowRight, Mail, Pencil, Plus, Send, UserRound } from "lucide-react";
+import { ArrowRight, Globe, Mail, Pencil, Plus, Send, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LoadingPanel } from "@/components/common/loading-panel";
@@ -120,6 +120,17 @@ const InvestorDetail = () => {
       <div className="flex flex-wrap items-center gap-2">
         <Pill tone="neutral">{INVESTOR_STATUS_LABEL[investor.status]}</Pill>
         {investor.isSynthetic ? <Pill tone="warning">Synthetic sample</Pill> : null}
+        {investor.website ? (
+          <a
+            href={investor.website.startsWith("http") ? investor.website : `https://${investor.website}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] font-medium text-brand-strong hover:underline"
+          >
+            <Globe className="h-3 w-3" aria-hidden="true" />
+            {investor.website}
+          </a>
+        ) : null}
         {contact?.email ? (
           <a
             href={`mailto:${contact.email}`}

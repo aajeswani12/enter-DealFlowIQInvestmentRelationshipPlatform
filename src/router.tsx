@@ -4,6 +4,7 @@ import { AppShell } from "./components/layout/app-shell";
 import Cases from "./pages/cases";
 import CaseDetail from "./pages/cases/detail";
 import Dashboard from "./pages/dashboard";
+import ImportsPage from "./pages/imports";
 import DealInbox from "./pages/deal-inbox";
 import VoiceCapture from "./pages/inbox/capture";
 import Investors from "./pages/investors";
@@ -37,6 +38,7 @@ export const routers = [
       { path: "investors", name: "investors", element: <Investors /> },
       { path: "investors/:id", name: "investor-detail", element: <InvestorDetail /> },
       { path: "matches", name: "matches", element: <Matches /> },
+      { path: "imports", name: "imports", element: <ImportsPage /> },
       { path: "workspace", name: "workspace-access", element: <WorkspaceAccess /> },
     ],
   },

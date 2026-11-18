@@ -8,9 +8,11 @@ import { SelectField } from "@/components/forms/select-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { api } from "@/lib/api";
 import { CLAIM_TYPE_LABEL, CLAIM_TYPE_OPTIONS, VERIFICATION_LABEL, VERIFICATION_OPTIONS } from "@/lib/constants";
+import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import { formatShortDate } from "@/lib/format";
 import type { ClaimType, DealClaim, VerificationStatus } from "@/lib/types";
 
@@ -23,6 +25,8 @@ const VERIFICATION_TONE = {
 
 export function ClaimsSection({ dealId, items }: { dealId: string; items: DealClaim[] }) {
   const actions = useWorkspaceActions();
+  const { data } = useWorkspace();
+  const workspace = data ?? EMPTY_WORKSPACE;
   const [adding, setAdding] = useState(false);
   const [claimType, setClaimType] = useState<ClaimType>("metric");
   const [label, setLabel] = useState("");
@@ -105,10 +109,16 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
   };
 
   const handleOpen = async (item: DealClaim) => {
-    if (!item.filePath) return;
+    const importedDocument = item.documentId
+      ? workspace.caseDocuments.find((document) => document.id === item.documentId)
+      : null;
+    const path = item.filePath ?? importedDocument?.storagePath ?? null;
+    if (!path) return;
     setOpeningId(item.id);
     try {
-      const url = await api.getClaimUrl(item.filePath);
+      const url = importedDocument
+        ? await api.getImportDocumentUrl(importedDocument.storagePath)
+        : await api.getClaimUrl(path);
       if (!url) {
         toast.error("This document is no longer available in storage.");
         return;
@@ -382,8 +392,8 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
                         </Link>
                       ) : null}
                       <span>{formatShortDate(item.createdAt)}</span>
-                      {item.fileName ? (
-                        item.filePath ? (
+                      {item.fileName || item.documentId ? (
+                        item.filePath || item.documentId ? (
                           <button
                             type="button"
                             onClick={() => handleOpen(item)}
@@ -394,10 +404,10 @@ export function ClaimsSection({ dealId, items }: { dealId: string; items: DealCl
                             ) : (
                               <ExternalLink className="h-3 w-3" aria-hidden="true" />
                             )}
-                            {item.fileName}
+                            {item.fileName ?? "Source document"}
                           </button>
                         ) : (
-                          <span>{item.fileName}</span>
+                          <span>{item.fileName ?? "Source document"}</span>
                         )
                       ) : null}
                     </div>

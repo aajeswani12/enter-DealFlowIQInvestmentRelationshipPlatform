@@ -3300,6 +3300,79 @@ export type Database = {
         }
         Relationships: []
       }
+      case_documents: {
+        Row: {
+          batch_id: string
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          document_type: string
+          excerpt: string
+          extracted_text: string
+          file_name: string
+          id: string
+          import_file_id: string
+          mime_type: string
+          source_date: string
+          storage_path: string
+          title: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          document_type: string
+          excerpt?: string
+          extracted_text?: string
+          file_name: string
+          id?: string
+          import_file_id: string
+          mime_type?: string
+          source_date?: string
+          storage_path: string
+          title: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          document_type?: string
+          excerpt?: string
+          extracted_text?: string
+          file_name?: string
+          id?: string
+          import_file_id?: string
+          mime_type?: string
+          source_date?: string
+          storage_path?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_documents_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_documents_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_documents_import_file_id_fkey"
+            columns: ["import_file_id"]
+            isOneToOne: false
+            referencedRelation: "import_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_analysis_runs: {
         Row: {
           completed_at: string | null
@@ -3436,6 +3509,7 @@ export type Database = {
           created_by: string | null
           currency: string
           deal_id: string
+          document_id: string | null
           file_name: string | null
           file_path: string | null
           id: string
@@ -3463,6 +3537,7 @@ export type Database = {
           created_by?: string | null
           currency?: string
           deal_id: string
+          document_id?: string | null
           file_name?: string | null
           file_path?: string | null
           id?: string
@@ -3490,6 +3565,7 @@ export type Database = {
           created_by?: string | null
           currency?: string
           deal_id?: string
+          document_id?: string | null
           file_name?: string | null
           file_path?: string | null
           id?: string
@@ -3521,6 +3597,13 @@ export type Database = {
             columns: ["analysis_run_id"]
             isOneToOne: false
             referencedRelation: "deal_analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_claims_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
             referencedColumns: ["id"]
           },
           {
@@ -3715,6 +3798,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           deal_id: string
+          document_id: string | null
           due_date: string | null
           evidence: string
           gap_key: string
@@ -3737,6 +3821,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deal_id: string
+          document_id?: string | null
           due_date?: string | null
           evidence?: string
           gap_key?: string
@@ -3759,6 +3844,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deal_id?: string
+          document_id?: string | null
           due_date?: string | null
           evidence?: string
           gap_key?: string
@@ -3790,10 +3876,94 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "decision_gaps_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "decision_gaps_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_tasks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          detail: string
+          due_date: string | null
+          id: string
+          import_candidate_id: string | null
+          investor_id: string | null
+          owner_user_id: string | null
+          source_document_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          detail?: string
+          due_date?: string | null
+          id?: string
+          import_candidate_id?: string | null
+          investor_id?: string | null
+          owner_user_id?: string | null
+          source_document_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          detail?: string
+          due_date?: string | null
+          id?: string
+          import_candidate_id?: string | null
+          investor_id?: string | null
+          owner_user_id?: string | null
+          source_document_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_tasks_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_import_candidate_id_fkey"
+            columns: ["import_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "import_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -3812,6 +3982,320 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      import_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          error_count: number
+          files_processed: number
+          id: string
+          is_synthetic: boolean
+          label: string
+          notes: string
+          records_needing_review: number
+          records_processed: number
+          status: string
+          total_files: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          error_count?: number
+          files_processed?: number
+          id?: string
+          is_synthetic?: boolean
+          label: string
+          notes?: string
+          records_needing_review?: number
+          records_processed?: number
+          status?: string
+          total_files?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          error_count?: number
+          files_processed?: number
+          id?: string
+          is_synthetic?: boolean
+          label?: string
+          notes?: string
+          records_needing_review?: number
+          records_processed?: number
+          status?: string
+          total_files?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      import_candidates: {
+        Row: {
+          applied_record_id: string | null
+          batch_id: string
+          conflict_summary: string
+          created_at: string
+          created_by: string | null
+          deal_id: string | null
+          entity_type: string
+          excerpt: string
+          file_id: string
+          fingerprint: string
+          id: string
+          investor_id: string | null
+          match_basis: string
+          match_confidence: string
+          parent_candidate_id: string | null
+          payload: Json
+          proposed_deal_id: string | null
+          proposed_investor_id: string | null
+          review_note: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_record_id?: string | null
+          batch_id: string
+          conflict_summary?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          entity_type: string
+          excerpt?: string
+          file_id: string
+          fingerprint: string
+          id?: string
+          investor_id?: string | null
+          match_basis?: string
+          match_confidence?: string
+          parent_candidate_id?: string | null
+          payload?: Json
+          proposed_deal_id?: string | null
+          proposed_investor_id?: string | null
+          review_note?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_record_id?: string | null
+          batch_id?: string
+          conflict_summary?: string
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          entity_type?: string
+          excerpt?: string
+          file_id?: string
+          fingerprint?: string
+          id?: string
+          investor_id?: string | null
+          match_basis?: string
+          match_confidence?: string
+          parent_candidate_id?: string | null
+          payload?: Json
+          proposed_deal_id?: string | null
+          proposed_investor_id?: string | null
+          review_note?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_candidates_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_candidates_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_candidates_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "import_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_candidates_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_candidates_parent_candidate_id_fkey"
+            columns: ["parent_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "import_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_candidates_proposed_deal_id_fkey"
+            columns: ["proposed_deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_candidates_proposed_investor_id_fkey"
+            columns: ["proposed_investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_files: {
+        Row: {
+          batch_id: string
+          checksum: string
+          created_at: string
+          created_by: string | null
+          duplicate_of: string | null
+          error_message: string
+          extracted_char_count: number
+          extracted_text: string
+          file_name: string
+          file_type: string
+          id: string
+          mime_type: string
+          page_count: number
+          processing_status: string
+          records_needing_review: number
+          records_processed: number
+          size_bytes: number
+          source_date: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          batch_id: string
+          checksum?: string
+          created_at?: string
+          created_by?: string | null
+          duplicate_of?: string | null
+          error_message?: string
+          extracted_char_count?: number
+          extracted_text?: string
+          file_name: string
+          file_type: string
+          id?: string
+          mime_type?: string
+          page_count?: number
+          processing_status?: string
+          records_needing_review?: number
+          records_processed?: number
+          size_bytes: number
+          source_date?: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string
+          checksum?: string
+          created_at?: string
+          created_by?: string | null
+          duplicate_of?: string | null
+          error_message?: string
+          extracted_char_count?: number
+          extracted_text?: string
+          file_name?: string
+          file_type?: string
+          id?: string
+          mime_type?: string
+          page_count?: number
+          processing_status?: string
+          records_needing_review?: number
+          records_processed?: number
+          size_bytes?: number
+          source_date?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_files_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_files_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "import_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_reviews: {
+        Row: {
+          action: string
+          after: Json
+          batch_id: string
+          before: Json
+          candidate_id: string
+          created_at: string
+          id: string
+          note: string
+          reviewer: string | null
+        }
+        Insert: {
+          action: string
+          after?: Json
+          batch_id: string
+          before?: Json
+          candidate_id: string
+          created_at?: string
+          id?: string
+          note?: string
+          reviewer?: string | null
+        }
+        Update: {
+          action?: string
+          after?: Json
+          batch_id?: string
+          before?: Json
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          reviewer?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_reviews_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_reviews_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "import_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       investor_contacts: {
         Row: {
@@ -3877,6 +4361,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           deal_id: string | null
+          document_id: string | null
           id: string
           investor_id: string
           kind: string
@@ -3889,6 +4374,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deal_id?: string | null
+          document_id?: string | null
           id?: string
           investor_id: string
           kind?: string
@@ -3901,6 +4387,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deal_id?: string | null
+          document_id?: string | null
           id?: string
           investor_id?: string
           kind?: string
@@ -3915,6 +4402,13 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_interactions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "case_documents"
             referencedColumns: ["id"]
           },
           {
@@ -3949,6 +4443,7 @@ export type Database = {
           status: string
           thesis: string
           updated_at: string
+          website: string
         }
         Insert: {
           created_at?: string
@@ -3972,6 +4467,7 @@ export type Database = {
           status?: string
           thesis?: string
           updated_at?: string
+          website?: string
         }
         Update: {
           created_at?: string
@@ -3995,6 +4491,7 @@ export type Database = {
           status?: string
           thesis?: string
           updated_at?: string
+          website?: string
         }
         Relationships: []
       }

@@ -3,7 +3,13 @@ import type {
   Capture,
   DealAnalysisRun,
   DealBrief,
+  CaseDocument,
   DealClaim,
+  FollowUpTask,
+  ImportBatch,
+  ImportCandidate,
+  ImportFileRecord,
+  ImportReview,
   MatchWeightConfig,
   DealInvestorMatch,
   DecisionGap,
@@ -31,6 +37,12 @@ export interface WorkspaceData {
   matchWeights: MatchWeightConfig | null;
   members: WorkspaceMember[];
   audit: AuditEvent[];
+  caseDocuments: CaseDocument[];
+  followUpTasks: FollowUpTask[];
+  importBatches: ImportBatch[];
+  importFiles: ImportFileRecord[];
+  importCandidates: ImportCandidate[];
+  importReviews: ImportReview[];
 }
 
 export const EMPTY_WORKSPACE: WorkspaceData = {
@@ -48,4 +60,10 @@ export const EMPTY_WORKSPACE: WorkspaceData = {
   matchWeights: null,
   members: [],
   audit: [],
+  caseDocuments: [],
+  followUpTasks: [],
+  importBatches: [],
+  importFiles: [],
+  importCandidates: [],
+  importReviews: [],
 };

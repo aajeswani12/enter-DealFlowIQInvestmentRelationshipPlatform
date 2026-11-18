@@ -210,6 +210,7 @@ export function DecisionGapsSection({ dealId, items }: { dealId: string; items: 
                       {item.blockingDecision ? <Pill tone="danger">Blocking</Pill> : null}
                       <Pill tone={STATUS_TONE[item.status] ?? "neutral"}>{QUESTION_STATUS_LABEL[item.status]}</Pill>
                       {item.origin === "analysis" ? <Pill tone="neutral">AI analysis</Pill> : null}
+                      {item.origin === "import" ? <Pill tone="neutral">Imported</Pill> : null}
                     </div>
                   </div>
                   <p className="mt-1 text-[10.5px] text-muted-foreground">
