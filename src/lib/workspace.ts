@@ -9,6 +9,9 @@ import type {
   DealInvestor,
   DealMemo,
   DealMemoVersion,
+  MemoTemplate,
+  MemoApproval,
+  MemoExportRecord,
   CaseFactProposal,
   CaseFactReview,
   FollowUpTask,
@@ -48,6 +51,9 @@ export interface WorkspaceData {
   dealInvestors: DealInvestor[];
   dealMemos: DealMemo[];
   memoVersions: DealMemoVersion[];
+  memoTemplates: MemoTemplate[];
+  memoApprovals: MemoApproval[];
+  memoExports: MemoExportRecord[];
   factProposals: CaseFactProposal[];
   factReviews: CaseFactReview[];
   followUpTasks: FollowUpTask[];
@@ -77,6 +83,9 @@ export const EMPTY_WORKSPACE: WorkspaceData = {
   dealInvestors: [],
   dealMemos: [],
   memoVersions: [],
+  memoTemplates: [],
+  memoApprovals: [],
+  memoExports: [],
   factProposals: [],
   factReviews: [],
   followUpTasks: [],

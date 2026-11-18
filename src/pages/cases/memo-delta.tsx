@@ -66,6 +66,7 @@ interface MemoDeltaProps {
   members: WorkspaceMember[];
   currentMemo: DealMemo | null;
   onMemoCreated: (memo: DealMemo) => void;
+  reviewOnly?: boolean;
 }
 
 interface EditState {
@@ -100,6 +101,7 @@ export function MemoDelta({
   members,
   currentMemo,
   onMemoCreated,
+  reviewOnly = false,
 }: MemoDeltaProps) {
   const actions = useWorkspaceActions();
   const [sourceChoice, setSourceChoice] = useState("");
@@ -313,6 +315,9 @@ export function MemoDelta({
         dealId: deal.id,
         requestId: memoRequestId,
         proposalIds: accepted.map((proposal) => proposal.id),
+        templateKind: "internal",
+        templateId: null,
+        focusAreas: [],
       });
       if (result.status !== "created" || !result.memo) {
         setMemoError(result.error ?? "The memo version was not created.");
@@ -533,6 +538,8 @@ export function MemoDelta({
           </details>
         ) : null}
 
+        {!reviewOnly ? (
+          <>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           <div>
             <p className="label-caps">Memo version</p>
@@ -552,8 +559,12 @@ export function MemoDelta({
             <Button size="sm" variant="outline" className="mt-1.5 h-6 text-[9.5px]" onClick={() => void generateMemo()} disabled={memoBusy}>Retry memo generation</Button>
           </div>
         ) : null}
+          </>
+        ) : null}
       </section>
 
+      {!reviewOnly ? (
+        <>
       <section className="panel p-4" aria-labelledby="memo-history-heading">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -616,6 +627,9 @@ export function MemoDelta({
           </div>
         )}
       </section>
+
+        </>
+      ) : null}
 
       {decided.length > 0 ? (
         <details className="panel p-4">

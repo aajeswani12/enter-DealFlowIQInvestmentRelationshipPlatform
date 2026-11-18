@@ -595,17 +595,23 @@ export interface DealInvestor {
 }
 
 export type MemoOrigin = "manual" | "template" | "ai_generated" | "ai_delta";
+export type MemoStatus = "draft" | "needs_review" | "approved";
+export type MemoTemplateKind = "internal" | "external" | "custom";
+export type MemoFocus = "team" | "market" | "traction" | "investment_thesis" | "risks";
 
 export interface DealMemo {
   id: string;
   dealId: string;
   title: string;
   content: string;
-  status: "draft" | "approved";
+  status: MemoStatus;
   origin: MemoOrigin;
   generationModel: string;
   sourceIds: string[];
   approvedProposalIds: string[];
+  templateKind: MemoTemplateKind;
+  templateId: string | null;
+  focusAreas: MemoFocus[];
   humanEdited: boolean;
   editedBy: string | null;
   createdBy: string | null;
@@ -625,6 +631,9 @@ export interface DealMemoVersion {
   generationModel: string;
   sourceIds: string[];
   approvedProposalIds: string[];
+  templateKind: MemoTemplateKind;
+  templateId: string | null;
+  focusAreas: MemoFocus[];
   humanEdited: boolean;
   editedBy: string | null;
   createdBy: string | null;
@@ -681,5 +690,44 @@ export interface CaseFactReview {
   after: Record<string, unknown>;
   note: string;
   reviewer: string | null;
+  createdAt: string;
+}
+
+
+export interface MemoTemplate {
+  id: string;
+  name: string;
+  storagePath: string;
+  fileName: string;
+  fileType: ImportFileType;
+  headings: string[];
+  styleNotes: string;
+  lengthGuidance: string;
+  status: "proposed" | "active";
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MemoApproval {
+  id: string;
+  memoId: string;
+  versionId: string;
+  decision: "approved" | "revision_requested";
+  note: string;
+  reviewer: string | null;
+  contentHash: string;
+  createdAt: string;
+}
+
+export interface MemoExportRecord {
+  id: string;
+  memoId: string;
+  versionId: string;
+  mode: "external_copy" | "external_markdown";
+  included: Record<string, unknown>;
+  note: string;
+  confirmer: string | null;
+  contentHash: string;
   createdAt: string;
 }

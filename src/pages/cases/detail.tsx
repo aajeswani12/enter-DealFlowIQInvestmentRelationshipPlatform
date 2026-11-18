@@ -4,14 +4,12 @@ import {
   CheckCircle2,
   Circle,
   CircleAlert,
-  Download,
   FilePlus2,
   FileText,
   Loader2,
   Mic,
   Pencil,
   Plus,
-  Printer,
   Search,
   Sparkles,
   Trash2,
@@ -47,7 +45,6 @@ import {
 import { dueLabel, formatCurrency, formatDate, formatShortDate, isOverdue } from "@/lib/format";
 import { buildCaseActivityEvents, buildCaseChecklist } from "@/lib/insights";
 import { primaryContact } from "@/lib/investors";
-import { buildInvestmentMemo } from "@/lib/memo";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import type {
   Capture,
@@ -62,7 +59,7 @@ import { ClaimsSection } from "./claims-section";
 import { DecisionGapsSection } from "./gaps-section";
 import { EvidenceTimeline } from "./evidence-timeline";
 import { FollowUpTasks } from "./follow-up-tasks";
-import { MemoDelta } from "./memo-delta";
+import { MemoWorkspace } from "./memo-workspace";
 
 type CaseTab = "documents" | "activity" | "memo" | "more";
 type ReadinessStatus = "Available" | "Needs Review" | "Missing";
@@ -137,16 +134,9 @@ const CaseDetail = () => {
   const [investorSearch, setInvestorSearch] = useState("");
   const [selectedInvestorId, setSelectedInvestorId] = useState("");
   const [associationStatus, setAssociationStatus] = useState<RelationshipStatus>("new");
-  const [memoId, setMemoId] = useState("");
-  const [memoTitle, setMemoTitle] = useState("");
-  const [memoContent, setMemoContent] = useState("");
-  const [memoBusy, setMemoBusy] = useState(false);
 
   useEffect(() => {
     setActiveTab("documents");
-    setMemoId("");
-    setMemoTitle("");
-    setMemoContent("");
     setDocOpen(false);
     setPersonOpen(false);
   }, [id]);
@@ -163,18 +153,6 @@ const CaseDetail = () => {
       setActiveTab("memo");
     }
   }, [id, location.hash]);
-
-  useEffect(() => {
-    if (!id || memoId) return;
-    const latest = workspace.dealMemos
-      .filter((memo) => memo.dealId === id)
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
-    if (latest) {
-      setMemoId(latest.id);
-      setMemoTitle(latest.title);
-      setMemoContent(latest.content);
-    }
-  }, [id, memoId, workspace.dealMemos]);
 
   const caseItem = workspace.cases.find((item) => item.id === id);
 
@@ -281,113 +259,6 @@ const CaseDetail = () => {
     { label: "Reviewed facts", value: `${approvedClaims.length}`, action: () => setActiveTab("more") },
   ].slice(0, 5);
 
-  const handleGenerateMemo = async () => {
-    setMemoBusy(true);
-    try {
-      const generated = buildInvestmentMemo({
-        caseItem,
-        claims,
-        gaps,
-        people,
-        documents: caseDocuments,
-        captures: sources,
-        dealInvestors: manualAssociations,
-        investors: workspace.investors,
-        matches: workspace.matches.filter((match) => match.dealId === caseItem.id),
-        tasks: followUpTasks,
-      });
-      const created = await actions.createDealMemo.mutateAsync({
-        dealId: caseItem.id,
-        title: generated.title,
-        content: generated.content,
-        origin: "template",
-        generationModel: "stored-fact template",
-      });
-      setMemoId(created.id);
-      setMemoTitle(created.title);
-      setMemoContent(created.content);
-      setActiveTab("memo");
-      toast.success("Memo draft generated");
-    } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : "Could not generate the memo.");
-    } finally {
-      setMemoBusy(false);
-    }
-  };
-
-  const handleSaveMemo = async () => {
-    if (!memoContent.trim()) {
-      toast.error("Memo is empty.");
-      return;
-    }
-    setMemoBusy(true);
-    try {
-      if (memoId) {
-        await actions.updateDealMemo.mutateAsync({
-          id: memoId,
-          input: { title: memoTitle || `Investment memo — ${caseItem.companyName}`, content: memoContent },
-        });
-      } else {
-        const created = await actions.createDealMemo.mutateAsync({
-          dealId: caseItem.id,
-          title: memoTitle || `Investment memo — ${caseItem.companyName}`,
-          content: memoContent,
-        });
-        setMemoId(created.id);
-      }
-      toast.success("Memo saved");
-    } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : "Could not save the memo.");
-    } finally {
-      setMemoBusy(false);
-    }
-  };
-
-  const copyMemo = async () => {
-    if (!memoContent.trim()) return;
-    try {
-      await navigator.clipboard.writeText(`${memoTitle}\n\n${memoContent}`);
-      toast.success("Memo copied");
-    } catch {
-      toast.error("Could not copy. Select the text manually.");
-    }
-  };
-
-  const printMemo = () => {
-    if (!memoContent.trim()) return;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      toast.error("Print window blocked.");
-      return;
-    }
-    const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    printWindow.document.write(
-      `<!doctype html><html><head><title>${escape(memoTitle || "Investment memo")}</title><style>body{font-family:Georgia,serif;max-width:760px;margin:40px auto;line-height:1.55;color:#17202a}h1{font-size:23px}pre{white-space:pre-wrap;font-family:Georgia,serif;font-size:12.5px}</style></head><body><h1>${escape(memoTitle || "Investment memo")}</h1><pre>${escape(memoContent)}</pre></body></html>`,
-    );
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  };
-
-  const downloadMemo = () => {
-    if (!memoContent.trim()) return;
-    const blob = new Blob([memoContent], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${caseItem.companyName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-memo.md`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const selectMemo = (value: string) => {
-    const memo = caseMemos.find((item) => item.id === value);
-    if (!memo) return;
-    setMemoId(memo.id);
-    setMemoTitle(memo.title);
-    setMemoContent(memo.content);
-  };
-
   const addDocument = async () => {
     if (!docFile) {
       toast.error("Choose a document.");
@@ -483,9 +354,9 @@ const CaseDetail = () => {
               Add Update
             </Link>
           </Button>
-          <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => void handleGenerateMemo()} disabled={memoBusy}>
-            {memoBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
-            Generate Memo
+          <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => setActiveTab("memo")}>
+            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+            Memo
           </Button>
           <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => setDocOpen(true)}>
             <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -714,56 +585,7 @@ const CaseDetail = () => {
 
           {activeTab === "memo" ? (
             <section role="tabpanel" id="case-panel-memo" aria-labelledby="case-tab-memo">
-              <div className="panel p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-[13.5px] font-semibold tracking-tight">Investment Memo</h2>
-                    {caseMemos.length > 1 ? (
-                      <div className="mt-1 w-[220px]">
-                        <SelectField value={memoId} onChange={selectMemo} options={caseMemos.map((memo) => ({ value: memo.id, label: `${memo.title} · ${formatShortDate(memo.updatedAt)}` }))} ariaLabel="Memo version" />
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => void handleGenerateMemo()} disabled={memoBusy}>Generate</Button>
-                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => void copyMemo()} disabled={!memoContent}>Copy</Button>
-                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={printMemo} disabled={!memoContent}><Printer className="h-3 w-3" aria-hidden="true" />Print</Button>
-                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={downloadMemo} disabled={!memoContent}><Download className="h-3 w-3" aria-hidden="true" />.md</Button>
-                  </div>
-                </div>
-                {memoContent ? (
-                  <div className="mt-2 space-y-2">
-                    <Input value={memoTitle} onChange={(event) => setMemoTitle(event.target.value)} className="h-8 bg-card text-[11.5px]" aria-label="Memo title" />
-                    <Textarea value={memoContent} onChange={(event) => setMemoContent(event.target.value)} rows={16} className="min-h-[320px] bg-card font-mono text-[11px] leading-relaxed" aria-label="Memo content" />
-                    <div className="flex justify-end">
-                      <Button size="sm" className="h-7 text-[10px]" onClick={() => void handleSaveMemo()} disabled={memoBusy}>Save</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-muted-foreground">No memo.</p>
-                    <Button size="sm" className="h-7 text-[10px]" onClick={() => void handleGenerateMemo()} disabled={memoBusy}>Generate Memo</Button>
-                  </div>
-                )}
-              </div>
-              <MemoDelta
-                deal={caseItem}
-                claims={claims}
-                sources={sources}
-                documents={caseDocuments}
-                versions={workspace.memoVersions}
-                proposals={workspace.factProposals}
-                reviews={workspace.factReviews}
-                gaps={gaps}
-                members={workspace.members}
-                currentMemo={caseMemos[0] ?? null}
-                onMemoCreated={(created) => {
-                  setMemoId(created.id);
-                  setMemoTitle(created.title);
-                  setMemoContent(created.content);
-                  setActiveTab("memo");
-                }}
-              />
+              <MemoWorkspace deal={caseItem} />
             </section>
           ) : null}
 

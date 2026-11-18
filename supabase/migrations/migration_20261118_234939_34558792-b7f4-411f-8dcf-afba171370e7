@@ -1,0 +1,44 @@
+create or replace function public.authorize_external_memo_export(
+  p_memo_id uuid,
+  p_version_id uuid,
+  p_mode text default 'external_markdown',
+  p_included jsonb default '{}'::jsonb,
+  p_note text default ''
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_memo public.deal_memos%rowtype;
+  v_version public.deal_memo_versions%rowtype;
+  v_hash text;
+begin
+  if auth.uid() is null or not public.is_project_admin() then
+    raise exception 'Only an owner or partner can authorize external sharing.' using errcode = '42501';
+  end if;
+  if p_mode not in ('external_copy','external_markdown') then
+    raise exception 'Unsupported external export mode.' using errcode = '22023';
+  end if;
+  select * into v_memo from public.deal_memos where id = p_memo_id for update;
+  if not found then return jsonb_build_object('status','not_found'); end if;
+  select * into v_version from public.deal_memo_versions where id = p_version_id and memo_id = p_memo_id;
+  if not found then return jsonb_build_object('status','not_found'); end if;
+  if v_version.template_kind <> 'external' then
+    return jsonb_build_object('status','not_external');
+  end if;
+  if not exists (
+    select 1 from public.deal_memo_approvals
+    where version_id = p_version_id and decision = 'approved'
+  ) then
+    return jsonb_build_object('status','not_approved');
+  end if;
+  v_hash := md5(v_version.title || E'\n' || v_version.content);
+  insert into public.deal_memo_exports (memo_id, version_id, mode, included, note, confirmer, content_hash)
+  values (p_memo_id, p_version_id, p_mode, coalesce(p_included,'{}'::jsonb), left(coalesce(p_note,''),2000), auth.uid(), v_hash);
+  return jsonb_build_object('status','authorized','version_number',v_version.version_number,'content_hash',v_hash);
+end;
+$$;
+revoke all on function public.authorize_external_memo_export(uuid, uuid, text, jsonb, text) from public, anon;
+grant execute on function public.authorize_external_memo_export(uuid, uuid, text, jsonb, text) to authenticated;

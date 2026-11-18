@@ -3949,6 +3949,105 @@ export type Database = {
           },
         ]
       }
+      deal_memo_approvals: {
+        Row: {
+          content_hash: string
+          created_at: string
+          decision: string
+          id: string
+          memo_id: string
+          note: string
+          reviewer: string | null
+          version_id: string
+        }
+        Insert: {
+          content_hash?: string
+          created_at?: string
+          decision: string
+          id?: string
+          memo_id: string
+          note?: string
+          reviewer?: string | null
+          version_id: string
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          decision?: string
+          id?: string
+          memo_id?: string
+          note?: string
+          reviewer?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_memo_approvals_memo_id_fkey"
+            columns: ["memo_id"]
+            isOneToOne: false
+            referencedRelation: "deal_memos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_memo_approvals_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "deal_memo_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_memo_exports: {
+        Row: {
+          confirmer: string | null
+          content_hash: string
+          created_at: string
+          id: string
+          included: Json
+          memo_id: string
+          mode: string
+          note: string
+          version_id: string
+        }
+        Insert: {
+          confirmer?: string | null
+          content_hash?: string
+          created_at?: string
+          id?: string
+          included?: Json
+          memo_id: string
+          mode?: string
+          note?: string
+          version_id: string
+        }
+        Update: {
+          confirmer?: string | null
+          content_hash?: string
+          created_at?: string
+          id?: string
+          included?: Json
+          memo_id?: string
+          mode?: string
+          note?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_memo_exports_memo_id_fkey"
+            columns: ["memo_id"]
+            isOneToOne: false
+            referencedRelation: "deal_memos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_memo_exports_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "deal_memo_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_memo_versions: {
         Row: {
           approved_proposal_ids: string[]
@@ -3957,12 +4056,15 @@ export type Database = {
           created_by: string | null
           deal_id: string
           edited_by: string | null
+          focus_areas: string[]
           generation_model: string
           human_edited: boolean
           id: string
           memo_id: string
           origin: string
           source_ids: string[]
+          template_id: string | null
+          template_kind: string
           title: string
           version_number: number
         }
@@ -3973,12 +4075,15 @@ export type Database = {
           created_by?: string | null
           deal_id: string
           edited_by?: string | null
+          focus_areas?: string[]
           generation_model?: string
           human_edited?: boolean
           id?: string
           memo_id: string
           origin?: string
           source_ids?: string[]
+          template_id?: string | null
+          template_kind?: string
           title?: string
           version_number: number
         }
@@ -3989,12 +4094,15 @@ export type Database = {
           created_by?: string | null
           deal_id?: string
           edited_by?: string | null
+          focus_areas?: string[]
           generation_model?: string
           human_edited?: boolean
           id?: string
           memo_id?: string
           origin?: string
           source_ids?: string[]
+          template_id?: string | null
+          template_kind?: string
           title?: string
           version_number?: number
         }
@@ -4013,6 +4121,13 @@ export type Database = {
             referencedRelation: "deal_memos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "deal_memo_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "memo_templates"
+            referencedColumns: ["id"]
+          },
         ]
       }
       deal_memos: {
@@ -4023,6 +4138,7 @@ export type Database = {
           created_by: string | null
           deal_id: string
           edited_by: string | null
+          focus_areas: string[]
           generation_model: string
           generation_request_id: string | null
           human_edited: boolean
@@ -4030,6 +4146,8 @@ export type Database = {
           origin: string
           source_ids: string[]
           status: string
+          template_id: string | null
+          template_kind: string
           title: string
           updated_at: string
           updated_by: string | null
@@ -4041,6 +4159,7 @@ export type Database = {
           created_by?: string | null
           deal_id: string
           edited_by?: string | null
+          focus_areas?: string[]
           generation_model?: string
           generation_request_id?: string | null
           human_edited?: boolean
@@ -4048,6 +4167,8 @@ export type Database = {
           origin?: string
           source_ids?: string[]
           status?: string
+          template_id?: string | null
+          template_kind?: string
           title?: string
           updated_at?: string
           updated_by?: string | null
@@ -4059,6 +4180,7 @@ export type Database = {
           created_by?: string | null
           deal_id?: string
           edited_by?: string | null
+          focus_areas?: string[]
           generation_model?: string
           generation_request_id?: string | null
           human_edited?: boolean
@@ -4066,6 +4188,8 @@ export type Database = {
           origin?: string
           source_ids?: string[]
           status?: string
+          template_id?: string | null
+          template_kind?: string
           title?: string
           updated_at?: string
           updated_by?: string | null
@@ -4076,6 +4200,13 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_memos_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "memo_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -4964,6 +5095,51 @@ export type Database = {
         }
         Relationships: []
       }
+      memo_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_name: string
+          file_type: string
+          headings: Json
+          id: string
+          length_guidance: string
+          name: string
+          status: string
+          storage_path: string
+          style_notes: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          file_type: string
+          headings?: Json
+          id?: string
+          length_guidance?: string
+          name: string
+          status?: string
+          storage_path: string
+          style_notes?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          file_type?: string
+          headings?: Json
+          id?: string
+          length_guidance?: string
+          name?: string
+          status?: string
+          storage_path?: string
+          style_notes?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       outreach_actions: {
         Row: {
           approved_at: string | null
@@ -5310,9 +5486,28 @@ export type Database = {
         }
         Returns: Json
       }
+      approve_deal_memo: {
+        Args: {
+          p_decision: string
+          p_memo_id: string
+          p_note?: string
+          p_version_id: string
+        }
+        Returns: Json
+      }
       approve_outreach: { Args: { p_id: string }; Returns: Json }
       assign_outreach_owner: {
         Args: { p_id: string; p_owner_user_id: string }
+        Returns: Json
+      }
+      authorize_external_memo_export: {
+        Args: {
+          p_included?: Json
+          p_memo_id: string
+          p_mode?: string
+          p_note?: string
+          p_version_id: string
+        }
         Returns: Json
       }
       can_write_project: { Args: never; Returns: boolean }

@@ -16,6 +16,9 @@ import type {
   DealInvestor,
   DealMemo,
   DealMemoVersion,
+  MemoTemplate,
+  MemoApproval,
+  MemoExportRecord,
   CaseFactProposal,
   CaseFactReview,
   FollowUpTask,
@@ -80,6 +83,9 @@ type DealPersonRow = Tables["deal_people"]["Row"];
 type DealInvestorRow = Tables["deal_investors"]["Row"];
 type DealMemoRow = Tables["deal_memos"]["Row"];
 type MemoVersionRow = Tables["deal_memo_versions"]["Row"];
+type MemoTemplateRow = Tables["memo_templates"]["Row"];
+type MemoApprovalRow = Tables["deal_memo_approvals"]["Row"];
+type MemoExportRow = Tables["deal_memo_exports"]["Row"];
 type FactProposalRow = Tables["case_fact_proposals"]["Row"];
 type FactReviewRow = Tables["case_fact_reviews"]["Row"];
 type FollowUpTaskRow = Tables["follow_up_tasks"]["Row"];
@@ -362,6 +368,9 @@ function mapDealMemo(row: DealMemoRow): DealMemo {
     generationModel: row.generation_model,
     sourceIds: row.source_ids ?? [],
     approvedProposalIds: row.approved_proposal_ids ?? [],
+    templateKind: row.template_kind as DealMemo["templateKind"],
+    templateId: row.template_id,
+    focusAreas: row.focus_areas as DealMemo["focusAreas"],
     humanEdited: row.human_edited,
     editedBy: row.edited_by,
     createdBy: row.created_by,
@@ -383,6 +392,9 @@ function mapMemoVersion(row: MemoVersionRow): DealMemoVersion {
     generationModel: row.generation_model,
     sourceIds: row.source_ids ?? [],
     approvedProposalIds: row.approved_proposal_ids ?? [],
+    templateKind: row.template_kind as DealMemoVersion["templateKind"],
+    templateId: row.template_id,
+    focusAreas: row.focus_areas as DealMemoVersion["focusAreas"],
     humanEdited: row.human_edited,
     editedBy: row.edited_by,
     createdBy: row.created_by,
@@ -428,6 +440,50 @@ function mapFactProposal(row: FactProposalRow): CaseFactProposal {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapMemoTemplate(row: MemoTemplateRow): MemoTemplate {
+  return {
+    id: row.id,
+    name: row.name,
+    storagePath: row.storage_path,
+    fileName: row.file_name,
+    fileType: row.file_type as MemoTemplate["fileType"],
+    headings: Array.isArray(row.headings) ? row.headings.filter((item): item is string => typeof item === "string") : [],
+    styleNotes: row.style_notes,
+    lengthGuidance: row.length_guidance,
+    status: row.status as MemoTemplate["status"],
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapMemoApproval(row: MemoApprovalRow): MemoApproval {
+  return {
+    id: row.id,
+    memoId: row.memo_id,
+    versionId: row.version_id,
+    decision: row.decision as MemoApproval["decision"],
+    note: row.note,
+    reviewer: row.reviewer,
+    contentHash: row.content_hash,
+    createdAt: row.created_at,
+  };
+}
+
+function mapMemoExport(row: MemoExportRow): MemoExportRecord {
+  return {
+    id: row.id,
+    memoId: row.memo_id,
+    versionId: row.version_id,
+    mode: row.mode as MemoExportRecord["mode"],
+    included: (row.included ?? {}) as Record<string, unknown>,
+    note: row.note,
+    confirmer: row.confirmer,
+    contentHash: row.content_hash,
+    createdAt: row.created_at,
   };
 }
 
@@ -921,7 +977,7 @@ export const api = {
   },
 
   async listWorkspace(): Promise<WorkspaceData> {
-    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, dealPeople, dealInvestors, dealMemos, memoVersions, factProposals, factReviews, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
+    const [deals, sources, claims, gaps, investors, contacts, interactions, outreach, matches, members, audit, runs, briefs, weightConfigs, outreachEvents, caseDocuments, dealPeople, dealInvestors, dealMemos, memoVersions, memoTemplates, memoApprovals, memoExports, factProposals, factReviews, followUpTasks, importBatches, importFiles, importCandidates, importReviews] =
       await Promise.all([
         supabase.from("deals").select("*").order("updated_at", { ascending: false }),
         supabase.from("sources").select("*").order("created_at", { ascending: false }),
@@ -943,6 +999,9 @@ export const api = {
         supabase.from("deal_investors").select("*").order("created_at", { ascending: false }).limit(1000),
         supabase.from("deal_memos").select("*").order("updated_at", { ascending: false }).limit(500),
         supabase.from("deal_memo_versions").select("*").order("created_at", { ascending: false }).limit(2000),
+        supabase.from("memo_templates").select("*").order("updated_at", { ascending: false }).limit(200),
+        supabase.from("deal_memo_approvals").select("*").order("created_at", { ascending: false }).limit(2000),
+        supabase.from("deal_memo_exports").select("*").order("created_at", { ascending: false }).limit(1000),
         supabase.from("case_fact_proposals").select("*").order("created_at", { ascending: false }).limit(2000),
         supabase.from("case_fact_reviews").select("*").order("created_at", { ascending: false }).limit(4000),
         supabase.from("follow_up_tasks").select("*").order("created_at", { ascending: false }).limit(500),
@@ -972,6 +1031,9 @@ export const api = {
     if (dealInvestors.error) fail("Could not load deal investors", dealInvestors.error);
     if (dealMemos.error) fail("Could not load deal memos", dealMemos.error);
     if (memoVersions.error) fail("Could not load memo versions", memoVersions.error);
+    if (memoTemplates.error) fail("Could not load memo templates", memoTemplates.error);
+    if (memoApprovals.error) fail("Could not load memo approvals", memoApprovals.error);
+    if (memoExports.error) fail("Could not load memo export authorizations", memoExports.error);
     if (factProposals.error) fail("Could not load proposed case changes", factProposals.error);
     if (factReviews.error) fail("Could not load proposed change reviews", factReviews.error);
     if (followUpTasks.error) fail("Could not load follow-up tasks", followUpTasks.error);
@@ -1011,6 +1073,9 @@ export const api = {
       dealInvestors: (dealInvestors.data ?? []).map(mapDealInvestor),
       dealMemos: (dealMemos.data ?? []).map(mapDealMemo),
       memoVersions: (memoVersions.data ?? []).map(mapMemoVersion),
+      memoTemplates: (memoTemplates.data ?? []).map(mapMemoTemplate),
+      memoApprovals: (memoApprovals.data ?? []).map(mapMemoApproval),
+      memoExports: (memoExports.data ?? []).map(mapMemoExport),
       factProposals: (factProposals.data ?? []).map(mapFactProposal),
       factReviews: (factReviews.data ?? []).map(mapFactReview),
       followUpTasks: (followUpTasks.data ?? []).map(mapFollowUpTask),
@@ -1563,6 +1628,9 @@ export const api = {
     generationModel?: string;
     sourceIds?: string[];
     approvedProposalIds?: string[];
+    templateKind?: DealMemo["templateKind"];
+    templateId?: string | null;
+    focusAreas?: DealMemo["focusAreas"];
   }): Promise<DealMemo> {
     const userId = await currentUserId();
     const { data, error } = await supabase
@@ -1576,6 +1644,9 @@ export const api = {
         generation_model: input.generationModel ?? "",
         source_ids: input.sourceIds ?? [],
         approved_proposal_ids: input.approvedProposalIds ?? [],
+        template_kind: input.templateKind ?? "internal",
+        template_id: input.templateId ?? null,
+        focus_areas: input.focusAreas ?? [],
         created_by: userId,
         updated_by: userId,
       })
@@ -1585,13 +1656,43 @@ export const api = {
     return mapDealMemo(data);
   },
 
-  async updateDealMemo(id: string, input: { title: string; content: string }): Promise<void> {
+  async updateDealMemo(id: string, input: {
+    title: string;
+    content: string;
+    templateKind?: DealMemo["templateKind"];
+    templateId?: string | null;
+    focusAreas?: DealMemo["focusAreas"];
+  }): Promise<void> {
     const userId = await currentUserId();
+    const { data: existing, error: readError } = await supabase
+      .from("deal_memos")
+      .select("title,content,template_kind,template_id,focus_areas")
+      .eq("id", id)
+      .maybeSingle();
+    if (readError) fail("Could not read this memo", readError);
+    if (!existing) throw new Error("This memo no longer exists.");
+    const nextTitle = input.title.trim().slice(0, 200);
+    const nextContent = input.content.slice(0, 100000);
+    const nextKind = input.templateKind ?? (existing.template_kind as DealMemo["templateKind"]);
+    const nextTemplateId = input.templateId === undefined ? existing.template_id : input.templateId;
+    const nextFocus = input.focusAreas ?? (existing.focus_areas as DealMemo["focusAreas"]);
+    if (
+      existing.title === nextTitle &&
+      existing.content === nextContent &&
+      existing.template_kind === nextKind &&
+      existing.template_id === nextTemplateId &&
+      JSON.stringify(existing.focus_areas ?? []) === JSON.stringify(nextFocus)
+    ) {
+      return;
+    }
     const { error } = await supabase
       .from("deal_memos")
       .update({
-        title: input.title.trim().slice(0, 200),
-        content: input.content.slice(0, 100000),
+        title: nextTitle,
+        content: nextContent,
+        template_kind: nextKind,
+        template_id: nextTemplateId,
+        focus_areas: nextFocus,
         updated_by: userId,
         edited_by: userId,
         human_edited: true,
@@ -1622,6 +1723,9 @@ export const api = {
     dealId: string;
     requestId: string;
     proposalIds: string[];
+    templateKind?: DealMemo["templateKind"];
+    templateId?: string | null;
+    focusAreas?: DealMemo["focusAreas"];
   }): Promise<GeneratedMemoResponse> {
     const { data, error } = await supabase.functions.invoke("caseIntelligence", {
       body: {
@@ -1629,6 +1733,9 @@ export const api = {
         deal_id: input.dealId,
         request_id: input.requestId,
         proposal_ids: input.proposalIds,
+        template_kind: input.templateKind ?? "internal",
+        template_id: input.templateId ?? null,
+        focus_areas: input.focusAreas ?? [],
       },
     });
     if (error) throw new Error(await readFunctionError(error));
@@ -1651,6 +1758,100 @@ export const api = {
     });
     if (error) throw new Error(error.message || "Could not review this proposed fact.");
     return (data ?? { status: "failed" }) as unknown as FactProposalReviewResponse;
+  },
+
+  async approveDealMemo(input: {
+    memoId: string;
+    versionId: string;
+    decision: "approved" | "revision_requested";
+    note: string;
+  }): Promise<{ status: string; version_number?: number; latest_version?: number; content_hash?: string }> {
+    const { data, error } = await supabase.rpc("approve_deal_memo", {
+      p_memo_id: input.memoId,
+      p_version_id: input.versionId,
+      p_decision: input.decision,
+      p_note: input.note,
+    });
+    if (error) throw new Error(error.message || "Could not record the memo decision.");
+    return (data ?? { status: "failed" }) as { status: string; version_number?: number; latest_version?: number; content_hash?: string };
+  },
+
+  async authorizeExternalMemoExport(input: {
+    memoId: string;
+    versionId: string;
+    mode: "external_copy" | "external_markdown";
+    included: Record<string, unknown>;
+    note: string;
+  }): Promise<{ status: string; version_number?: number; latest_version?: number; content_hash?: string }> {
+    const { data, error } = await supabase.rpc("authorize_external_memo_export", {
+      p_memo_id: input.memoId,
+      p_version_id: input.versionId,
+      p_mode: input.mode,
+      p_included: input.included as Json,
+      p_note: input.note,
+    });
+    if (error) throw new Error(error.message || "Could not authorize external sharing.");
+    return (data ?? { status: "failed" }) as { status: string; version_number?: number; latest_version?: number; content_hash?: string };
+  },
+
+  async uploadMemoTemplate(input: {
+    name: string;
+    file: File;
+  }): Promise<MemoTemplate> {
+    const userId = await currentUserId();
+    const extension = input.file.name.toLowerCase().split(".").pop() ?? "";
+    const fileType =
+      extension === "pdf" ? "pdf" :
+      extension === "docx" ? "docx" :
+      extension === "csv" ? "csv" :
+      extension === "eml" ? "email" :
+      extension === "txt" ? "txt" : null;
+    if (!fileType) throw new Error("Unsupported precedent format. Use PDF, DOCX, CSV, TXT or EML.");
+    if (input.file.size > 20 * 1024 * 1024) throw new Error("The precedent is larger than 20 MB.");
+    const safeName = input.file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
+    const path = `${userId}/templates/${crypto.randomUUID()}-${safeName}`;
+    const upload = await supabase.storage.from("imports").upload(path, input.file, {
+      contentType: input.file.type || "application/octet-stream",
+      upsert: false,
+    });
+    if (upload.error) fail("Could not store the precedent privately", upload.error);
+    const { data, error } = await supabase.functions.invoke("caseIntelligence", {
+      body: {
+        action: "extract_template",
+        name: input.name.trim().slice(0, 160) || input.file.name,
+        storage_path: path,
+        file_name: input.file.name.slice(0, 240),
+        file_type: fileType,
+      },
+    });
+    if (error) throw new Error(await readFunctionError(error));
+    const response = (data ?? {}) as { status?: string; template?: MemoTemplate; error?: string };
+    if (response.status !== "proposed" || !response.template) {
+      throw new Error(response.error || "Precedent extraction did not produce a template. Nothing was saved.");
+    }
+    return response.template;
+  },
+
+  async updateMemoTemplate(input: {
+    id: string;
+    name: string;
+    headings: string[];
+    styleNotes: string;
+    lengthGuidance: string;
+    status: "proposed" | "active";
+  }): Promise<void> {
+    const { error } = await supabase
+      .from("memo_templates")
+      .update({
+        name: input.name.trim().slice(0, 160),
+        headings: input.headings.map((item) => item.trim()).filter(Boolean).slice(0, 40),
+        style_notes: input.styleNotes.slice(0, 1200),
+        length_guidance: input.lengthGuidance.slice(0, 500),
+        status: input.status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.id);
+    if (error) fail("Could not save this precedent template", error);
   },
 
   async addCaseDocument(input: {

@@ -37,6 +37,16 @@ export function useWorkspaceActions() {
       mutationFn: api.generateCaseMemo,
       onSuccess: invalidate,
     }),
+    approveDealMemo: useMutation({
+      mutationFn: api.approveDealMemo,
+      onSuccess: invalidate,
+    }),
+    authorizeExternalMemoExport: useMutation({
+      mutationFn: api.authorizeExternalMemoExport,
+      onSuccess: invalidate,
+    }),
+    uploadMemoTemplate: useMutation({ mutationFn: api.uploadMemoTemplate, onSuccess: invalidate }),
+    updateMemoTemplate: useMutation({ mutationFn: api.updateMemoTemplate, onSuccess: invalidate }),
     reviewCaseFactProposal: useMutation({
       mutationFn: api.reviewCaseFactProposal,
       onSuccess: invalidate,
