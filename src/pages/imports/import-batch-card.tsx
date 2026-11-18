@@ -90,6 +90,7 @@ export function ImportBatchCard({
       candidate.status === "needs_review" ||
       (candidate.entityType === "claim" && candidate.status === "pending"),
   ).length;
+  const reviewCount = pendingReview || batch.recordsNeedingReview;
 
   return (
     <article
@@ -124,7 +125,7 @@ export function ImportBatchCard({
           <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">Records</p>
         </div>
         <div className="rounded-md border border-border bg-card px-2 py-1.5">
-          <p className="text-[15px] font-semibold tabular-nums">{pendingReview || batch.recordsNeedingReview}</p>
+          <p className="text-[15px] font-semibold tabular-nums">{reviewCount}</p>
           <p className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">To review</p>
         </div>
         <div className="rounded-md border border-border bg-card px-2 py-1.5">
@@ -230,10 +231,10 @@ export function ImportBatchCard({
           )}
           Updated {formatShortDate(batch.updatedAt)}
         </p>
-        {pendingReview > 0 ? (
+        {reviewCount > 0 ? (
           <Button size="sm" className="h-7 gap-1 text-[11px]" onClick={onReview}>
             <Copy className="h-3 w-3" aria-hidden="true" />
-            Review {pendingReview}
+            Review {reviewCount}
           </Button>
         ) : null}
       </div>

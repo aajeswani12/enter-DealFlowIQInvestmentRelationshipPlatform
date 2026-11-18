@@ -43,7 +43,10 @@ export function ContactForm({ open, onOpenChange, investorId, initial, hasPrimar
     setPermission(initial?.outreachPermissionStatus ?? "unknown");
     setIsPrimary(initial?.isPrimary ?? !hasPrimary);
     setError("");
-  }, [open, initial, hasPrimary]);
+    // Reset only on open/target change; background query refreshes must not
+    // overwrite fields while the user is typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

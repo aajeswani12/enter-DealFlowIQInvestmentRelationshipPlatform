@@ -75,6 +75,20 @@ const TRANSCRIPTION_PILL: Record<
   failed: { label: "Transcription failed", tone: "danger" },
 };
 
+const SUPPORTED_AUDIO_MIME = new Set([
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+]);
+const SUPPORTED_AUDIO_EXTENSION = /\.(webm|mp3|m4a|mp4|ogg|wav)$/i;
+
 function guessMimeType(fileName: string): string {
   const extension = fileName.split(".").pop()?.toLowerCase();
   switch (extension) {
@@ -267,10 +281,13 @@ const VoiceCapture = () => {
   const handleFileChange = async (file: File | null) => {
     if (!file || processing || saving) return;
     const mimeType = file.type || guessMimeType(file.name);
+    const normalizedMime = mimeType.toLowerCase().split(";")[0];
     const looksLikeAudio =
-      file.type.startsWith("audio/") || /\.(webm|mp3|m4a|mp4|ogg|wav|aac|flac)$/i.test(file.name);
+      SUPPORTED_AUDIO_MIME.has(normalizedMime) || SUPPORTED_AUDIO_EXTENSION.test(file.name);
     if (!looksLikeAudio) {
-      setAudioError("Choose an audio file (MP3, M4A, WAV, OGG or WebM).");
+      setAudioError(
+        "Unsupported audio format. Use MP3, M4A/MP4, WAV, OGG or WebM. AAC and FLAC are not accepted.",
+      );
       return;
     }
     if (file.size === 0) {
@@ -876,7 +893,7 @@ const VoiceCapture = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.flac"
+              accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.mp4"
               className="sr-only"
               onChange={(event) => {
                 void handleFileChange(event.target.files?.[0] ?? null);

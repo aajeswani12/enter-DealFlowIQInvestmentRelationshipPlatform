@@ -5,3 +5,15 @@ verify_jwt = false
 
 [functions.importHub]
 verify_jwt = false
+
+[functions.transcribeVoiceNote]
+verify_jwt = false
+
+[functions.extractDealFields]
+verify_jwt = false
+
+[functions.analyzeDealSource]
+verify_jwt = false
+
+[functions.matchInvestorsToDeal]
+verify_jwt = false

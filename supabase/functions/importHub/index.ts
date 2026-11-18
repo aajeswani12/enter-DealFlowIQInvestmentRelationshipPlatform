@@ -1958,7 +1958,7 @@ async function reviewCandidate(ctx: AuthContext, input: JsonRecord): Promise<Res
       label,
       supporting_excerpt: excerpt,
       value_text: value,
-      normalized_value: numeric(currentPayload.normalized_value) ?? numeric(value),
+      normalized_value: numeric(value) ?? numeric(currentPayload.normalized_value),
       currency: text(currentPayload.currency) || "USD",
       reporting_period: period,
       verification_status: conflict

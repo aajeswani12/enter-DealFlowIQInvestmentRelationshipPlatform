@@ -118,7 +118,10 @@ export function CaseForm({ open, onOpenChange, initial, capture, onCreated }: Ca
       setFields(toState(initial, capture));
       setCompanyError("");
     }
-  }, [open, initial, capture]);
+    // Reset only when the editor opens or targets another record. A background
+    // workspace refresh must not overwrite edits already in progress.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id, capture?.id]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setFields((current) => ({ ...current, [key]: value }));

@@ -80,6 +80,18 @@ Deno.serve(async (req) => {
     const body = (await req.json().catch(() => null)) as { audioPath?: string; mimeType?: string } | null;
     const audioPath = typeof body?.audioPath === "string" ? body.audioPath.trim() : "";
     const mimeType = typeof body?.mimeType === "string" ? body.mimeType : "audio/webm";
+    const normalizedMime = mimeType.toLowerCase().split(";")[0];
+    const supportedMime = new Set([
+      "audio/webm", "audio/ogg", "audio/mp4", "audio/m4a", "audio/x-m4a",
+      "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave",
+    ]);
+    const audioExtension = audioPath.split(".").pop()?.toLowerCase() ?? "";
+    if (!supportedMime.has(normalizedMime) && !["webm", "ogg", "mp4", "m4a", "mp3", "wav"].includes(audioExtension)) {
+      return json(
+        { error: "Unsupported audio format. Use MP3, M4A/MP4, WAV, OGG or WebM.", configured: false },
+        415,
+      );
+    }
 
     if (!audioPath || audioPath.includes("..") || !audioPath.startsWith(`${userId}/`)) {
       return json({ error: "Invalid audio path." }, 400);
@@ -131,7 +143,15 @@ Deno.serve(async (req) => {
       return json({ error: "The recording is larger than 25 MB." }, 413);
     }
 
-    const extension = mimeType.includes("mp4") || mimeType.includes("m4a") ? "m4a" : mimeType.includes("ogg") ? "ogg" : "webm";
+    const extension = normalizedMime.includes("mp4") || normalizedMime.includes("m4a")
+      ? "m4a"
+      : normalizedMime.includes("ogg")
+        ? "ogg"
+        : normalizedMime.includes("mpeg") || normalizedMime.includes("mp3")
+          ? "mp3"
+          : normalizedMime.includes("wav")
+            ? "wav"
+            : "webm";
     const form = new FormData();
     form.append("file", new Blob([audio], { type: mimeType || "audio/webm" }), `recording.${extension}`);
     form.append("model", model);

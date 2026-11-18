@@ -141,7 +141,10 @@ export function InvestorForm({ open, onOpenChange, initial, prefill }: InvestorF
       });
     }
     setErrors({});
-  }, [open, initial, prefill]);
+    // Reset only on open/target change; background query refreshes must not
+    // overwrite fields while the user is typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id, prefill?.caseItem?.id]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setFields((current) => ({ ...current, [key]: value }));

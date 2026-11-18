@@ -252,7 +252,7 @@ export function scoreInvestors(
   if (!deal.sector.trim()) missingDealInputs.push("Deal sector is not recorded.");
   if (!deal.stage.trim()) missingDealInputs.push("Deal stage is not recorded.");
   if (!deal.geography.trim()) missingDealInputs.push("Deal geography is not recorded.");
-  if (deal.chequeSought === null) missingDealInputs.push("Cheque sought from this investor is not recorded.");
+  if (deal.chequeSought === null) missingDealInputs.push("Cheque sought is not recorded.");
   if (!deal.thesis.trim() && !deal.summary.trim() && !deal.claimText.trim()) {
     missingDealInputs.push("Deal thesis or summary is not recorded.");
   }
