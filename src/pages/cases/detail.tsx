@@ -14,7 +14,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { LoadingPanel } from "@/components/common/loading-panel";
@@ -66,9 +66,9 @@ type ReadinessStatus = "Available" | "Needs Review" | "Missing";
 
 const TABS: { id: CaseTab; label: string }[] = [
   { id: "documents", label: "Documents" },
-  { id: "activity", label: "Activity" },
+  { id: "activity", label: "Full Activity" },
   { id: "memo", label: "Memo" },
-  { id: "more", label: "More Details" },
+  { id: "more", label: "More" },
 ];
 
 const READINESS_TONE: Record<ReadinessStatus, "success" | "warning" | "neutral"> = {
@@ -121,6 +121,7 @@ const CaseDetail = () => {
   const actions = useWorkspaceActions();
 
   const [activeTab, setActiveTab] = useState<CaseTab>("documents");
+  const [memoMounted, setMemoMounted] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -137,6 +138,7 @@ const CaseDetail = () => {
 
   useEffect(() => {
     setActiveTab("documents");
+    setMemoMounted(false);
     setDocOpen(false);
     setPersonOpen(false);
   }, [id]);
@@ -153,6 +155,10 @@ const CaseDetail = () => {
       setActiveTab("memo");
     }
   }, [id, location.hash]);
+
+  useEffect(() => {
+    if (activeTab === "memo") setMemoMounted(true);
+  }, [activeTab]);
 
   const caseItem = workspace.cases.find((item) => item.id === id);
 
@@ -329,6 +335,23 @@ const CaseDetail = () => {
     }
   };
 
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const keys = ["ArrowRight", "ArrowLeft", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? TABS.length - 1
+          : event.key === "ArrowRight"
+            ? (index + 1) % TABS.length
+            : (index - 1 + TABS.length) % TABS.length;
+    const next = TABS[nextIndex];
+    setActiveTab(next.id);
+    window.requestAnimationFrame(() => document.getElementById(`case-tab-${next.id}`)?.focus());
+  };
+
   return (
     <div className="page-enter space-y-4">
       <header className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -343,7 +366,6 @@ const CaseDetail = () => {
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
             <span>{caseItem.sector || "Unknown"}</span>
             <span>{caseItem.roundStage || "Unknown"}</span>
-            <span>Funding: {funding !== null ? formatCurrency(funding) : "Unknown"}</span>
             {caseItem.isSynthetic ? <Pill tone="warning">Synthetic</Pill> : null}
           </div>
         </div>
@@ -351,16 +373,16 @@ const CaseDetail = () => {
           <Button asChild className="h-8 gap-1.5 text-[11px]">
             <Link to={`/inbox/capture?deal=${caseItem.id}`}>
               <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-              Add Update
+              Add Voice Note
             </Link>
-          </Button>
-          <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => setActiveTab("memo")}>
-            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-            Memo
           </Button>
           <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => setDocOpen(true)}>
             <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
             Add Document
+          </Button>
+          <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => setActiveTab("memo")}>
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+            Prepare Memo
           </Button>
         </div>
       </header>
@@ -368,7 +390,7 @@ const CaseDetail = () => {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
         <div className="space-y-3">
           <section className="panel p-4" aria-labelledby="deal-summary-heading">
-            <h2 id="deal-summary-heading" className="text-[13.5px] font-semibold tracking-tight">Deal Summary</h2>
+            <h2 id="deal-summary-heading" className="text-[13.5px] font-semibold tracking-tight">Overview</h2>
             <p className="mt-1.5 max-w-[70ch] text-[12.5px] leading-relaxed text-foreground/90">{summary}</p>
           </section>
 
@@ -482,7 +504,7 @@ const CaseDetail = () => {
           </section>
 
           <section className="panel p-4" aria-labelledby="checklist-heading">
-            <h2 id="checklist-heading" className="text-[13.5px] font-semibold tracking-tight">Information Checklist</h2>
+            <h2 id="checklist-heading" className="text-[13.5px] font-semibold tracking-tight">Evidence Status</h2>
             <p className="mt-0.5 text-[9px] text-muted-foreground">Availability, not verification or investment quality.</p>
             <ul className="mt-2 space-y-1.5">
               {checklist.map((item) => {
@@ -504,13 +526,16 @@ const CaseDetail = () => {
 
       <div className="border-t border-border pt-3">
         <div role="tablist" aria-label="Case details" className="flex min-w-max gap-1 overflow-x-auto">
-          {TABS.map((tab) => (
+          {TABS.map((tab, index) => (
             <button
               key={tab.id}
+              id={`case-tab-${tab.id}`}
               type="button"
               role="tab"
               aria-selected={activeTab === tab.id}
               aria-controls={`case-panel-${tab.id}`}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
               onClick={() => setActiveTab(tab.id)}
               className={activeTab === tab.id
                 ? "border-b-2 border-brand px-3 py-2 text-[11.5px] font-semibold text-brand-strong"
@@ -583,10 +608,12 @@ const CaseDetail = () => {
             </section>
           ) : null}
 
-          {activeTab === "memo" ? (
-            <section role="tabpanel" id="case-panel-memo" aria-labelledby="case-tab-memo">
-              <MemoWorkspace deal={caseItem} />
-            </section>
+          {memoMounted ? (
+            <div hidden={activeTab !== "memo"} aria-hidden={activeTab !== "memo"}>
+              <section role="tabpanel" id="case-panel-memo" aria-labelledby="case-tab-memo">
+                <MemoWorkspace deal={caseItem} />
+              </section>
+            </div>
           ) : null}
 
           {activeTab === "more" ? (
