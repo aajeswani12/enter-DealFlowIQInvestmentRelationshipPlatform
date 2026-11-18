@@ -66,9 +66,9 @@ const Cases = () => {
       .filter((item) =>
         stage === "all"
           ? true
-          : stage === "Not recorded"
-            ? !item.roundStage
-            : item.roundStage === stage,
+          : stage === "Unknown"
+            ? !item.roundStage.trim() || !(ROUND_STAGES as readonly string[]).includes(item.roundStage.trim())
+            : item.roundStage.trim() === stage,
       )
       .filter((item) =>
         search
@@ -125,7 +125,7 @@ const Cases = () => {
             options={[
               { value: "all", label: "All stages" },
               ...ROUND_STAGES.map((value) => ({ value, label: value })),
-              { value: "Not recorded", label: "Not recorded" },
+              { value: "Unknown", label: "Unknown" },
             ]}
             ariaLabel="Filter by funding stage"
           />

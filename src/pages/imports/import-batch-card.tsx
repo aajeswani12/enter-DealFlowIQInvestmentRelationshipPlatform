@@ -134,11 +134,11 @@ export function ImportBatchCard({
       <div className="mt-3 grid grid-cols-3 gap-1.5 text-center sm:grid-cols-6">
         {[
           { label: "Files uploaded", value: files.length },
-          { label: "Successful", value: successfullyProcessed },
+          { label: "Files processed", value: successfullyProcessed },
           { label: "Companies", value: companiesIdentified },
-          { label: "Matched", value: recordsMatched },
-          { label: "To review", value: reviewCount },
-          { label: "Errors", value: batch.errorCount },
+          { label: "Records matched", value: recordsMatched },
+          { label: "Records to review", value: reviewCount },
+          { label: "File issues", value: batch.errorCount },
         ].map((stat) => (
           <div key={stat.label} className="rounded-md border border-border bg-card px-1.5 py-1.5">
             <p className="text-[14px] font-semibold tabular-nums">{stat.value}</p>

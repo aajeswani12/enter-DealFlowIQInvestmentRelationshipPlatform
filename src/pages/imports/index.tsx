@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/layout/page-header";
 import { Field } from "@/components/forms/form-field";
 import { SelectField } from "@/components/forms/select-field";
@@ -21,6 +22,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { api } from "@/lib/api";
+import { buildImportJobBuckets } from "@/lib/insights";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import type { ImportFileType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -58,7 +60,7 @@ interface QueuedLog {
 }
 
 const ImportsPage = () => {
-  const { data } = useWorkspace();
+  const { data, isLoading: workspaceLoading, isError: workspaceError } = useWorkspace();
   const workspace = data ?? EMPTY_WORKSPACE;
   const actions = useWorkspaceActions();
   const { membership } = useAuth();
@@ -82,6 +84,14 @@ const ImportsPage = () => {
     () => [...workspace.importBatches].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [workspace.importBatches],
   );
+  const jobBuckets = buildImportJobBuckets(batches);
+  const jobChart = [
+    { name: "Successfully processed", count: jobBuckets.completed, color: "hsl(var(--success))" },
+    { name: "Need review", count: jobBuckets.review, color: "hsl(var(--warning))" },
+    { name: "Failed", count: jobBuckets.failed, color: "hsl(var(--destructive))" },
+    { name: "Processing", count: jobBuckets.processing, color: "hsl(var(--brand))" },
+  ];
+  const processingBatches = batches.filter((batch) => batch.status === "processing" || batch.status === "uploading");
 
   useEffect(() => {
     if (!selectedBatchId && batches[0]) setSelectedBatchId(batches[0].id);
@@ -502,13 +512,58 @@ const ImportsPage = () => {
             <span className="text-[10px] text-muted-foreground">{batches.length} batch{batches.length === 1 ? "" : "es"}</span>
           </div>
 
-          {batches.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-card/60 px-5 py-10 text-center">
-              <FileText className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
-              <p className="mt-2 text-[13px] font-semibold">No imports yet</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">Start with a file or the synthetic demo above.</p>
+          <section className="panel p-3.5" aria-labelledby="job-processing-heading">
+            <div className="flex items-center justify-between gap-2">
+              <h3 id="job-processing-heading" className="text-[12px] font-semibold tracking-tight">Import job processing</h3>
+              <span className="text-[9.5px] text-muted-foreground">{batches.length} job{batches.length === 1 ? "" : "s"}</span>
             </div>
-          ) : (
+            {workspaceLoading ? (
+              <p className="mt-2 text-[10.5px] text-muted-foreground">Loading import jobs.</p>
+            ) : workspaceError ? (
+              <p className="mt-2 text-[10.5px] text-destructive">Import jobs could not be loaded.</p>
+            ) : batches.length === 0 ? (
+              <p className="mt-2 text-[10.5px] text-muted-foreground">No import jobs.</p>
+            ) : (
+              <>
+                <div className="mt-2 h-[128px] w-full" role="img" aria-label={`Import batch jobs: ${jobBuckets.completed} successfully processed, ${jobBuckets.review} need review, ${jobBuckets.failed} failed, ${jobBuckets.processing} processing.`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={jobChart} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                      <XAxis type="number" hide allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" width={116} tickLine={false} axisLine={false} tick={{ fontSize: 9 }} />
+                      <Tooltip
+                        cursor={{ fill: "hsl(var(--secondary))" }}
+                        contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", color: "hsl(var(--foreground))", fontSize: 11 }}
+                        formatter={(value: number | string) => [`${value} job${Number(value) === 1 ? "" : "s"}`, "Count"]}
+                      />
+                      <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={12}>
+                        {jobChart.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="mt-1 text-[9.5px] text-muted-foreground">
+                  Successfully processed {jobBuckets.completed} · Need review {jobBuckets.review} · Failed {jobBuckets.failed} · Processing {jobBuckets.processing}.
+                </p>
+                <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">
+                  Import batches (jobs), not files or records. Each batch is counted once by stored status. A review job may contain completed files and pending records.
+                </p>
+                <p className="text-[9px] leading-relaxed text-muted-foreground">
+                  Processing is shown by status only; no fabricated percentage. File-level progress is shown below.
+                </p>
+                {processingBatches.length > 0 ? (
+                  <ul className="mt-1.5 space-y-1">
+                    {processingBatches.map((batch) => (
+                      <li key={batch.id} className="text-[9.5px] text-muted-foreground">
+                        {batch.label}: {batch.totalFiles > 0 ? `${batch.filesProcessed}/${batch.totalFiles} files` : "Processing"}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            )}
+          </section>
+
+          {batches.length > 0 ? (
             <div className="space-y-3">
               {batches.map((batch) => (
                 <ImportBatchCard
@@ -553,7 +608,7 @@ const ImportsPage = () => {
                 />
               ))}
             </div>
-          )}
+          ) : null}
         </section>
       </div>
 

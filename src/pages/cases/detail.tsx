@@ -1,6 +1,9 @@
 import {
   ArrowRight,
   CalendarClock,
+  CheckCircle2,
+  Circle,
+  CircleAlert,
   Download,
   FilePlus2,
   FileText,
@@ -42,6 +45,7 @@ import {
   VERIFICATION_LABEL,
 } from "@/lib/constants";
 import { dueLabel, formatCurrency, formatDate, formatShortDate, isOverdue } from "@/lib/format";
+import { buildCaseActivityEvents, buildCaseChecklist } from "@/lib/insights";
 import { primaryContact } from "@/lib/investors";
 import { buildInvestmentMemo } from "@/lib/memo";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
@@ -56,7 +60,6 @@ import type {
 import { AnalysisSection } from "./analysis-section";
 import { ClaimsSection } from "./claims-section";
 import { DecisionGapsSection } from "./gaps-section";
-import { EvidenceTimeline } from "./evidence-timeline";
 import { FollowUpTasks } from "./follow-up-tasks";
 
 type CaseTab = "documents" | "activity" | "memo" | "more";
@@ -74,6 +77,12 @@ const READINESS_TONE: Record<ReadinessStatus, "success" | "warning" | "neutral">
   "Needs Review": "warning",
   Missing: "neutral",
 };
+
+const CHECK_ICON = {
+  Available: CheckCircle2,
+  "Needs Review": CircleAlert,
+  Missing: Circle,
+} as const;
 
 function firstSentences(value: string, count = 3): string {
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -242,40 +251,25 @@ const CaseDetail = () => {
     })[0]?.title ||
     "Unknown";
 
-  const readiness: { label: string; status: ReadinessStatus }[] = [
-    { label: "Company profile", status: [caseItem.summary, caseItem.website, caseItem.sector, caseItem.roundStage].filter(Boolean).length === 4 ? "Available" : "Needs Review" },
-    { label: "Funding", status: funding !== null ? "Available" : "Missing" },
-    { label: "Founder / team", status: people.length > 0 ? "Available" : "Missing" },
-    { label: "Source evidence", status: sources.length + caseDocuments.length > 0 ? "Available" : "Missing" },
-    { label: "Reviewed facts", status: approvedClaims.length > 0 ? "Available" : draftClaims.length > 0 ? "Needs Review" : "Missing" },
-    { label: "Diligence questions", status: openGaps.length > 0 ? "Needs Review" : gaps.length > 0 ? "Available" : "Missing" },
-    { label: "Investor view", status: manualAssociations.length > 0 ? "Available" : matches.length > 0 ? "Needs Review" : "Missing" },
-  ];
+  const checklist = buildCaseChecklist({
+    caseItem,
+    claims,
+    people,
+    gaps,
+    documents: caseDocuments,
+    captures: sources,
+  });
 
-  const recentEntries = [
-    ...caseDocuments.map((document) => ({
-      id: `document-${document.id}`,
-      date: document.sourceDate,
-      title: document.title,
-      detail: document.documentType.toUpperCase(),
-    })),
-    ...sources.map((source) => ({
-      id: `source-${source.id}`,
-      date: source.sourceDate,
-      title: source.companyName || (source.source === "voice" ? "Voice note" : "Note"),
-      detail: source.source === "voice" ? "Voice note" : "Note",
-    })),
-    ...workspace.interactions
-      .filter((interaction) => interaction.dealId === caseItem.id)
-      .map((interaction) => ({
-        id: `interaction-${interaction.id}`,
-        date: interaction.occurredAt,
-        title: workspace.investors.find((investor) => investor.id === interaction.investorId)?.name || "Investor interaction",
-        detail: interaction.kind,
-      })),
-  ]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 3);
+  const activityEvents = buildCaseActivityEvents({
+    caseId: caseItem.id,
+    documents: caseDocuments,
+    captures: sources,
+    memos: caseMemos,
+    associations: manualAssociations,
+    investors: workspace.investors,
+    audit: workspace.audit,
+  });
+  const recentActivity = activityEvents.slice(0, 3);
 
   const keyFacts = [
     { label: "Website", value: caseItem.website || "Unknown" },
@@ -538,16 +532,16 @@ const CaseDetail = () => {
               <h2 id="recent-heading" className="text-[13.5px] font-semibold tracking-tight">Recent Activity</h2>
               <button type="button" onClick={() => setActiveTab("activity")} className="text-[10px] font-medium text-brand-strong hover:underline">All activity</button>
             </div>
-            {recentEntries.length > 0 ? (
+            {recentActivity.length > 0 ? (
               <ul className="mt-2 space-y-1.5">
-                {recentEntries.map((entry) => (
+                {recentActivity.map((entry) => (
                   <li key={entry.id}>
                     <button type="button" onClick={() => setActiveTab("activity")} className="flex w-full items-baseline justify-between gap-3 text-left">
                       <span className="min-w-0">
                         <span className="block truncate text-[11px] font-medium">{entry.title}</span>
-                        <span className="text-[9.5px] text-muted-foreground">{entry.detail}</span>
+                        <span className="text-[9.5px] text-muted-foreground">{entry.type}</span>
                       </span>
-                      <span className="shrink-0 text-[9.5px] text-muted-foreground">{formatShortDate(entry.date)}</span>
+                      <span className="shrink-0 text-[9.5px] text-muted-foreground">{entry.date ? formatShortDate(entry.date) : "Unknown date"}</span>
                     </button>
                   </li>
                 ))}
@@ -614,13 +608,20 @@ const CaseDetail = () => {
 
           <section className="panel p-4" aria-labelledby="checklist-heading">
             <h2 id="checklist-heading" className="text-[13.5px] font-semibold tracking-tight">Information Checklist</h2>
+            <p className="mt-0.5 text-[9px] text-muted-foreground">Availability, not verification or investment quality.</p>
             <ul className="mt-2 space-y-1.5">
-              {readiness.map((item) => (
-                <li key={item.label} className="flex items-center justify-between gap-2 border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
-                  <span className="text-[10.5px] text-foreground/90">{item.label}</span>
-                  <Pill tone={READINESS_TONE[item.status]}>{item.status}</Pill>
-                </li>
-              ))}
+              {checklist.map((item) => {
+                const Icon = CHECK_ICON[item.status];
+                return (
+                  <li key={item.key} title={item.detail} className="flex items-center justify-between gap-2 border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
+                    <span className="flex min-w-0 items-center gap-1.5 text-[10.5px] text-foreground/90">
+                      <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    <Pill tone={READINESS_TONE[item.status]}>{item.status}</Pill>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         </aside>
@@ -684,14 +685,39 @@ const CaseDetail = () => {
 
           {activeTab === "activity" ? (
             <section role="tabpanel" id="case-panel-activity" aria-labelledby="case-tab-activity">
-              {caseDocuments.length + sources.length > 0 ? (
-                <EvidenceTimeline
-                  documents={caseDocuments}
-                  captures={sources}
-                  batches={workspace.importBatches}
-                  interactions={workspace.interactions.filter((interaction) => interaction.dealId === caseItem.id)}
-                  investors={workspace.investors}
-                />
+              {activityEvents.length > 0 ? (
+                <ol className="panel divide-y divide-border">
+                  {activityEvents.map((event) => {
+                    const document = event.documentId ? caseDocuments.find((item) => item.id === event.documentId) : null;
+                    return (
+                      <li key={event.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-[10.5px]">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-medium">{event.title}</span>
+                            <span className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground">{event.type}</span>
+                          </div>
+                          <p className="mt-0.5 text-[9.5px] text-muted-foreground">{event.detail}</p>
+                        </div>
+                        <span className="shrink-0 text-[9.5px] text-muted-foreground">{event.date ? formatShortDate(event.date) : "Unknown date"}</span>
+                        {document ? (
+                          <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[9.5px]" onClick={() => void api.getImportDocumentUrl(document.storagePath).then((url) => {
+                            if (!url) {
+                              toast.error("Source unavailable.");
+                              return;
+                            }
+                            window.open(url, "_blank", "noopener,noreferrer");
+                          })}>Open source</Button>
+                        ) : event.captureId ? (
+                          <Link to={`/inbox#source-${event.captureId}`} className="text-[9.5px] font-medium text-brand-strong hover:underline">Source</Link>
+                        ) : event.memoId ? (
+                          <button type="button" onClick={() => setActiveTab("memo")} className="text-[9.5px] font-medium text-brand-strong hover:underline">Memo</button>
+                        ) : event.investorId ? (
+                          <Link to={`/investors/${event.investorId}`} className="text-[9.5px] font-medium text-brand-strong hover:underline">Profile</Link>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ol>
               ) : (
                 <p className="text-[11px] text-muted-foreground">No activity.</p>
               )}

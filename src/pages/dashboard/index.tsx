@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { EmptyState } from "@/components/common/empty-state";
 import { LoadingPanel, StatGridSkeleton } from "@/components/common/loading-panel";
 import { StatCard } from "@/components/common/stat-card";
@@ -23,27 +24,27 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
-import { ACTIVE_CASE_STATUSES, CASE_STATUS_LABEL, ROUND_STAGES } from "@/lib/constants";
+import { ACTIVE_CASE_STATUSES, CASE_STATUS_LABEL } from "@/lib/constants";
+import { buildFollowUpBuckets, buildStageCounts } from "@/lib/insights";
 import { dueLabel, formatShortDate, isOverdue, pluralize, relativeDays } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
-  const { data, isLoading } = useWorkspace();
+  const { data, isLoading, isError } = useWorkspace();
   const workspace = data ?? EMPTY_WORKSPACE;
   const [caseFormOpen, setCaseFormOpen] = useState(false);
 
   const activeCases = workspace.cases.filter((item) => ACTIVE_CASE_STATUSES.includes(item.status));
   const openGaps = workspace.gaps.filter((item) => item.status === "open" || item.status === "needs_review");
   const pendingOutreach = workspace.outreach.filter((item) => item.status === "draft");
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-  const followupsDue = workspace.outreach.filter(
-    (item) =>
-      Boolean(item.nextFollowupAt) &&
-      item.status !== "rejected" &&
-      item.status !== "not_interested" &&
-      new Date(item.nextFollowupAt as string).getTime() <= endOfToday.getTime(),
-  );
+  const followUpBuckets = buildFollowUpBuckets(workspace.followUpTasks, new Date(), 7);
+  const followUpChart = [
+    { name: "Overdue", count: followUpBuckets.overdue, color: "hsl(var(--destructive))" },
+    { name: "Due soon", count: followUpBuckets.dueSoon, color: "hsl(var(--warning))" },
+    { name: "Completed", count: followUpBuckets.completed, color: "hsl(var(--success))" },
+  ];
+  const followUpChartTotal = followUpBuckets.overdue + followUpBuckets.dueSoon + followUpBuckets.completed;
+  const followUpSummary = `Overdue ${followUpBuckets.overdue}, due soon ${followUpBuckets.dueSoon}, completed ${followUpBuckets.completed}`;
 
   const nextSteps = useMemo(() => {
     const caseSteps = workspace.cases
@@ -75,14 +76,7 @@ const Dashboard = () => {
     isOverdue(item.nextStepDue),
   ).length;
 
-  const pipeline = [...ROUND_STAGES, "Not recorded"].map((stage) => ({
-    value: stage,
-    label: stage,
-    count:
-      stage === "Not recorded"
-        ? workspace.cases.filter((item) => !item.roundStage).length
-        : workspace.cases.filter((item) => item.roundStage === stage).length,
-  }));
+  const pipeline = buildStageCounts(workspace.cases);
   const pipelineMax = Math.max(1, ...pipeline.map((item) => item.count));
 
   const sourceTimeline = [
@@ -244,8 +238,8 @@ const Dashboard = () => {
           />
           <StatCard
             label="Follow-ups due"
-            value={followupsDue.length}
-            hint="Manual outreach tasks with a persisted due date."
+            value={followUpBuckets.overdue + followUpBuckets.dueSoon}
+            hint="Saved follow-up tasks overdue or due in the next 7 days."
             icon={CalendarClock}
             to="/matches?tab=outreach"
           />
@@ -309,11 +303,18 @@ const Dashboard = () => {
               </Link>
             </div>
 
+            {isLoading ? (
+              <p className="mt-4 text-[11.5px] text-muted-foreground">Loading pipeline.</p>
+            ) : isError ? (
+              <p className="mt-4 text-[11.5px] text-destructive">Pipeline unavailable.</p>
+            ) : workspace.cases.length === 0 ? (
+              <p className="mt-4 text-[11.5px] text-muted-foreground">No deals.</p>
+            ) : (
             <ul className="mt-4 space-y-2.5">
               {pipeline.map((item) => (
-                <li key={item.value}>
+                <li key={item.key}>
                   <Link
-                    to={`/cases?stage=${encodeURIComponent(item.value)}`}
+                    to={`/cases?stage=${encodeURIComponent(item.key)}`}
                     aria-label={`${item.label}: ${item.count} case${item.count === 1 ? "" : "s"}. Open Deals filtered by this stage.`}
                     className="grid grid-cols-[92px_1fr_28px] items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
@@ -326,6 +327,7 @@ const Dashboard = () => {
                 </li>
               ))}
             </ul>
+            )}
 
           </section>
 
@@ -336,8 +338,68 @@ const Dashboard = () => {
                 <h2 id="attention-heading" className="text-[15px] font-semibold tracking-tight">
                   Needs attention
                 </h2>
-                <p className="text-[11.5px] text-muted-foreground">Dated next steps across cases and investors.</p>
+                <p className="text-[11.5px] text-muted-foreground">Saved follow-up tasks and dated next steps.</p>
               </div>
+            </div>
+
+            <div className="mt-3 border-b border-border pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="label-caps">Follow-up tasks</p>
+                <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+                  {followUpBuckets.overdue + followUpBuckets.dueSoon} due
+                </span>
+              </div>
+              {isLoading ? (
+                <p className="mt-2 text-[10.5px] text-muted-foreground">Loading follow-ups.</p>
+              ) : isError ? (
+                <p className="mt-2 text-[10.5px] text-destructive">Follow-ups unavailable.</p>
+              ) : workspace.followUpTasks.length === 0 ? (
+                <p className="mt-2 text-[10.5px] text-muted-foreground">No saved follow-up tasks.</p>
+              ) : followUpChartTotal === 0 ? (
+                <p className="mt-2 text-[10.5px] text-muted-foreground">No overdue, due-soon or completed tasks.</p>
+              ) : (
+                <>
+                  <div className="mt-2 h-[124px] w-full" role="img" aria-label={`Follow-up task chart. ${followUpSummary}.`}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={followUpChart} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                        <XAxis type="number" hide allowDecimals={false} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={64}
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fontSize: 10 }}
+                        />
+                        <Tooltip
+                          cursor={{ fill: "hsl(var(--secondary))" }}
+                          contentStyle={{
+                            borderRadius: 8,
+                            border: "1px solid hsl(var(--border))",
+                            background: "hsl(var(--card))",
+                            color: "hsl(var(--foreground))",
+                            fontSize: 11,
+                          }}
+                          formatter={(value: number | string) => [`${value} task${Number(value) === 1 ? "" : "s"}`, "Count"]}
+                        />
+                        <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14}>
+                          {followUpChart.map((entry) => (
+                            <Cell key={entry.name} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="mt-1 text-[9.5px] text-muted-foreground">{followUpSummary}.</p>
+                </>
+              )}
+              <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">
+                Overdue: open before now. Due soon: open now through 7 days. Completed: done regardless of due date. Device local time.
+                {followUpBuckets.undated > 0 ? ` ${followUpBuckets.undated} undated open excluded.` : ""}
+                {followUpBuckets.later > 0 ? ` ${followUpBuckets.later} later-dated excluded.` : ""}
+                {followUpBuckets.dismissed > 0 ? ` ${followUpBuckets.dismissed} dismissed excluded.` : ""}
+                {" "}Saved follow-up tasks only; outreach stage dates excluded.
+              </p>
             </div>
 
             {nextSteps.length === 0 ? (
