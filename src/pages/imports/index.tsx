@@ -288,6 +288,19 @@ const ImportsPage = () => {
       candidate.status === "needs_review" ||
       (candidate.entityType === "claim" && candidate.status === "pending"),
   ).length;
+  const reviewQueueCount = workspace.importCandidates.filter(
+    (candidate) =>
+      candidate.status === "needs_review" ||
+      (candidate.entityType === "claim" && candidate.status === "pending"),
+  ).length;
+  const dealsFound = new Set(
+    workspace.importCandidates
+      .filter((candidate) => candidate.entityType === "deal" && ["applied", "kept_separate"].includes(candidate.status))
+      .map((candidate) => candidate.appliedRecordId ?? candidate.proposedDealId ?? candidate.id),
+  ).size;
+  const failedFiles = workspace.importFiles
+    .filter((file) => file.processingStatus === "failed" && file.errorMessage)
+    .slice(0, 4);
 
   const scrollToReview = () => {
     reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -297,8 +310,8 @@ const ImportsPage = () => {
     <div className="page-enter space-y-5">
       <PageHeader
         eyebrow="Historical data import & organization"
-        title="Import & Organize"
-        description="Turn Talok Capital's historical files into connected deal cases, investor relationships, source-linked claims and follow-up tasks. Originals stay private; extraction is never simulated."
+        title="Import Files"
+        description="Bring your deal information together."
         actions={
           <Button variant="outline" className="gap-1.5" onClick={scrollToReview}>
             <FolderInput className="h-4 w-4" aria-hidden="true" />
@@ -309,6 +322,33 @@ const ImportsPage = () => {
           </Button>
         }
       />
+
+      <section className="panel grid gap-4 p-5 sm:grid-cols-3" aria-label="Import summary">
+        <div>
+          <p className="text-[14px] text-muted-foreground">Files imported</p>
+          <p className="mt-1 text-[24px] font-semibold tabular-nums">{workspaceLoading ? "…" : workspaceError ? "—" : workspace.importFiles.length}</p>
+        </div>
+        <div>
+          <p className="text-[14px] text-muted-foreground">Deals found</p>
+          <p className="mt-1 text-[24px] font-semibold tabular-nums">{workspaceLoading ? "…" : workspaceError ? "—" : dealsFound}</p>
+        </div>
+        <div>
+          <p className="text-[14px] text-muted-foreground">Records needing review</p>
+          <p className="mt-1 text-[24px] font-semibold tabular-nums">{workspaceLoading ? "…" : workspaceError ? "—" : reviewQueueCount}</p>
+        </div>
+        {failedFiles.length > 0 ? (
+          <details className="sm:col-span-3">
+            <summary className="cursor-pointer text-[14px] font-medium text-warning">{failedFiles.length} import error{failedFiles.length === 1 ? "" : "s"} to review</summary>
+            <ul className="mt-2 space-y-1">
+              {failedFiles.map((file) => (
+                <li key={file.id} className="text-[14px] leading-[1.5] text-muted-foreground">
+                  <span className="font-medium text-foreground">{file.fileName}</span>: {file.errorMessage}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+      </section>
 
       <div className="flex items-start gap-2 rounded-lg border border-brand/20 bg-brand-soft/50 px-3.5 py-2.5 text-[11px] leading-relaxed text-brand-strong">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />

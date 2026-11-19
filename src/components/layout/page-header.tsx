@@ -19,18 +19,18 @@ export function PageHeader({ eyebrow, title, description, actions, backTo, class
         {backTo ? (
           <Link
             to={backTo.to}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1.5 text-[16px] font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             {backTo.label}
           </Link>
         ) : null}
         {eyebrow ? <p className="label-caps">{eyebrow}</p> : null}
-        <h1 className="font-display text-[30px] leading-[1.1] tracking-tight text-foreground sm:text-[38px]">
+        <h1 className="text-[30px] font-bold leading-[1.1] tracking-tight text-foreground sm:text-[32px]">
           {title}
         </h1>
         {description ? (
-          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <p className="max-w-2xl text-[17px] leading-[1.5] text-muted-foreground">{description}</p>
         ) : null}
       </div>
       {actions ? (

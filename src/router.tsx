@@ -1,11 +1,15 @@
 import { Navigate } from "react-router-dom";
+import { RedirectWithParams } from "./components/routing/redirect-with-params";
 import { RequireAuth } from "./components/auth/require-auth";
 import { RequireMember } from "./components/auth/require-member";
 import { AppShell } from "./components/layout/app-shell";
 import Cases from "./pages/cases";
 import CaseDetail from "./pages/cases/detail";
-import Dashboard from "./pages/dashboard";
+import Home from "./pages/dashboard";
+import Analytics from "./pages/dashboard/analytics";
 import DecisionCenter from "./pages/decision";
+import CreateMemo from "./pages/create-memo";
+import FindInvestors from "./pages/find-investors";
 import ImportsPage from "./pages/imports";
 import DealInbox from "./pages/deal-inbox";
 import VoiceCapture from "./pages/inbox/capture";
@@ -32,13 +36,20 @@ export const routers = [
       </RequireAuth>
     ),
     children: [
-      { index: true, name: "dashboard", element: <Dashboard /> },
+      { index: true, name: "home", element: <Home /> },
+      { path: "analytics", name: "analytics", element: <Analytics /> },
+      { path: "create-memo", name: "create-memo", element: <CreateMemo /> },
+      { path: "find-investors", name: "find-investors", element: <FindInvestors /> },
       { path: "inbox", name: "deal-inbox", element: <DealInbox /> },
       { path: "inbox/capture", name: "voice-capture", element: <VoiceCapture /> },
       { path: "cases", name: "cases", element: <Cases /> },
+      { path: "deals", name: "deals-redirect", element: <RedirectWithParams to="/cases" /> },
+      { path: "import-files", name: "import-files-redirect", element: <RedirectWithParams to="/imports" /> },
       { path: "cases/:id", name: "case-detail", element: <CaseDetail /> },
       { path: "tasks", name: "tasks-outreach", element: <DecisionCenter /> },
-      { path: "decision", name: "decision-center-redirect", element: <Navigate to="/tasks" replace /> },
+      { path: "decision", name: "decision-center-redirect", element: <RedirectWithParams to="/tasks" /> },
+      { path: "dashboard", name: "dashboard-redirect", element: <RedirectWithParams to="/analytics" /> },
+      { path: "pipeline", name: "pipeline-redirect", element: <RedirectWithParams to="/analytics" /> },
       { path: "investors", name: "investors", element: <Investors /> },
       { path: "investors/:id", name: "investor-detail", element: <InvestorDetail /> },
       { path: "matches", name: "matches", element: <Matches /> },

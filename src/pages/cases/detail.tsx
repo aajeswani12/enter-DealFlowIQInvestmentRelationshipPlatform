@@ -2,17 +2,21 @@ import {
   ArrowRight,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   Circle,
   CircleAlert,
   FilePlus2,
   FileText,
+  FolderInput,
   Loader2,
   Mic,
   Pencil,
+  PenLine,
   Plus,
   Search,
   Sparkles,
   Trash2,
+  UserRoundSearch,
 } from "lucide-react";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -31,6 +35,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -81,6 +91,12 @@ const CHECK_ICON = {
   Available: CheckCircle2,
   "Needs Review": CircleAlert,
   Missing: Circle,
+} as const;
+
+const MEMO_STATUS_LABEL = {
+  draft: "Draft",
+  needs_review: "Needs Review",
+  approved: "Approved",
 } as const;
 
 function firstSentences(value: string, count = 3): string {
@@ -353,59 +369,78 @@ const CaseDetail = () => {
   };
 
   return (
-    <div className="page-enter space-y-4">
+    <div className="page-enter space-y-7">
       <header className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <Link to="/cases" className="text-[10.5px] font-medium text-muted-foreground hover:text-foreground">
             ← Deals
           </Link>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-[26px] leading-none tracking-tight">{caseItem.companyName}</h1>
+            <h1 className="text-[32px] font-bold leading-tight tracking-tight">{caseItem.companyName}</h1>
             <CaseStatusPill status={caseItem.status} label={CASE_STATUS_LABEL[caseItem.status]} />
           </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[16px] text-muted-foreground">
             <span>{caseItem.sector || "Unknown"}</span>
             <span>{caseItem.roundStage || "Unknown"}</span>
-            {caseItem.isSynthetic ? <Pill tone="warning">Synthetic</Pill> : null}
+            <button type="button" onClick={() => setActiveTab("memo")} className="font-medium text-brand-strong hover:underline">
+              Memo: {caseMemos[0] ? MEMO_STATUS_LABEL[caseMemos[0].status] : "None"}
+            </button>
+            {caseItem.isSynthetic ? <Pill tone="warning" className="text-[14px]">Synthetic</Pill> : null}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild className="h-8 gap-1.5 text-[11px]">
-            <Link to={`/inbox/capture?deal=${caseItem.id}`}>
-              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-              Add Voice Note
-            </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="h-10 gap-2 text-[16px]">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add Information
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[220px]">
+              <DropdownMenuItem asChild className="text-[16px]">
+                <Link to={`/inbox/capture?deal=${caseItem.id}`} className="flex w-full items-center gap-2">
+                  <Mic className="h-4 w-4" aria-hidden="true" />Add voice note
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-[16px]" onSelect={() => setDocOpen(true)}>
+                <FilePlus2 className="h-4 w-4" aria-hidden="true" />Add document
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="text-[16px]">
+                <Link to="/imports" className="flex w-full items-center gap-2">
+                  <FolderInput className="h-4 w-4" aria-hidden="true" />Import files
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button asChild variant="outline" className="h-10 gap-2 text-[16px]">
+            <Link to={`/create-memo?deal=${caseItem.id}`}><PenLine className="h-4 w-4" aria-hidden="true" />Create Memo</Link>
           </Button>
-          <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => setDocOpen(true)}>
-            <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
-            Add Document
-          </Button>
-          <Button variant="outline" className="h-8 gap-1.5 text-[11px]" onClick={() => setActiveTab("memo")}>
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            Prepare Memo
+          <Button asChild variant="outline" className="h-10 gap-2 text-[16px]">
+            <Link to={`/find-investors?case=${caseItem.id}`}><UserRoundSearch className="h-4 w-4" aria-hidden="true" />Find Investors</Link>
           </Button>
         </div>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
         <div className="space-y-3">
           <section className="panel p-4" aria-labelledby="deal-summary-heading">
-            <h2 id="deal-summary-heading" className="text-[13.5px] font-semibold tracking-tight">Overview</h2>
-            <p className="mt-1.5 max-w-[70ch] text-[12.5px] leading-relaxed text-foreground/90">{summary}</p>
+            <h2 id="deal-summary-heading" className="text-[21px] font-semibold tracking-tight">Overview</h2>
+            <p className="mt-2 max-w-[70ch] text-[17px] leading-[1.5] text-foreground/90">{summary}</p>
           </section>
 
           <section className="panel p-4" aria-labelledby="key-facts-heading">
-            <h2 id="key-facts-heading" className="text-[13.5px] font-semibold tracking-tight">Key Facts</h2>
+            <h2 id="key-facts-heading" className="text-[21px] font-semibold tracking-tight">Key Facts</h2>
             <dl className="mt-2 space-y-1.5">
               {keyFacts.map((fact) => (
                 <div key={fact.label} className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
-                  <dt className="text-[10.5px] text-muted-foreground">{fact.label}</dt>
+                  <dt className="text-[14px] text-muted-foreground">{fact.label}</dt>
                   {fact.action ? (
-                    <button type="button" onClick={fact.action} className="text-right text-[11px] font-medium text-brand-strong hover:underline">
+                    <button type="button" onClick={fact.action} className="text-right text-[16px] font-medium text-brand-strong hover:underline">
                       {fact.value} →
                     </button>
                   ) : (
-                    <dd className="max-w-[70%] text-right text-[11px] font-medium">{fact.value}</dd>
+                    <dd className="max-w-[70%] text-right text-[16px] font-medium">{fact.value}</dd>
                   )}
                 </div>
               ))}
@@ -413,11 +448,11 @@ const CaseDetail = () => {
           </section>
 
           <section className="panel p-4" aria-labelledby="next-action-heading">
-            <h2 id="next-action-heading" className="text-[13.5px] font-semibold tracking-tight">Next Action</h2>
+            <h2 id="next-action-heading" className="text-[21px] font-semibold tracking-tight">Next Action</h2>
             <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[12px] leading-relaxed">{nextAction}</p>
+              <p className="text-[17px] leading-[1.5]">{nextAction}</p>
               {caseItem.nextStepDue ? (
-                <span className={isOverdue(caseItem.nextStepDue) ? "text-[10px] font-semibold text-destructive" : "text-[10px] text-muted-foreground"}>
+                <span className={isOverdue(caseItem.nextStepDue) ? "text-[14px] font-semibold text-destructive" : "text-[14px] text-muted-foreground"}>
                   {dueLabel(caseItem.nextStepDue)}
                 </span>
               ) : null}
@@ -426,8 +461,8 @@ const CaseDetail = () => {
 
           <section className="panel p-4" aria-labelledby="recent-heading">
             <div className="flex items-center justify-between">
-              <h2 id="recent-heading" className="text-[13.5px] font-semibold tracking-tight">Recent Activity</h2>
-              <button type="button" onClick={() => setActiveTab("activity")} className="text-[10px] font-medium text-brand-strong hover:underline">All activity</button>
+              <h2 id="recent-heading" className="text-[21px] font-semibold tracking-tight">Recent Activity</h2>
+              <button type="button" onClick={() => setActiveTab("activity")} className="text-[16px] font-medium text-brand-strong hover:underline">All activity</button>
             </div>
             {recentActivity.length > 0 ? (
               <ul className="mt-2 space-y-1.5">
@@ -435,34 +470,34 @@ const CaseDetail = () => {
                   <li key={entry.id}>
                     <button type="button" onClick={() => setActiveTab("activity")} className="flex w-full items-baseline justify-between gap-3 text-left">
                       <span className="min-w-0">
-                        <span className="block truncate text-[11px] font-medium">{entry.title}</span>
-                        <span className="text-[9.5px] text-muted-foreground">{entry.type}</span>
+                        <span className="block truncate text-[16px] font-medium">{entry.title}</span>
+                        <span className="text-[14px] text-muted-foreground">{entry.type}</span>
                       </span>
-                      <span className="shrink-0 text-[9.5px] text-muted-foreground">{entry.date ? formatShortDate(entry.date) : "Unknown date"}</span>
+                      <span className="shrink-0 text-[14px] text-muted-foreground">{entry.date ? formatShortDate(entry.date) : "Unknown date"}</span>
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-[11px] text-muted-foreground">No activity.</p>
+              <p className="mt-2 text-[16px] text-muted-foreground">No activity.</p>
             )}
           </section>
         </div>
 
         <aside className="space-y-3">
           <section className="panel p-4" aria-labelledby="deal-investors-heading">
-            <h2 id="deal-investors-heading" className="text-[13.5px] font-semibold tracking-tight">Investors on This Deal</h2>
+            <h2 id="deal-investors-heading" className="text-[21px] font-semibold tracking-tight">Investors on This Deal</h2>
             {manualRows.length > 0 ? (
               <ul className="mt-2 space-y-2">
                 {manualRows.map(({ association, investor, contact, lastActivity }) => (
                   <li key={association.id} className="border-b border-border/60 pb-2 last:border-0 last:pb-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <Link to={`/investors/${investor.id}`} className="text-[11.5px] font-medium hover:text-brand-strong">{investor.name}</Link>
-                        <p className="truncate text-[9.5px] text-muted-foreground">
+                        <Link to={`/investors/${investor.id}`} className="text-[16px] font-medium hover:text-brand-strong">{investor.name}</Link>
+                        <p className="truncate text-[14px] text-muted-foreground">
                           {contact?.contactName || "Unknown contact"}{contact?.email ? ` · ${contact.email}` : ""}
                         </p>
-                        <p className="text-[9px] text-muted-foreground">{RELATIONSHIP_LABEL[association.relationshipStatus]} · {lastActivity ? formatShortDate(lastActivity) : "No activity"}</p>
+                        <p className="text-[14px] text-muted-foreground">{RELATIONSHIP_LABEL[association.relationshipStatus]} · {lastActivity ? formatShortDate(lastActivity) : "No activity"}</p>
                       </div>
                       <button type="button" onClick={() => void removeInvestor(association, investor)} aria-label={`Remove ${investor.name} from deal`} className="rounded p-1 text-muted-foreground hover:text-destructive">
                         <Trash2 className="h-3 w-3" aria-hidden="true" />
@@ -472,13 +507,13 @@ const CaseDetail = () => {
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-[10.5px] text-muted-foreground">None associated.</p>
+              <p className="mt-2 text-[16px] text-muted-foreground">None associated.</p>
             )}
 
             <div className="mt-3 space-y-1.5 border-t border-border pt-2">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <Input value={investorSearch} onChange={(event) => setInvestorSearch(event.target.value)} placeholder="Search investors" className="h-8 bg-card pl-8 text-[10.5px]" />
+                <Input value={investorSearch} onChange={(event) => setInvestorSearch(event.target.value)} placeholder="Search investors" className="h-10 bg-card pl-8 text-[16px]" />
               </div>
               <SelectField
                 value={selectedInvestorId}
@@ -491,27 +526,27 @@ const CaseDetail = () => {
                 <div className="min-w-0 flex-1">
                   <SelectField value={associationStatus} onChange={(value) => setAssociationStatus(value as RelationshipStatus)} options={RELATIONSHIP_OPTIONS} ariaLabel="Relationship status" />
                 </div>
-                <Button size="sm" className="h-8 text-[10px]" onClick={() => void addInvestor()} disabled={!selectedInvestorId || actions.addDealInvestor.isPending}>
+                <Button size="sm" className="h-10 text-[16px]" onClick={() => void addInvestor()} disabled={!selectedInvestorId || actions.addDealInvestor.isPending}>
                   Add
                 </Button>
               </div>
             </div>
             {suggestedMatches.length > 0 ? (
-              <button type="button" onClick={() => setActiveTab("more")} className="mt-2 text-left text-[10px] font-medium text-brand-strong hover:underline">
+              <button type="button" onClick={() => setActiveTab("more")} className="mt-2 text-left text-[14px] font-medium text-brand-strong hover:underline">
                 Suggested investors ({suggestedMatches.length}) → distinct from associated
               </button>
             ) : null}
           </section>
 
           <section className="panel p-4" aria-labelledby="checklist-heading">
-            <h2 id="checklist-heading" className="text-[13.5px] font-semibold tracking-tight">Evidence Status</h2>
-            <p className="mt-0.5 text-[9px] text-muted-foreground">Availability, not verification or investment quality.</p>
+            <h2 id="checklist-heading" className="text-[21px] font-semibold tracking-tight">Evidence Status</h2>
+            <p className="mt-1 text-[14px] text-muted-foreground">Availability, not verification or investment quality.</p>
             <ul className="mt-2 space-y-1.5">
               {checklist.map((item) => {
                 const Icon = CHECK_ICON[item.status];
                 return (
                   <li key={item.key} title={item.detail} className="flex items-center justify-between gap-2 border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
-                    <span className="flex min-w-0 items-center gap-1.5 text-[10.5px] text-foreground/90">
+                    <span className="flex min-w-0 items-center gap-1.5 text-[16px] text-foreground/90">
                       <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
                       <span className="truncate">{item.label}</span>
                     </span>
@@ -538,8 +573,8 @@ const CaseDetail = () => {
               onKeyDown={(event) => handleTabKeyDown(event, index)}
               onClick={() => setActiveTab(tab.id)}
               className={activeTab === tab.id
-                ? "border-b-2 border-brand px-3 py-2 text-[11.5px] font-semibold text-brand-strong"
-                : "border-b-2 border-transparent px-3 py-2 text-[11.5px] font-medium text-muted-foreground hover:text-foreground"}
+                ? "border-b-2 border-brand px-4 py-3 text-[16px] font-semibold text-brand-strong"
+                : "border-b-2 border-transparent px-4 py-3 text-[16px] font-medium text-muted-foreground hover:text-foreground"}
             >
               {tab.label}
               {tab.id === "documents" ? ` · ${caseDocuments.length + sources.length}` : null}

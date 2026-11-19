@@ -70,9 +70,10 @@ function sanitizeExport(content: string): string {
 
 interface MemoWorkspaceProps {
   deal: InvestmentCase;
+  wizardMode?: boolean;
 }
 
-export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
+export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) {
   const { data } = useWorkspace();
   const { membership } = useAuth();
   const workspace = data ?? EMPTY_WORKSPACE;
@@ -476,27 +477,30 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
       <div className="panel p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 id="memo-workspace-heading" className="text-[14px] font-semibold tracking-tight">Memo</h2>
-            <Pill tone={STATUS_TONE[displayStatus]}>{statusLabel(displayStatus)}</Pill>
-            {currentMemo?.humanEdited ? <Pill tone="warning">Human-edited</Pill> : null}
-            {dirty ? <Pill tone="warning">Unsaved edits</Pill> : null}
-            {pendingChanges.length > 0 ? <Pill tone="warning">What Changed? · {pendingChanges.length}</Pill> : null}
+            <h2 id="memo-workspace-heading" className="text-[21px] font-semibold tracking-tight">{wizardMode ? "Review & Approve" : "Memo"}</h2>
+            <Pill tone={STATUS_TONE[displayStatus]} className="text-[14px]">{statusLabel(displayStatus)}</Pill>
+            {currentMemo?.humanEdited ? <Pill tone="warning" className="text-[14px]">Human-edited</Pill> : null}
+            {dirty ? <Pill tone="warning" className="text-[14px]">Unsaved edits</Pill> : null}
+            {pendingChanges.length > 0 ? <Pill tone="warning" className="text-[14px]">What Changed? · {pendingChanges.length}</Pill> : null}
             {!canApprove ? <span className="inline-flex items-center gap-1 text-[9px] text-muted-foreground"><Lock className="h-3 w-3" aria-hidden="true" />Approval: owner or partner</span> : null}
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => void save()} disabled={!canWrite || busy || !viewingLatest}>Save</Button>
-            <Button size="sm" variant="outline" className="h-7 gap-1 text-[10px]" onClick={() => void generate()} disabled={!canWrite || busy || !viewingLatest}>
-              {busy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <Sparkles className="h-3 w-3" aria-hidden="true" />}
-              Generate
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => void copyApproved()} disabled={!approvedForExport}>Copy</Button>
-            <Button size="sm" variant="outline" className="h-7 gap-1 text-[10px]" onClick={downloadApproved} disabled={!approvedForExport}><Download className="h-3 w-3" aria-hidden="true" />.md</Button>
+            <Button size="sm" variant="outline" className="h-9 text-[16px]" onClick={() => void save()} disabled={!canWrite || busy || !viewingLatest}>Save</Button>
+            {!wizardMode ? (
+              <Button size="sm" variant="outline" className="h-7 gap-1 text-[10px]" onClick={() => void generate()} disabled={!canWrite || busy || !viewingLatest}>
+                {busy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <Sparkles className="h-3 w-3" aria-hidden="true" />}
+                Generate
+              </Button>
+            ) : null}
+            <Button size="sm" variant="outline" className="h-9 text-[16px]" onClick={() => void copyApproved()} disabled={!approvedForExport}>Copy</Button>
+            <Button size="sm" variant="outline" className="h-9 gap-1 text-[16px]" onClick={downloadApproved} disabled={!approvedForExport}><Download className="h-4 w-4" aria-hidden="true" />.md</Button>
             {selectedVersion?.templateKind === "external" ? (
-              <Button size="sm" className="h-7 text-[10px]" onClick={() => { setExportOpen(true); setExportConfirmed(false); }} disabled={!approvedForExport || !canApprove}>Export external</Button>
+              <Button size="sm" className="h-9 text-[16px]" onClick={() => { setExportOpen(true); setExportConfirmed(false); }} disabled={!approvedForExport || !canApprove}>Export external</Button>
             ) : null}
           </div>
         </div>
 
+        {!wizardMode ? (
         <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="memo-template" className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Template</label>
@@ -539,6 +543,7 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
             ))}
           </div>
         </div>
+        ) : null}
         {notice ? <p className="mt-1.5 text-[9.5px] text-success">{notice}</p> : null}
         {error ? (
           <p role="alert" className="mt-1.5 flex items-start gap-1.5 rounded-md border border-destructive/20 bg-danger-soft px-2.5 py-1.5 text-[10px] leading-relaxed text-destructive">
@@ -564,7 +569,7 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
             value={selectedTitle}
             onChange={(event) => setTitle(event.target.value)}
             readOnly={!viewingLatest || !canWrite}
-            className="h-9 border-0 bg-transparent px-0 text-[16px] font-semibold shadow-none focus-visible:ring-0"
+            className="h-10 border-0 bg-transparent px-0 text-[21px] font-semibold shadow-none focus-visible:ring-0"
             aria-label="Memo title"
           />
           <p className="mt-0.5 text-[9px] text-muted-foreground">
@@ -577,7 +582,7 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
               onChange={(event) => setContent(event.target.value)}
               readOnly={!canWrite}
               rows={22}
-              className="mt-2 min-h-[440px] resize-y border-0 bg-transparent px-0 font-mono text-[10.5px] leading-relaxed shadow-none focus-visible:ring-0"
+              className="mt-2 min-h-[440px] resize-y border-0 bg-transparent px-0 text-[17px] leading-[1.5] shadow-none focus-visible:ring-0"
               aria-label="Memo content"
               placeholder="No memo yet. Choose a template, set focus areas, and generate a source-grounded draft."
             />
@@ -589,8 +594,8 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
             <div className="flex gap-1.5">
               {canApprove ? (
                 <>
-                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => { setApprovalOpen("revision_requested"); setApprovalNote(""); }} disabled={!currentMemo || !latestVersion || dirty || !viewingLatest || busy}>Return for revision</Button>
-                  <Button size="sm" className="h-7 gap-1 text-[10px]" onClick={() => { setApprovalOpen("approved"); setApprovalNote(""); }} disabled={!currentMemo || !latestVersion || dirty || !viewingLatest || status === "approved" || busy}><Check className="h-3 w-3" aria-hidden="true" />Approve</Button>
+                  <Button size="sm" variant="outline" className="h-9 text-[16px]" onClick={() => { setApprovalOpen("revision_requested"); setApprovalNote(""); }} disabled={!currentMemo || !latestVersion || dirty || !viewingLatest || busy}>Return for revision</Button>
+                  <Button size="sm" className="h-9 gap-1 text-[16px]" onClick={() => { setApprovalOpen("approved"); setApprovalNote(""); }} disabled={!currentMemo || !latestVersion || dirty || !viewingLatest || status === "approved" || busy}><Check className="h-3 w-3" aria-hidden="true" />Approve</Button>
                 </>
               ) : null}
             </div>
@@ -605,7 +610,7 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
             </summary>
             <div className="mt-2 space-y-2">
               <div className="flex flex-wrap gap-1.5">
-                <Pill tone={STATUS_TONE[displayStatus]}>{statusLabel(displayStatus)}</Pill>
+                <Pill tone={STATUS_TONE[displayStatus]} className="text-[14px]">{statusLabel(displayStatus)}</Pill>
                 {dirty ? <Pill tone="warning">Save before approval</Pill> : null}
                 <span className="text-[9px] text-muted-foreground">{includedClaims.length} evidence item{includedClaims.length === 1 ? "" : "s"}</span>
               </div>

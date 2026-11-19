@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Briefcase,
   ClipboardCheck,
   FolderInput,
@@ -7,7 +8,9 @@ import {
   LogOut,
   Menu,
   Mic,
+  PenLine,
   ShieldCheck,
+  UserRoundSearch,
   Users,
   Waypoints,
   X,
@@ -25,14 +28,17 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/", label: "Home", short: "Home", icon: LayoutDashboard, end: true },
   { to: "/cases", label: "Deals", short: "Deals", icon: Briefcase },
-  { to: "/imports", label: "Import Data", short: "Import", icon: FolderInput },
-  { to: "/investors", label: "Investor Network", short: "Investors", icon: Users },
-  { to: "/tasks", label: "Tasks & Outreach", short: "Tasks", icon: ClipboardCheck },
+  { to: "/create-memo", label: "Create Memo", short: "Memo", icon: PenLine },
+  { to: "/find-investors", label: "Find Investors", short: "Investors", icon: UserRoundSearch },
+  { to: "/imports", label: "Import Files", short: "Import", icon: FolderInput },
 ];
 
 const SECONDARY_NAV = [
   { to: "/inbox", label: "Deal Inbox", short: "Inbox", icon: Inbox },
-  { to: "/matches", label: "Suggested Investors", short: "Matches", icon: Waypoints },
+  { to: "/investors", label: "Investor Directory", short: "Directory", icon: Users },
+  { to: "/matches", label: "Advanced Matching", short: "Matching", icon: Waypoints },
+  { to: "/tasks", label: "Tasks & Outreach", short: "Tasks", icon: ClipboardCheck },
+  { to: "/analytics", label: "Pipeline & Analytics", short: "Analytics", icon: BarChart3 },
 ];
 
 function BrandLink({
@@ -64,7 +70,7 @@ function NavItems({ onNavigate, variant }: { onNavigate?: () => void; variant: "
       onClick={onNavigate}
       className={({ isActive }) =>
         cn(
-          "group flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-medium transition-colors",
+          "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[17px] font-medium transition-colors",
           isActive
             ? "bg-sidebar-accent text-sidebar-accent-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
@@ -91,7 +97,7 @@ function NavItems({ onNavigate, variant }: { onNavigate?: () => void; variant: "
   return (
     <nav aria-label="Primary" className="space-y-0.5">
       {NAV.map(renderItem)}
-      <p className="px-3 pb-1 pt-4 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45">
+      <p className="px-3 pb-1 pt-5 text-[14px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">
         More
       </p>
       {SECONDARY_NAV.map(renderItem)}
@@ -113,7 +119,7 @@ function MobileNav() {
               end={item.end}
               className={({ isActive }) =>
                 cn(
-                  "flex flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-medium transition-colors",
+                  "flex flex-col items-center gap-1 px-0.5 py-2.5 text-[11px] font-medium leading-tight transition-colors",
                   isActive ? "text-brand-strong" : "text-muted-foreground",
                 )
               }
@@ -121,7 +127,7 @@ function MobileNav() {
               {({ isActive }) => (
                 <>
                   <item.icon className={cn("h-[18px] w-[18px]", isActive && "text-brand")} aria-hidden="true" />
-                  <span className="truncate">{item.short}</span>
+                  <span className="text-center">{item.label}</span>
                 </>
               )}
             </NavLink>
@@ -159,7 +165,7 @@ export function AppShell() {
         <div className="mt-6 px-2">
           <Button
             asChild
-            className="h-9 w-full justify-start gap-2 rounded-lg bg-sidebar-primary text-[13px] font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
+            className="h-10 w-full justify-start gap-2 rounded-lg bg-sidebar-primary text-[16px] font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
           >
             <Link to="/inbox/capture">
               <Mic className="h-4 w-4" aria-hidden="true" />
@@ -169,7 +175,7 @@ export function AppShell() {
         </div>
 
         <div className="mt-6 flex-1 overflow-y-auto">
-          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/50">
+          <p className="px-3 pb-2 text-[14px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">
             Workspace
           </p>
           <NavItems variant="sidebar" />
@@ -181,15 +187,15 @@ export function AppShell() {
               {initials(email)}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-[11.5px] font-medium text-sidebar-accent-foreground">{email}</p>
-              <p className="text-[9.5px] uppercase tracking-[0.14em] text-sidebar-foreground/50">
+              <p className="truncate text-[14px] font-medium text-sidebar-accent-foreground">{email}</p>
+              <p className="text-[14px] uppercase tracking-[0.08em] text-sidebar-foreground/60">
                 {membership?.role ?? "member"} · Talok Capital
               </p>
             </div>
           </div>
           <Link
             to="/workspace"
-            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[11px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-accent-foreground"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-[14px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-accent-foreground"
           >
             <ShieldCheck className="h-3 w-3" aria-hidden="true" />
             Team access
@@ -197,7 +203,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => void signOut()}
-            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[11px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-accent-foreground"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-[14px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-accent-foreground"
           >
             <LogOut className="h-3 w-3" aria-hidden="true" />
             Sign out
@@ -228,13 +234,13 @@ export function AppShell() {
             </div>
           </div>
           <div className="flex items-center justify-between px-4 pb-2">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="text-[14px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
               {active?.label ?? "Workspace"}
             </p>
           </div>
         </header>
 
-        <main id="main-content" className="mx-auto w-full max-w-[1280px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10">
+        <main id="main-content" className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10">
           {isError ? (
             <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/25 bg-danger-soft px-4 py-3">
               <div>
@@ -273,7 +279,7 @@ export function AppShell() {
             <div className="mt-6">
               <Button
                 asChild
-                className="h-10 w-full justify-start gap-2 rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
+                className="h-11 w-full justify-start gap-2 rounded-lg bg-sidebar-primary text-[16px] font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
               >
                 <Link to="/inbox/capture" onClick={() => setMenuOpen(false)}>
                   <Mic className="h-4 w-4" aria-hidden="true" />
@@ -282,12 +288,12 @@ export function AppShell() {
               </Button>
             </div>
             <div className="mt-6 flex-1">
-              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/50">
+              <p className="px-3 pb-2 text-[14px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">
                 Workspace
               </p>
               <NavItems variant="drawer" onNavigate={() => setMenuOpen(false)} />
             </div>
-            <div className="space-y-2 border-t border-sidebar-border px-3 pt-4 text-[11px] leading-relaxed text-sidebar-foreground/60">
+            <div className="space-y-2 border-t border-sidebar-border px-3 pt-4 text-[14px] leading-relaxed text-sidebar-foreground/60">
               <p className="truncate">{email}</p>
               <Link
                 to="/workspace"
