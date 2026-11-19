@@ -20,11 +20,13 @@ interface InteractionFormProps {
   investorId: string;
   deals: InvestmentCase[];
   contacts: InvestorContact[];
+  initialKind?: InteractionKind;
 }
 
-export function InteractionForm({ open, onOpenChange, investorId, deals, contacts }: InteractionFormProps) {
+export function InteractionForm({ open, onOpenChange, investorId, deals, contacts, initialKind = "call" }: InteractionFormProps) {
   const isMobile = useIsMobile();
   const actions = useWorkspaceActions();
+  const noteMode = initialKind === "note";
   const [kind, setKind] = useState<InteractionKind>("call");
   const [summary, setSummary] = useState("");
   const [occurredAt, setOccurredAt] = useState(toDateInputValue(new Date().toISOString()));
@@ -36,7 +38,7 @@ export function InteractionForm({ open, onOpenChange, investorId, deals, contact
 
   useEffect(() => {
     if (!open) return;
-    setKind("call");
+    setKind(initialKind);
     setSummary("");
     setOccurredAt(toDateInputValue(new Date().toISOString()));
     setNextStep("");
@@ -44,7 +46,7 @@ export function InteractionForm({ open, onOpenChange, investorId, deals, contact
     setDealId("none");
     setContactId(contacts.find((contact) => contact.isPrimary)?.id ?? "none");
     setError("");
-  }, [open, contacts]);
+  }, [open, contacts, initialKind]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -63,7 +65,7 @@ export function InteractionForm({ open, onOpenChange, investorId, deals, contact
         nextStep: nextStep.trim(),
         nextStepDue: fromDateInputValue(nextStepDue),
       });
-      toast.success("Interaction logged");
+      toast.success(noteMode ? "Note saved" : "Interaction logged");
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not log this interaction.");
@@ -80,9 +82,11 @@ export function InteractionForm({ open, onOpenChange, investorId, deals, contact
         )}
       >
         <SheetHeader className="border-b border-border px-5 py-4 text-left">
-          <SheetTitle className="font-display text-2xl tracking-tight">Log an interaction</SheetTitle>
+          <SheetTitle className="font-display text-2xl tracking-tight">{noteMode ? "Add note" : "Log an interaction"}</SheetTitle>
           <SheetDescription className="text-[13px] leading-relaxed">
-            What was said, and what happens next. This also updates the relationship's last-contact date.
+            {noteMode
+              ? "Capture a relationship note. It is stored in the investor activity history."
+              : "What was said, and what happens next. This also updates the relationship's last-contact date."}
           </SheetDescription>
         </SheetHeader>
 
@@ -179,7 +183,7 @@ export function InteractionForm({ open, onOpenChange, investorId, deals, contact
             </Button>
             <Button type="submit" className="gap-1.5" disabled={actions.createInteraction.isPending}>
               <Plus className="h-4 w-4" aria-hidden="true" />
-              {actions.createInteraction.isPending ? "Saving…" : "Log interaction"}
+              {actions.createInteraction.isPending ? "Saving…" : noteMode ? "Save note" : "Log interaction"}
             </Button>
           </div>
         </form>
