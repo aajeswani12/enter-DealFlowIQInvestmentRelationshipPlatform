@@ -685,6 +685,118 @@ async function aiToken(): Promise<string | null> {
   return Deno.env.get("AI_API_TOKEN_6f92e2693b09") ?? null;
 }
 
+function collectAiText(value: unknown, depth = 0): string {
+  if (value === null || value === undefined || depth > 7) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => collectAiText(item, depth + 1)).filter(Boolean).join("\n").trim();
+  }
+  if (typeof value !== "object") return "";
+  const object = value as Record<string, unknown>;
+  for (const key of ["text", "output_text", "content", "reasoning_content", "response", "message"]) {
+    const text = collectAiText(object[key], depth + 1);
+    if (text) return text;
+  }
+  return "";
+}
+
+function extractAiText(raw: string): { content: string; error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { content: "", error: "The AI gateway returned an empty body. Nothing was saved." };
+  }
+
+  const candidates: unknown[] = [];
+  let fromSse = false;
+  try {
+    candidates.push(JSON.parse(trimmed));
+  } catch {
+    fromSse = true;
+    const dataLines = trimmed
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim())
+      .filter((line) => line && line !== "[DONE]");
+    for (const line of dataLines) {
+      try { candidates.push(JSON.parse(line)); } catch { /* ignore malformed event */ }
+    }
+  }
+
+  if (candidates.length === 0) {
+    return {
+      content: "",
+      error: `The AI gateway returned HTTP 200 with a non-JSON body (${trimmed.slice(0, 80).replace(/\s+/g, " ")}). Nothing was saved.`,
+    };
+  }
+
+  const finishReasons: string[] = [];
+  const keys = new Set<string>();
+
+  const readObject = (value: unknown, depth = 0): string => {
+    if (value === null || value === undefined || depth > 7) return "";
+    if (typeof value === "string") return value.trim();
+    if (Array.isArray(value)) {
+      return value.map((item) => readObject(item, depth + 1)).filter(Boolean).join("\n").trim();
+    }
+    if (typeof value !== "object") return "";
+    const object = value as Record<string, unknown>;
+    if (depth === 0) Object.keys(object).forEach((key) => keys.add(key));
+
+    if (object.error) {
+      const errorObject = typeof object.error === "object" && object.error !== null
+        ? object.error as Record<string, unknown>
+        : null;
+      const message = errorObject ? String(errorObject.message ?? "") : String(object.error);
+      if (message.trim()) return `__ERROR__:${message.trim()}`;
+    }
+
+    for (const key of ["output_text", "response", "content", "text", "message", "result", "data", "output"]) {
+      const text = readObject(object[key], depth + 1);
+      if (text) return text;
+    }
+
+    const choices = Array.isArray(object.choices) ? object.choices : [];
+    for (const choice of choices) {
+      if (!choice || typeof choice !== "object") continue;
+      const choiceObject = choice as Record<string, unknown>;
+      const finish = String(choiceObject.finish_reason ?? "");
+      if (finish) finishReasons.push(finish);
+      const message = choiceObject.message && typeof choiceObject.message === "object"
+        ? choiceObject.message as Record<string, unknown>
+        : null;
+      const delta = choiceObject.delta && typeof choiceObject.delta === "object"
+        ? choiceObject.delta as Record<string, unknown>
+        : null;
+      const text = collectAiText(message?.content ?? message?.reasoning_content ?? delta?.content ?? choiceObject.text);
+      if (text) return text;
+    }
+
+    const output = Array.isArray(object.output) ? object.output : [];
+    for (const item of output) {
+      const text = readObject(item, depth + 1);
+      if (text) return text;
+    }
+    return "";
+  };
+
+  const texts: string[] = [];
+  for (const candidate of candidates) {
+    const text = readObject(candidate);
+    if (text.startsWith("__ERROR__:")) {
+      return { content: "", error: `${text.slice("__ERROR__:".length)} Nothing was saved.` };
+    }
+    if (text) texts.push(text);
+  }
+
+  const content = texts.join(fromSse ? "" : "\n").trim();
+  if (content) return { content };
+  const finish = finishReasons.length > 0 ? ` Finish reason: ${[...new Set(finishReasons)].join(", ")}.` : "";
+  return {
+    content: "",
+    error: `The AI gateway returned HTTP 200 but no readable message text (keys: ${[...keys].join(", ") || "none"}).${finish} Nothing was saved.`,
+  };
+}
+
 async function aiCall(system: string, user: string, sessionId: string, maxTokens: number): Promise<string> {
   const token = await aiToken();
   if (!token) {
@@ -714,22 +826,20 @@ async function aiCall(system: string, user: string, sessionId: string, maxTokens
     console.error("caseIntelligence: AI gateway error", response.status);
     let message = "AI is temporarily unavailable. Nothing was saved.";
     try {
-      const parsed = JSON.parse(raw) as { error?: { message?: string } };
+      const parsed = JSON.parse(raw) as { error?: { message?: string }; message?: string };
       if (parsed.error?.message) message = parsed.error.message;
+      else if (parsed.message) message = parsed.message;
     } catch {
       // generic
     }
     throw new Error(message);
   }
   const raw = await response.text();
-  try {
-    const parsed = JSON.parse(raw) as { choices?: { message?: { content?: string } }[] };
-    const content = parsed.choices?.[0]?.message?.content ?? "";
-    if (!content.trim()) throw new Error("AI returned an empty response.");
-    return content;
-  } catch {
-    throw new Error("AI returned an unreadable response. Nothing was saved.");
+  const extracted = extractAiText(raw);
+  if (!extracted.content) {
+    throw new Error(extracted.error ?? "The AI gateway returned no readable text. Nothing was saved.");
   }
+  return extracted.content;
 }
 
 function parseJsonObject(content: string): JsonRecord | null {
