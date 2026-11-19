@@ -1760,6 +1760,18 @@ export const api = {
     return (data ?? { status: "failed" }) as unknown as FactProposalReviewResponse;
   },
 
+  async createMemoRevision(input: {
+    memoId: string;
+    proposalId: string;
+  }): Promise<{ status: string; memo_id?: string; version_id?: string; version_number?: number; idempotent?: boolean }> {
+    const { data, error } = await supabase.rpc("create_memo_revision_from_proposal", {
+      p_memo_id: input.memoId,
+      p_proposal_id: input.proposalId,
+    });
+    if (error) throw new Error(error.message || "The memo revision was not created.");
+    return (data ?? { status: "failed" }) as { status: string; memo_id?: string; version_id?: string; version_number?: number; idempotent?: boolean };
+  },
+
   async approveDealMemo(input: {
     memoId: string;
     versionId: string;

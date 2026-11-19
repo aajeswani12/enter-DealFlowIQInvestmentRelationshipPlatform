@@ -4062,6 +4062,7 @@ export type Database = {
           id: string
           memo_id: string
           origin: string
+          revision_proposal_id: string | null
           source_ids: string[]
           template_id: string | null
           template_kind: string
@@ -4081,6 +4082,7 @@ export type Database = {
           id?: string
           memo_id: string
           origin?: string
+          revision_proposal_id?: string | null
           source_ids?: string[]
           template_id?: string | null
           template_kind?: string
@@ -4100,6 +4102,7 @@ export type Database = {
           id?: string
           memo_id?: string
           origin?: string
+          revision_proposal_id?: string | null
           source_ids?: string[]
           template_id?: string | null
           template_kind?: string
@@ -4119,6 +4122,13 @@ export type Database = {
             columns: ["memo_id"]
             isOneToOne: false
             referencedRelation: "deal_memos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_memo_versions_revision_proposal_id_fkey"
+            columns: ["revision_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "case_fact_proposals"
             referencedColumns: ["id"]
           },
           {
@@ -4144,6 +4154,7 @@ export type Database = {
           human_edited: boolean
           id: string
           origin: string
+          revision_proposal_id: string | null
           source_ids: string[]
           status: string
           template_id: string | null
@@ -4165,6 +4176,7 @@ export type Database = {
           human_edited?: boolean
           id?: string
           origin?: string
+          revision_proposal_id?: string | null
           source_ids?: string[]
           status?: string
           template_id?: string | null
@@ -4186,6 +4198,7 @@ export type Database = {
           human_edited?: boolean
           id?: string
           origin?: string
+          revision_proposal_id?: string | null
           source_ids?: string[]
           status?: string
           template_id?: string | null
@@ -4200,6 +4213,13 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_memos_revision_proposal_id_fkey"
+            columns: ["revision_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "case_fact_proposals"
             referencedColumns: ["id"]
           },
           {
@@ -5512,6 +5532,10 @@ export type Database = {
       }
       can_write_project: { Args: never; Returns: boolean }
       claim_workspace: { Args: never; Returns: string }
+      create_memo_revision_from_proposal: {
+        Args: { p_memo_id: string; p_proposal_id: string }
+        Returns: Json
+      }
       current_member_role: { Args: never; Returns: string }
       decide_deal_match: {
         Args: { p_match_id: string; p_status: string }

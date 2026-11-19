@@ -67,6 +67,22 @@ interface MemoDeltaProps {
   currentMemo: DealMemo | null;
   onMemoCreated: (memo: DealMemo) => void;
   reviewOnly?: boolean;
+  onAccepted?: (proposal: CaseFactProposal) => void | Promise<void>;
+}
+
+function affectedSections(proposal: CaseFactProposal): string[] {
+  if (["traction", "revenue", "financial", "metric", "product"].includes(proposal.claimType)) {
+    return ["Funding / Traction", "Market / business model"];
+  }
+  if (["founder", "company"].includes(proposal.claimType)) return ["Company / product / founders"];
+  if (["funding", "ownership"].includes(proposal.claimType)) return ["Funding / Traction"];
+  if (proposal.claimType === "sector") return ["Market / business model"];
+  return ["Investment considerations", "Risks / open questions"];
+}
+
+function proposedMemoChange(proposal: CaseFactProposal): string {
+  const previous = proposal.previousValueText || "Not recorded";
+  return `${proposal.label}: ${previous} → ${proposal.valueText}${proposal.reportingPeriod ? ` (${proposal.reportingPeriod})` : ""}`;
 }
 
 interface EditState {
@@ -102,6 +118,7 @@ export function MemoDelta({
   currentMemo,
   onMemoCreated,
   reviewOnly = false,
+  onAccepted,
 }: MemoDeltaProps) {
   const actions = useWorkspaceActions();
   const [sourceChoice, setSourceChoice] = useState("");
@@ -352,9 +369,9 @@ export function MemoDelta({
       <section className="panel p-4" aria-labelledby="delta-heading">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="label-caps">Living memo</p>
+            <p className="label-caps">{reviewOnly ? "What Changed?" : "Living memo"}</p>
             <h2 id="delta-heading" className="mt-0.5 text-[13.5px] font-semibold tracking-tight">
-              Review new evidence
+              {reviewOnly ? "Review source changes" : "Review new evidence"}
             </h2>
             <p className="mt-0.5 max-w-2xl text-[10.5px] leading-relaxed text-muted-foreground">
               AI proposes facts only from an associated source. Every proposal needs human approval; rejected or edited proposals never silently change canonical facts.
@@ -449,7 +466,7 @@ export function MemoDelta({
 
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
                       <div className="rounded-md border border-border bg-secondary/20 px-2.5 py-2">
-                        <p className="label-caps">Previously reviewed</p>
+                        <p className="label-caps">Previous information</p>
                         <p className="mt-1 text-[11.5px] font-medium">
                           {previous ? `${previous.label}: ${previous.valueText}` : "No matching reviewed fact"}
                         </p>
@@ -468,15 +485,26 @@ export function MemoDelta({
                         ) : null}
                       </div>
                       <div className="rounded-md border border-brand/25 bg-brand-soft/30 px-2.5 py-2">
-                        <p className="label-caps">Proposed</p>
+                        <p className="label-caps">New information</p>
                         <p className="mt-1 text-[11.5px] font-medium">{proposal.label}: {proposal.valueText}</p>
                         <p className="mt-0.5 text-[9.5px] text-muted-foreground">
                           {proposal.reportingPeriod || "period not stated"} · {proposal.currency} · {proposal.metricDefinition || "definition not stated"}
                         </p>
-                        <p className="mt-1 line-clamp-3 text-[9.5px] leading-relaxed text-muted-foreground">“{proposal.sourceExcerpt}”</p>
+                        <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Source evidence</p>
+                        <p className="mt-0.5 line-clamp-3 text-[9.5px] leading-relaxed text-muted-foreground">“{proposal.sourceExcerpt}”</p>
                         <button type="button" onClick={() => void openSource(proposal)} className="mt-1 inline-flex items-center gap-1 text-[9.5px] font-medium text-brand-strong hover:underline">
                           Open source <ArrowUpRight className="h-2.5 w-2.5" aria-hidden="true" />
                         </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <div>
+                        <p className="label-caps">Affected memo sections</p>
+                        <p className="mt-0.5 text-[9.5px] text-muted-foreground">{affectedSections(proposal).join(" · ")}</p>
+                      </div>
+                      <div>
+                        <p className="label-caps">Proposed memo change</p>
+                        <p className="mt-0.5 text-[9.5px] text-muted-foreground">{proposedMemoChange(proposal)}</p>
                       </div>
                     </div>
                     {proposal.reason ? <p className="mt-1.5 text-[9.5px] leading-relaxed text-muted-foreground">{proposal.reason}</p> : null}

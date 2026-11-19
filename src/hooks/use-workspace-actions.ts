@@ -37,6 +37,10 @@ export function useWorkspaceActions() {
       mutationFn: api.generateCaseMemo,
       onSuccess: invalidate,
     }),
+    createMemoRevision: useMutation({
+      mutationFn: api.createMemoRevision,
+      onSuccess: invalidate,
+    }),
     approveDealMemo: useMutation({
       mutationFn: api.approveDealMemo,
       onSuccess: invalidate,

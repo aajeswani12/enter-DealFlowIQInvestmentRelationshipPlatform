@@ -1,0 +1,109 @@
+alter table public.deal_memos add column if not exists revision_proposal_id uuid references public.case_fact_proposals(id) on delete set null;
+create unique index if not exists deal_memos_revision_proposal_idx on public.deal_memos (revision_proposal_id) where revision_proposal_id is not null;
+alter table public.deal_memo_versions add column if not exists revision_proposal_id uuid references public.case_fact_proposals(id) on delete set null;
+
+create or replace function public.snapshot_deal_memo_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_next integer;
+begin
+  if tg_op = 'UPDATE'
+     and new.content is not distinct from old.content
+     and new.title is not distinct from old.title
+     and new.origin is not distinct from old.origin
+     and new.generation_model is not distinct from old.generation_model
+     and new.source_ids is not distinct from old.source_ids
+     and new.approved_proposal_ids is not distinct from old.approved_proposal_ids
+     and new.human_edited is not distinct from old.human_edited
+     and new.template_kind is not distinct from old.template_kind
+     and new.template_id is not distinct from old.template_id
+     and new.focus_areas is not distinct from old.focus_areas
+     and new.revision_proposal_id is not distinct from old.revision_proposal_id then
+    return new;
+  end if;
+  select coalesce(max(version_number), 0) + 1 into v_next from public.deal_memo_versions where memo_id = new.id;
+  insert into public.deal_memo_versions (
+    memo_id, deal_id, version_number, title, content, origin, generation_model,
+    source_ids, approved_proposal_ids, human_edited, edited_by, created_by,
+    template_kind, template_id, focus_areas, revision_proposal_id
+  ) values (
+    new.id, new.deal_id, v_next, new.title, new.content, coalesce(new.origin, 'manual'),
+    coalesce(new.generation_model, ''), coalesce(new.source_ids, '{}'::uuid[]),
+    coalesce(new.approved_proposal_ids, '{}'::uuid[]), coalesce(new.human_edited, false),
+    new.edited_by, coalesce(new.updated_by, new.created_by),
+    coalesce(new.template_kind, 'internal'), new.template_id, coalesce(new.focus_areas, '{}'::text[]),
+    new.revision_proposal_id
+  );
+  return new;
+end;
+$$;
+
+create or replace function public.create_memo_revision_from_proposal(p_memo_id uuid, p_proposal_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_base public.deal_memos%rowtype;
+  v_proposal public.case_fact_proposals%rowtype;
+  v_existing public.deal_memos%rowtype;
+  v_sections text;
+  v_change text;
+  v_content text;
+  v_memo_id uuid;
+  v_version public.deal_memo_versions%rowtype;
+begin
+  if auth.uid() is null or not public.can_write_project() then
+    raise exception 'You need project write access to create a memo revision.' using errcode = '42501';
+  end if;
+  select * into v_proposal from public.case_fact_proposals where id = p_proposal_id and status = 'accepted';
+  if not found then return jsonb_build_object('status','not_accepted'); end if;
+  select * into v_base from public.deal_memos where id = p_memo_id and deal_id = v_proposal.deal_id;
+  if not found then return jsonb_build_object('status','no_base'); end if;
+  select * into v_existing from public.deal_memos where revision_proposal_id = p_proposal_id limit 1;
+  if found then
+    select * into v_version from public.deal_memo_versions where memo_id = v_existing.id order by version_number desc limit 1;
+    return jsonb_build_object('status','created','memo_id',v_existing.id,'version_id',v_version.id,'version_number',v_version.version_number,'idempotent',true);
+  end if;
+  v_sections := case
+    when v_proposal.claim_type in ('traction','revenue','financial','metric','product') then 'FUNDING / TRACTION; MARKET / BUSINESS MODEL'
+    when v_proposal.claim_type in ('founder','company') then 'COMPANY / PRODUCT / FOUNDERS'
+    when v_proposal.claim_type in ('funding','ownership') then 'FUNDING / TRACTION'
+    when v_proposal.claim_type = 'sector' then 'MARKET / BUSINESS MODEL'
+    else 'INVESTMENT CONSIDERATIONS; RISKS / OPEN QUESTIONS'
+  end;
+  v_change := 'WHAT CHANGED — ' || coalesce(v_proposal.source_title,'Source') || ' (' || to_char(v_proposal.source_date,'YYYY-MM-DD') || E')\n' ||
+    'Affected memo sections: ' || v_sections || E'\n' ||
+    'Previous information: ' || coalesce(nullif(v_proposal.previous_value_text,''),'Not recorded') ||
+    case when v_proposal.previous_period <> '' then ' (' || v_proposal.previous_period || ')' else '' end || E'\n' ||
+    'New information: ' || v_proposal.label || ': ' || v_proposal.value_text ||
+    case when v_proposal.reporting_period <> '' then ' (' || v_proposal.reporting_period || ')' else '' end || E'\n' ||
+    'Source evidence: "' || v_proposal.source_excerpt || '"' || E'\n' ||
+    'Review status: approved by an authorized reviewer. This memo revision is a DRAFT and requires its own approval.';
+  v_content := v_base.content || E'\n\n' || v_change;
+  insert into public.deal_memos (
+    deal_id, title, content, status, origin, generation_model, source_ids, approved_proposal_ids,
+    template_kind, template_id, focus_areas, human_edited, edited_by, created_by, updated_by,
+    revision_proposal_id
+  ) values (
+    v_base.deal_id, 'Revision — ' || v_base.title, v_content, 'draft', 'manual', 'source-delta revision',
+    case when v_proposal.source_document_id is not null then array[v_proposal.source_document_id]::uuid[]
+         when v_proposal.source_capture_id is not null then array[v_proposal.source_capture_id]::uuid[]
+         else '{}'::uuid[] end || coalesce(v_base.source_ids,'{}'::uuid[]),
+    array_append(coalesce(v_base.approved_proposal_ids,'{}'::uuid[]), p_proposal_id),
+    v_base.template_kind, v_base.template_id, v_base.focus_areas, true, auth.uid(), auth.uid(), auth.uid(), p_proposal_id
+  ) returning id into v_memo_id;
+  select * into v_version from public.deal_memo_versions where memo_id = v_memo_id order by version_number desc limit 1;
+  if v_version.id is null then
+    return jsonb_build_object('status','version_failed','memo_id',v_memo_id);
+  end if;
+  return jsonb_build_object('status','created','memo_id',v_memo_id,'version_id',v_version.id,'version_number',v_version.version_number);
+end;
+$$;
+revoke all on function public.create_memo_revision_from_proposal(uuid, uuid) from public, anon;
+grant execute on function public.create_memo_revision_from_proposal(uuid, uuid) to authenticated;

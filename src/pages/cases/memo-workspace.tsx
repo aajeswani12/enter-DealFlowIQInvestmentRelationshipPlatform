@@ -16,6 +16,7 @@ import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import type {
   Capture,
   CaseDocument,
+  CaseFactProposal,
   DealClaim,
   DealMemo,
   DealMemoVersion,
@@ -125,6 +126,9 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
   const [templateLength, setTemplateLength] = useState("");
   const [templateError, setTemplateError] = useState("");
   const [templateBusy, setTemplateBusy] = useState(false);
+  const [revisionError, setRevisionError] = useState<{ proposal: CaseFactProposal; message: string } | null>(null);
+  const [revisionBusy, setRevisionBusy] = useState(false);
+  const pendingChanges = proposals.filter((proposal) => proposal.dealId === deal.id && proposal.status === "pending");
 
   useEffect(() => {
     if (!currentMemo || currentMemo.id === loadedMemoId) return;
@@ -280,6 +284,43 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
       setError(caught instanceof Error ? caught.message : "The memo was not generated. No version was created.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleAcceptedProposal = async (proposal: CaseFactProposal) => {
+    setRevisionError(null);
+    if (!currentMemo) {
+      setRevisionError({ proposal, message: "The case change was accepted, but there is no saved memo to revise. Create a memo first." });
+      return;
+    }
+    setRevisionBusy(true);
+    try {
+      if (dirty) {
+        const saved = await save();
+        if (!saved) {
+          setRevisionError({ proposal, message: "The case change was accepted, but the current memo edits could not be saved. The previous memo is unchanged." });
+          return;
+        }
+      }
+      const result = await actions.createMemoRevision.mutateAsync({
+        memoId: currentMemo.id,
+        proposalId: proposal.id,
+      });
+      if (result.status !== "created") {
+        setRevisionError({ proposal, message: "The case change was accepted, but the revised memo draft was not created. The previous memo is unchanged." });
+        return;
+      }
+      setSelectedVersionId("");
+      setNotice("Approved source change saved. A new DRAFT memo version was created; it does not inherit prior approval.");
+    } catch (caught) {
+      setRevisionError({
+        proposal,
+        message: caught instanceof Error
+          ? `The case change was accepted, but the revised memo draft was not created: ${caught.message}`
+          : "The case change was accepted, but the revised memo draft was not created.",
+      });
+    } finally {
+      setRevisionBusy(false);
     }
   };
 
@@ -439,6 +480,7 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
             <Pill tone={STATUS_TONE[displayStatus]}>{statusLabel(displayStatus)}</Pill>
             {currentMemo?.humanEdited ? <Pill tone="warning">Human-edited</Pill> : null}
             {dirty ? <Pill tone="warning">Unsaved edits</Pill> : null}
+            {pendingChanges.length > 0 ? <Pill tone="warning">What Changed? · {pendingChanges.length}</Pill> : null}
             {!canApprove ? <span className="inline-flex items-center gap-1 text-[9px] text-muted-foreground"><Lock className="h-3 w-3" aria-hidden="true" />Approval: owner or partner</span> : null}
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -502,6 +544,12 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
           <p role="alert" className="mt-1.5 flex items-start gap-1.5 rounded-md border border-destructive/20 bg-danger-soft px-2.5 py-1.5 text-[10px] leading-relaxed text-destructive">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />{error}
           </p>
+        ) : null}
+        {revisionError ? (
+          <div role="alert" className="mt-1.5 rounded-md border border-warning/30 bg-warning-soft/40 px-2.5 py-2 text-[10px] leading-relaxed text-warning">
+            <p><span className="font-medium">Case updated; memo revision not created.</span> {revisionError.message}</p>
+            <Button size="sm" variant="outline" className="mt-1.5 h-6 text-[9.5px]" onClick={() => void handleAcceptedProposal(revisionError.proposal)} disabled={revisionBusy}>Retry memo revision</Button>
+          </div>
         ) : null}
         {!viewingLatest && selectedVersion ? (
           <div className="mt-2 rounded-md border border-warning/25 bg-warning-soft/30 px-2.5 py-1.5 text-[9.5px] text-warning">
@@ -576,6 +624,29 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
                 <p className="text-[9px] text-muted-foreground">No human approval recorded for this version.</p>
               )}
 
+              <details open className="rounded-md border border-brand/20 bg-brand-soft/10 p-2">
+                <summary className="cursor-pointer text-[10.5px] font-semibold text-brand-strong">
+                  What Changed? · {pendingChanges.length} pending
+                </summary>
+                <div className="mt-1">
+                  <MemoDelta
+                    deal={deal}
+                    claims={claims}
+                    sources={captures}
+                    documents={documents}
+                    versions={versions}
+                    proposals={proposals}
+                    reviews={reviews}
+                    gaps={gaps}
+                    members={workspace.members}
+                    currentMemo={currentMemo}
+                    onMemoCreated={() => undefined}
+                    onAccepted={handleAcceptedProposal}
+                    reviewOnly
+                  />
+                </div>
+              </details>
+
               <details open>
                 <summary className="cursor-pointer text-[10px] font-medium">Evidence · source links and labels</summary>
                 <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">AI text is analysis until supported by a stored claim. Approval is not fact verification.</p>
@@ -628,25 +699,6 @@ export function MemoWorkspace({ deal }: MemoWorkspaceProps) {
                 </ul>
               </details>
 
-              <details>
-                <summary className="cursor-pointer text-[10px] font-medium">Source updates</summary>
-                <div className="mt-1">
-                  <MemoDelta
-                    deal={deal}
-                    claims={claims}
-                    sources={captures}
-                    documents={documents}
-                    versions={versions}
-                    proposals={proposals}
-                    reviews={reviews}
-                    gaps={gaps}
-                    members={workspace.members}
-                    currentMemo={currentMemo}
-                    onMemoCreated={() => undefined}
-                    reviewOnly
-                  />
-                </div>
-              </details>
             </div>
           </details>
         </aside>
