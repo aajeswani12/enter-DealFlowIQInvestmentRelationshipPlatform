@@ -14,7 +14,9 @@ const corsHeaders = {
 };
 
 const AI_API_BASE = "https://api.enter.pro";
-const AI_MODEL = "deepseek/deepseek-v4-flash";
+// Structured JSON extraction needs a model that returns its answer on the content
+// channel; the reasoning-only model produced an empty answer for these documents.
+const AI_MODEL = "z-ai/glm-5";
 const ENTER_PROJECT_ID = "6f92e2693b094e9486160dabb429ab7e";
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_TEXT = 200_000;
@@ -703,17 +705,23 @@ function collectAiText(value: unknown, depth = 0): string {
   }
   if (typeof value !== "object") return "";
   const object = value as Record<string, unknown>;
-  for (const key of ["text", "output_text", "content", "reasoning_content", "response", "message"]) {
+  for (const key of ["text", "output_text", "content", "response", "message"]) {
     const text = collectAiText(object[key], depth + 1);
     if (text) return text;
   }
   return "";
 }
 
-/** Accepts chat-completions, nested content parts, responses-style and SSE envelopes. */
-function extractAiText(raw: string): { content: string; error?: string } {
+interface AiText {
+  content: string;
+  reasoning: string;
+  error?: string;
+}
+
+/** Reads chat-completions, content-part, responses-style and SSE envelopes without mixing reasoning into the answer. */
+function extractAiText(raw: string): AiText {
   const trimmed = raw.trim();
-  if (!trimmed) return { content: "", error: "AI extraction returned an empty response." };
+  if (!trimmed) return { content: "", reasoning: "", error: "The AI gateway returned an empty response." };
 
   const candidates: unknown[] = [];
   let fromSse = false;
@@ -733,20 +741,29 @@ function extractAiText(raw: string): { content: string; error?: string } {
   if (candidates.length === 0) {
     return {
       content: "",
-      error: `AI extraction returned an unreadable response (${trimmed.slice(0, 80).replace(/\s+/g, " ")}).`,
+      reasoning: "",
+      error: `The AI gateway returned a non-JSON response (${trimmed.slice(0, 80).replace(/\s+/g, " ")}).`,
     };
   }
 
+  const contentParts: string[] = [];
+  const reasoningParts: string[] = [];
   const finishReasons: string[] = [];
   const keys = new Set<string>();
+  let gatewayError = "";
 
-  const readObject = (value: unknown, depth = 0): string => {
-    if (value === null || value === undefined || depth > 7) return "";
-    if (typeof value === "string") return value.trim();
-    if (Array.isArray(value)) {
-      return value.map((item) => readObject(item, depth + 1)).filter(Boolean).join("\n").trim();
+  const walk = (value: unknown, depth = 0): void => {
+    if (value === null || value === undefined || depth > 7) return;
+    if (typeof value === "string") {
+      if (value.trim()) contentParts.push(value.trim());
+      return;
     }
-    if (typeof value !== "object") return "";
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, depth + 1);
+      return;
+    }
+    if (typeof value !== "object") return;
+
     const object = value as Record<string, unknown>;
     if (depth === 0) Object.keys(object).forEach((key) => keys.add(key));
 
@@ -755,54 +772,54 @@ function extractAiText(raw: string): { content: string; error?: string } {
         ? object.error as Record<string, unknown>
         : null;
       const message = errorObject ? String(errorObject.message ?? "") : String(object.error);
-      if (message.trim()) return `__ERROR__:${message.trim()}`;
-    }
-
-    for (const key of ["output_text", "response", "content", "text", "message", "result", "data", "output"]) {
-      const text = readObject(object[key], depth + 1);
-      if (text) return text;
+      if (message.trim()) gatewayError = message.trim();
+      return;
     }
 
     const choices = Array.isArray(object.choices) ? object.choices : [];
-    for (const choice of choices) {
-      if (!choice || typeof choice !== "object") continue;
-      const choiceObject = choice as Record<string, unknown>;
-      const finish = String(choiceObject.finish_reason ?? "");
-      if (finish) finishReasons.push(finish);
-      const message = choiceObject.message && typeof choiceObject.message === "object"
-        ? choiceObject.message as Record<string, unknown>
-        : null;
-      const delta = choiceObject.delta && typeof choiceObject.delta === "object"
-        ? choiceObject.delta as Record<string, unknown>
-        : null;
-      const text = collectAiText(message?.content) ||
-        collectAiText(message?.reasoning_content) ||
-        collectAiText(delta?.content) ||
-        collectAiText(choiceObject.text);
-      if (text) return text;
+    if (choices.length > 0) {
+      for (const choice of choices) {
+        if (!choice || typeof choice !== "object") continue;
+        const choiceObject = choice as Record<string, unknown>;
+        const finish = String(choiceObject.finish_reason ?? "");
+        if (finish) finishReasons.push(finish);
+        const message = choiceObject.message && typeof choiceObject.message === "object"
+          ? choiceObject.message as Record<string, unknown>
+          : null;
+        const delta = choiceObject.delta && typeof choiceObject.delta === "object"
+          ? choiceObject.delta as Record<string, unknown>
+          : null;
+        const reasoning = collectAiText(message?.reasoning_content) ||
+          collectAiText(message?.reasoning) ||
+          collectAiText(delta?.reasoning_content) ||
+          collectAiText(delta?.reasoning);
+        if (reasoning) reasoningParts.push(reasoning);
+        const text = collectAiText(message?.content) ||
+          collectAiText(delta?.content) ||
+          collectAiText(choiceObject.text);
+        if (text) contentParts.push(text);
+      }
+      return;
     }
 
-    const output = Array.isArray(object.output) ? object.output : [];
-    for (const item of output) {
-      const text = readObject(item, depth + 1);
-      if (text) return text;
+    for (const key of ["output_text", "content", "text", "response", "result", "data", "output"]) {
+      walk(object[key], depth + 1);
     }
-    return "";
   };
 
-  const texts: string[] = [];
-  for (const candidate of candidates) {
-    const text = readObject(candidate);
-    if (text.startsWith("__ERROR__:")) return { content: "", error: text.slice("__ERROR__:".length) };
-    if (text) texts.push(text);
-  }
+  for (const candidate of candidates) walk(candidate);
+  if (gatewayError) return { content: "", reasoning: "", error: gatewayError };
 
-  const content = texts.join(fromSse ? "" : "\n").trim();
-  if (content) return { content };
+  const join = (parts: string[]) => (fromSse ? parts.join("") : parts.join("\n")).trim();
+  const content = join(contentParts);
+  const reasoning = join(reasoningParts);
+  if (content || reasoning) return { content, reasoning };
+
   const finish = finishReasons.length > 0 ? ` Finish reason: ${[...new Set(finishReasons)].join(", ")}.` : "";
   return {
     content: "",
-    error: `AI extraction returned no readable text (keys: ${[...keys].join(", ") || "none"}).${finish}`,
+    reasoning: "",
+    error: `The AI gateway returned no readable text (keys: ${[...keys].join(", ") || "none"}).${finish}`,
   };
 }
 
@@ -892,15 +909,20 @@ async function aiExtract(
   }
   const raw = await upstream.text();
   const extracted = extractAiText(raw);
-  if (!extracted.content) {
-    console.error("importHub: unreadable AI response", extracted.error ?? "no content");
-    throw new Error(extracted.error ?? "AI extraction returned an unreadable response.");
+  if (extracted.error) {
+    console.error("importHub: unreadable AI response", extracted.error);
+    throw new Error(extracted.error);
   }
-  const object = parseJsonObject(extracted.content);
+  let object = extracted.content ? parseJsonObject(extracted.content) : null;
+  if (!object && extracted.reasoning) object = parseJsonObject(extracted.reasoning);
   if (!object) {
-    console.error("importHub: AI response was not a JSON object", extracted.content.slice(0, 200));
+    console.error(
+      "importHub: AI response had no JSON object",
+      extracted.content.slice(0, 300),
+      extracted.reasoning.slice(0, 300),
+    );
     throw new Error(
-      `AI extraction returned an unreadable response (${extracted.content.slice(0, 120).replace(/\s+/g, " ")}).`,
+      "AI extraction did not return usable JSON, so no records were created. The file is stored; retry it or try a smaller file.",
     );
   }
   const investors = Array.isArray(object.investors) ? (object.investors as InvestorExtract[]) : [];
