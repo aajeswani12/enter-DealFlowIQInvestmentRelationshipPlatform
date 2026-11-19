@@ -264,11 +264,11 @@ const CreateMemo = () => {
               <Button className="mt-2 gap-2 text-[16px]" onClick={() => void extractTemplate()} disabled={busy || !templateFile}><Upload className="h-4 w-4" aria-hidden="true" />Extract structure</Button>
               {templateDraft ? (
                 <div className="mt-4 space-y-2 border-t border-border pt-4">
-                  <label className="text-[14px] font-medium" htmlFor="custom-headings">Proposed headings</label>
+                  <label className="text-[16px] font-medium" htmlFor="custom-headings">Proposed headings</label>
                   <Textarea id="custom-headings" rows={6} value={headings} onChange={(event) => setHeadings(event.target.value)} className="bg-card text-[16px]" />
-                  <label className="text-[14px] font-medium" htmlFor="custom-style">Style notes</label>
+                  <label className="text-[16px] font-medium" htmlFor="custom-style">Style notes</label>
                   <Textarea id="custom-style" rows={2} value={styleNotes} onChange={(event) => setStyleNotes(event.target.value)} className="bg-card text-[16px]" />
-                  <label className="text-[14px] font-medium" htmlFor="custom-length">Length guidance</label>
+                  <label className="text-[16px] font-medium" htmlFor="custom-length">Length guidance</label>
                   <Input id="custom-length" value={lengthGuidance} onChange={(event) => setLengthGuidance(event.target.value)} className="h-10 bg-card text-[16px]" />
                   <Button className="text-[16px]" onClick={() => void saveTemplate()} disabled={busy}>Save template</Button>
                 </div>

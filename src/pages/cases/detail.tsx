@@ -82,7 +82,7 @@ const TABS: { id: CaseTab; label: string }[] = [
 ];
 
 const READINESS_TONE: Record<ReadinessStatus, "success" | "warning" | "neutral"> = {
-  Available: "success",
+  Available: "neutral",
   "Needs Review": "warning",
   Missing: "neutral",
 };
@@ -385,7 +385,7 @@ const CaseDetail = () => {
             <button type="button" onClick={() => setActiveTab("memo")} className="font-medium text-brand-strong hover:underline">
               Memo: {caseMemos[0] ? MEMO_STATUS_LABEL[caseMemos[0].status] : "None"}
             </button>
-            {caseItem.isSynthetic ? <Pill tone="warning" className="text-[14px]">Synthetic</Pill> : null}
+            {caseItem.isSynthetic ? <Pill tone="neutral" className="text-[14px]">Synthetic</Pill> : null}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

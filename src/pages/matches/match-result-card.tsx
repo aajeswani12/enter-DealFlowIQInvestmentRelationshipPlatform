@@ -49,7 +49,7 @@ export function MatchResultCard({
             <h3 id={`match-${match.id}`} className="truncate text-[14.5px] font-semibold tracking-tight">
               {investor.name}
             </h3>
-            {investor.isSynthetic ? <Pill tone="warning">Sample</Pill> : null}
+            {investor.isSynthetic ? <Pill tone="neutral">Sample</Pill> : null}
             <Pill tone={status.tone}>{status.label}</Pill>
             {match.needsResearch ? <Pill tone="warning">Needs Research</Pill> : null}
           </div>

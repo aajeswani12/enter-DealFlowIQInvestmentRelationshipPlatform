@@ -20,13 +20,13 @@ export function Field({
   return (
     <div className={cn("space-y-1.5", className)}>
       <div className="flex items-baseline justify-between gap-2">
-        <Label htmlFor={htmlFor} className="text-[13px] font-medium text-foreground">
+        <Label htmlFor={htmlFor} className="text-[16px] font-medium text-foreground">
           {label}
-          {optional ? <span className="ml-1.5 font-normal text-muted-foreground">Optional</span> : null}
+          {optional ? <span className="ml-1.5 text-[14px] font-normal text-muted-foreground">Optional</span> : null}
         </Label>
       </div>
       {children}
-      {hint ? <p className="text-[11px] leading-relaxed text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="text-[14px] leading-[1.5] text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -47,8 +47,8 @@ export function FormSection({
   return (
     <section className="space-y-3">
       <div className="space-y-0.5">
-        <h3 className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{title}</h3>
-        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+        <h3 className="text-[16px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{title}</h3>
+        {description ? <p className="text-[14px] leading-[1.5] text-muted-foreground">{description}</p> : null}
       </div>
       {children}
     </section>
@@ -71,8 +71,8 @@ export function ChipGroup({ label, options, selected, onChange, hint }: ChipGrou
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] font-medium text-foreground">{label}</span>
-        <span className="text-[11px] text-muted-foreground">{hint}</span>
+        <span className="text-[16px] font-medium text-foreground">{label}</span>
+        <span className="text-[14px] text-muted-foreground">{hint}</span>
       </div>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label={label}>
         {options.map((option) => {
@@ -84,7 +84,7 @@ export function ChipGroup({ label, options, selected, onChange, hint }: ChipGrou
               aria-pressed={active}
               onClick={() => toggle(option)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-full border px-3 py-1.5 text-[16px] font-medium transition-colors",
                 active
                   ? "border-brand/30 bg-brand-soft text-brand-strong"
                   : "border-border bg-card text-muted-foreground hover:border-brand/30 hover:text-foreground",

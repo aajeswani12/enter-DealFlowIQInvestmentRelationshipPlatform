@@ -114,7 +114,7 @@ const FindInvestors = () => {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Link to={`/investors/${investor.id}`} className="text-[21px] font-semibold tracking-tight hover:text-brand-strong">{investor.name}</Link>
-              {associatedHere ? <Pill tone="success" className="text-[14px]">Associated</Pill> : <Pill tone={searchResult ? "neutral" : "brand"} className="text-[14px]">{searchResult ? "Search result" : "Suggested"}</Pill>}
+              {associatedHere ? <Pill tone="brand" className="text-[14px]">Associated</Pill> : <Pill tone={searchResult ? "neutral" : "brand"} className="text-[14px]">{searchResult ? "Search result" : "Suggested"}</Pill>}
             </div>
             <p className="mt-1 text-[16px] text-muted-foreground">{INVESTOR_TYPE_LABEL[investor.investorType]} · {RELATIONSHIP_LABEL[investor.relationship]}</p>
           </div>
@@ -157,7 +157,7 @@ const FindInvestors = () => {
           <section className="panel p-5 sm:p-6" aria-label="Investor search controls">
             <div className="grid gap-4 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
               <div>
-                <label htmlFor="find-investors-deal" className="text-[14px] font-medium text-muted-foreground">Deal</label>
+                <label htmlFor="find-investors-deal" className="text-[16px] font-medium text-muted-foreground">Deal</label>
                 <select
                   id="find-investors-deal"
                   value={selectedDeal?.id ?? ""}
@@ -168,7 +168,7 @@ const FindInvestors = () => {
                 </select>
               </div>
               <div>
-                <label htmlFor="find-investors-search" className="text-[14px] font-medium text-muted-foreground">Search existing investors and contacts</label>
+                <label htmlFor="find-investors-search" className="text-[16px] font-medium text-muted-foreground">Search existing investors and contacts</label>
                 <div className="relative mt-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                   <Input id="find-investors-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, contact, sector or stage" className="h-11 bg-card pl-10 text-[16px]" />
@@ -211,7 +211,7 @@ const FindInvestors = () => {
                         <Link to={`/investors/${investor.id}`} className="text-[21px] font-semibold tracking-tight hover:text-brand-strong">{investor.name}</Link>
                         <p className="mt-1 text-[16px] text-muted-foreground">{INVESTOR_TYPE_LABEL[investor.investorType]} · {RELATIONSHIP_LABEL[association.relationshipStatus]}</p>
                       </div>
-                      <Pill tone="success" className="text-[14px]">Associated</Pill>
+                      <Pill tone="brand" className="text-[14px]">Associated</Pill>
                     </li>
                   ))}</ul>
                 )}

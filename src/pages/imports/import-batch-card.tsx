@@ -119,7 +119,7 @@ export function ImportBatchCard({
               {batch.label}
             </h3>
             <Pill tone={STATUS_TONE[batch.status]}>{batch.status}</Pill>
-            {batch.isSynthetic ? <Pill tone="warning">Synthetic demo</Pill> : null}
+            {batch.isSynthetic ? <Pill tone="neutral">Synthetic demo</Pill> : null}
           </div>
           <p className="mt-0.5 text-[10.5px] text-muted-foreground">
             Job {batch.id.slice(0, 8)} · {formatDate(batch.createdAt)} · {batch.filesProcessed}/{batch.totalFiles} files processed ·{" "}

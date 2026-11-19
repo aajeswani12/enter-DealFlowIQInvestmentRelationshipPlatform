@@ -156,7 +156,7 @@ const Investors = () => {
                             <p className="text-[13.5px] font-semibold tracking-tight group-hover:text-brand-strong">
                               {investor.name}
                             </p>
-                            {investor.isSynthetic ? <Pill tone="warning">Sample</Pill> : null}
+                            {investor.isSynthetic ? <Pill tone="neutral">Sample</Pill> : null}
                           </div>
                           <p className="mt-0.5 text-[11px] text-muted-foreground">
                             {INVESTOR_STATUS_LABEL[investor.status]} · {investor.currency}
@@ -224,7 +224,7 @@ const Investors = () => {
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <Pill tone="neutral">{INVESTOR_STATUS_LABEL[investor.status]}</Pill>
-                        {investor.isSynthetic ? <Pill tone="warning">Sample</Pill> : null}
+                        {investor.isSynthetic ? <Pill tone="neutral">Sample</Pill> : null}
                       </div>
                     </div>
                     <dl className="mt-3 grid grid-cols-2 gap-2 text-[11.5px]">

@@ -187,7 +187,7 @@ export function AppShell() {
               {initials(email)}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-[14px] font-medium text-sidebar-accent-foreground">{email}</p>
+              <p className="truncate text-[14px] font-medium text-sidebar-foreground">{email}</p>
               <p className="text-[14px] uppercase tracking-[0.08em] text-sidebar-foreground/60">
                 {membership?.role ?? "member"} · Talok Capital
               </p>
@@ -195,7 +195,7 @@ export function AppShell() {
           </div>
           <Link
             to="/workspace"
-            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-[14px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-accent-foreground"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-[14px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground"
           >
             <ShieldCheck className="h-3 w-3" aria-hidden="true" />
             Team access
@@ -203,7 +203,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => void signOut()}
-            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-[14px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-accent-foreground"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-[14px] font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground"
           >
             <LogOut className="h-3 w-3" aria-hidden="true" />
             Sign out

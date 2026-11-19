@@ -91,28 +91,28 @@ const Login = () => {
         </div>
 
         <div className="relative max-w-md space-y-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sidebar-primary">
+          <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-sidebar-primary">
             Deal intelligence system
           </p>
-          <h1 className="font-display text-[42px] leading-[1.05] tracking-tight text-sidebar-accent-foreground">
+          <h1 className="font-display text-[42px] leading-[1.05] tracking-tight text-sidebar-foreground">
             The conversation, the case file and the introduction in one place.
           </h1>
           <ul className="space-y-4">
             {PILLARS.map((pillar) => (
               <li key={pillar.title} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-primary">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground">
                   <pillar.icon className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="text-[13px] font-semibold text-sidebar-accent-foreground">{pillar.title}</p>
-                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-sidebar-foreground/70">{pillar.body}</p>
+                  <p className="text-[16px] font-semibold text-sidebar-foreground">{pillar.title}</p>
+                  <p className="mt-0.5 text-[16px] leading-[1.5] text-sidebar-foreground/75">{pillar.body}</p>
                 </div>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="relative flex items-center gap-2 text-[10.5px] uppercase tracking-[0.14em] text-sidebar-foreground/50">
+        <div className="relative flex items-center gap-2 text-[14px] uppercase tracking-[0.12em] text-sidebar-foreground/60">
           <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
           Talok Capital workspace · authorised partners only
         </div>
@@ -128,7 +128,7 @@ const Login = () => {
           <h2 className="mt-1 font-display text-3xl tracking-tight">
             {mode === "signin" ? "Sign in to the deal desk" : "Create your partner account"}
           </h2>
-          <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-[16px] leading-[1.5] text-muted-foreground">
             {mode === "signin"
               ? "Use the email address your firm recorded for you."
               : "Accounts are for the Talok Capital investment team. A partner still has to grant workspace access."}
@@ -149,7 +149,7 @@ const Login = () => {
                   setNotice(null);
                 }}
                 className={cn(
-                  "rounded-md px-3 py-2 text-[12.5px] font-medium transition-colors",
+                  "rounded-md px-3 py-2.5 text-[16px] font-medium transition-colors",
                   mode === option.value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -160,7 +160,7 @@ const Login = () => {
 
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="login-email" className="text-[13px] font-medium">
+              <Label htmlFor="login-email" className="text-[16px] font-medium">
                 Work email
               </Label>
               <Input
@@ -170,12 +170,12 @@ const Login = () => {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="partner@talokcapital.com"
-                className="h-11 bg-card"
+                className="h-11 bg-card text-[16px]"
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="login-password" className="text-[13px] font-medium">
+              <Label htmlFor="login-password" className="text-[16px] font-medium">
                 Password
               </Label>
               <Input
@@ -185,18 +185,18 @@ const Login = () => {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder={mode === "signin" ? "Your password" : "At least 8 characters"}
-                className="h-11 bg-card"
+                className="h-11 bg-card text-[16px]"
                 required
               />
             </div>
 
             {error ? (
-              <p role="alert" className="rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[11.5px] leading-relaxed text-destructive">
+              <p role="alert" className="rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[14px] leading-[1.5] text-destructive">
                 {error}
               </p>
             ) : null}
             {notice ? (
-              <p role="status" className="rounded-md border border-brand/20 bg-brand-soft px-3 py-2 text-[11.5px] leading-relaxed text-brand-strong">
+              <p role="status" className="rounded-md border border-brand/20 bg-brand-soft px-3 py-2 text-[14px] leading-[1.5] text-brand-strong">
                 {notice}
               </p>
             ) : null}
@@ -207,7 +207,7 @@ const Login = () => {
             </Button>
           </form>
 
-          <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="mt-6 text-[14px] leading-[1.5] text-muted-foreground">
             Records are visible only to active workspace members. Audio and documents are stored in the firm's private
             workspace, not on the public web.
           </p>

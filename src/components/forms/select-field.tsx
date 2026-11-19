@@ -28,12 +28,12 @@ export function SelectField({
 
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger id={id} aria-label={ariaLabel} className={cn("h-10 bg-card text-[13px]", className)}>
+      <SelectTrigger id={id} aria-label={ariaLabel} className={cn("h-10 bg-card text-[16px]", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         {normalized.map((option) => (
-          <SelectItem key={option.value} value={option.value} className="text-[13px]">
+          <SelectItem key={option.value} value={option.value} className="text-[16px]">
             {option.label}
           </SelectItem>
         ))}

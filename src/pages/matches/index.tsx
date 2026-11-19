@@ -463,7 +463,7 @@ const Matches = () => {
                               >
                                 {investor.name}
                               </Link>
-                              {investor.isSynthetic ? <Pill tone="warning">Sample</Pill> : null}
+                              {investor.isSynthetic ? <Pill tone="neutral">Sample</Pill> : null}
                               <Pill tone="neutral">{INVESTOR_STATUS_LABEL[investor.status]}</Pill>
                               {prior ? (
                                 <Pill tone={MATCH_STATUS_META[prior.matchStatus].tone}>
