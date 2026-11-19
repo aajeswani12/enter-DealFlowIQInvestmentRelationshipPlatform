@@ -485,7 +485,7 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
             {deal.isSynthetic ? <Pill tone="neutral" className="text-[14px]">Synthetic test case</Pill> : null}
             {currentMemo?.humanEdited ? <Pill tone="warning" className="text-[14px]">Human-edited</Pill> : null}
             {dirty ? <Pill tone="warning" className="text-[14px]">Unsaved edits</Pill> : null}
-            {!canApprove ? <span className="inline-flex items-center gap-1 text-[9px] text-muted-foreground"><Lock className="h-3 w-3" aria-hidden="true" />Approval: owner or partner</span> : null}
+            {!canApprove ? <span className="inline-flex items-center gap-1 text-[14px] text-muted-foreground"><Lock className="h-3.5 w-3.5" aria-hidden="true" />Approval: owner or partner</span> : null}
           </div>
           <div className="flex flex-wrap gap-1.5">
             <Button size="sm" variant="outline" className="h-9 text-[16px]" onClick={() => void save()} disabled={!canWrite || busy || !viewingLatest}>Save</Button>
@@ -506,7 +506,7 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
         {!wizardMode ? (
         <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="memo-template" className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Template</label>
+            <label htmlFor="memo-template" className="text-[14px] font-medium text-muted-foreground">Template</label>
             <select
               id="memo-template"
               value={templateValueState}
@@ -521,7 +521,7 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
                 }
               }}
               disabled={!canWrite || busy || !viewingLatest}
-              className="h-8 min-w-[220px] rounded-md border border-input bg-card px-2 text-[11px]"
+              className="h-10 min-w-[220px] rounded-md border border-input bg-card px-3 text-[16px]"
             >
               <option value="internal">{TEMPLATE_LABEL.internal}</option>
               <option value="external">{TEMPLATE_LABEL.external}</option>
@@ -529,11 +529,11 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
                 <option key={template.id} value={`custom:${template.id}`}>{template.name}{template.status === "proposed" ? " (proposed)" : ""}</option>
               ))}
             </select>
-            <Button size="sm" variant="ghost" className="h-7 gap-1 px-1.5 text-[9.5px]" onClick={openTemplateDialog} disabled={!canWrite || busy}><Plus className="h-3 w-3" aria-hidden="true" />Precedent</Button>
+            <Button size="sm" variant="ghost" className="h-9 gap-1 px-2 text-[16px]" onClick={openTemplateDialog} disabled={!canWrite || busy}><Plus className="h-4 w-4" aria-hidden="true" />Template</Button>
           </div>
           <div className="flex flex-wrap items-center gap-1.5" aria-label="Generation focus">
             {FOCUS_OPTIONS.map((focus) => (
-              <label key={focus.id} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-[9.5px]">
+              <label key={focus.id} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[14px]">
                 <input
                   type="checkbox"
                   checked={focusAreas.includes(focus.id)}
@@ -549,12 +549,12 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
         ) : null}
         {notice ? <p className="mt-1.5 text-[9.5px] text-success">{notice}</p> : null}
         {error ? (
-          <p role="alert" className="mt-1.5 flex items-start gap-1.5 rounded-md border border-destructive/20 bg-danger-soft px-2.5 py-1.5 text-[10px] leading-relaxed text-destructive">
+          <p role="alert" className="mt-1.5 flex items-start gap-1.5 rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[14px] leading-[1.5] text-destructive">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />{error}
           </p>
         ) : null}
         {revisionError ? (
-          <div role="alert" className="mt-1.5 rounded-md border border-warning/30 bg-warning-soft/40 px-2.5 py-2 text-[10px] leading-relaxed text-warning">
+          <div role="alert" className="mt-1.5 rounded-md border border-warning/30 bg-warning-soft/40 px-3 py-2 text-[14px] leading-[1.5] text-warning">
             <p><span className="font-medium">Case updated; memo revision not created.</span> {revisionError.message}</p>
             <Button size="sm" variant="outline" className="mt-1.5 h-6 text-[9.5px]" onClick={() => void handleAcceptedProposal(revisionError.proposal)} disabled={revisionBusy}>Retry memo revision</Button>
           </div>
@@ -575,12 +575,8 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
             className="h-10 border-0 bg-transparent px-0 text-[21px] font-semibold shadow-none focus-visible:ring-0"
             aria-label="Memo title"
           />
-          <p className="mt-0.5 text-[14px] leading-[1.5] text-muted-foreground">
-            {currentTemplateLabel} · {dirty ? "Unsaved edits" : "Saved version"} · AI output starts as Draft; human assessment is not generated.
-            {currentMemo?.humanEdited ? " Human edits are not source-verified; review the evidence rail before approval." : ""}
-          </p>
-          <div className="mt-2 flex items-center justify-between gap-2 border-b border-border pb-2">
-            <span className="text-[14px] font-medium text-muted-foreground">{editingDocument && viewingLatest ? "Editing document" : "Document preview"}</span>
+          <p className="mt-0.5 text-[14px] text-muted-foreground">{currentTemplateLabel} · {dirty ? "Unsaved" : "Saved"}</p>
+          <div className="mt-2 flex items-center justify-end border-b border-border pb-2">
             {viewingLatest && canWrite ? (
               <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5 text-[16px]" onClick={() => setEditingDocument((current) => !current)}>
                 {editingDocument ? <Eye className="h-4 w-4" aria-hidden="true" /> : <Pencil className="h-4 w-4" aria-hidden="true" />}

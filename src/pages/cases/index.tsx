@@ -61,7 +61,6 @@ const Deals = () => {
     <div className="mx-auto w-full max-w-[1440px] space-y-7">
       <PageHeader
         title="Deals"
-        description="Every company folder in one searchable list."
         actions={
           <Button variant="outline" className="h-10 gap-2 text-[16px]" onClick={() => setFormOpen(true)}>
             <Plus className="h-4 w-4" aria-hidden="true" />New deal

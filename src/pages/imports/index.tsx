@@ -352,10 +352,7 @@ const ImportsPage = () => {
 
       <div className="flex items-start gap-2 rounded-lg border border-brand/20 bg-brand-soft/50 px-3.5 py-2.5 text-[11px] leading-relaxed text-brand-strong">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <p>
-          Exact website domains, known contact emails and exact normalized names link automatically. Anything uncertain
-          waits for a human. Existing reviewed facts are never overwritten by an import.
-        </p>
+        <p>Uncertain matches wait for human review. Existing reviewed facts are never overwritten.</p>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">

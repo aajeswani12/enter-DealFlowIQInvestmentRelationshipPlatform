@@ -150,7 +150,6 @@ const Home = () => {
         <section className="space-y-3" aria-labelledby="review-heading">
           <div>
             <h2 id="review-heading" className="text-[21px] font-semibold tracking-tight">Ready for Your Review</h2>
-            <p className="mt-1 text-[14px] text-muted-foreground">Only items already waiting on a human decision.</p>
           </div>
           {isLoading ? (
             <LoadingPanel rows={2} />
@@ -184,7 +183,6 @@ const Home = () => {
           <div className="flex items-end justify-between gap-3">
             <div>
               <h2 id="recent-deals-heading" className="text-[21px] font-semibold tracking-tight">Recent Deals</h2>
-              <p className="mt-1 text-[14px] text-muted-foreground">Most recently updated folders.</p>
             </div>
             <Link to="/cases" className="text-[16px] text-brand-strong hover:underline">All deals</Link>
           </div>

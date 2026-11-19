@@ -142,7 +142,6 @@ const FindInvestors = () => {
     <div className="mx-auto w-full max-w-[1440px] space-y-7">
       <PageHeader
         title="Find Investors"
-        description="Select a deal, then review existing relationships and stored suggestions."
         actions={selectedDeal ? <Button asChild variant="outline" className="h-10 text-[16px]"><Link to={`/matches?case=${selectedDeal.id}`}>Advanced matching</Link></Button> : null}
       />
 
@@ -191,7 +190,6 @@ const FindInvestors = () => {
               <section className="space-y-3" aria-labelledby="suggested-investors">
                 <div>
                   <h2 id="suggested-investors" className="text-[21px] font-semibold tracking-tight">Suggested Investors</h2>
-                  <p className="mt-1 text-[14px] text-muted-foreground">Stored suggestions for {selectedDeal?.companyName}. Scores are not shown.</p>
                 </div>
                 {suggestions.length === 0 ? (
                   <p className="text-[17px] text-muted-foreground">No stored suggestions for this deal.</p>
@@ -218,12 +216,6 @@ const FindInvestors = () => {
               </section>
             </>
           )}
-
-          {selectedDeal ? (
-            <p className="text-[16px] text-muted-foreground">
-              Need to refresh stored suggestions? <Link to={`/matches?case=${selectedDeal.id}`} className="font-medium text-brand-strong hover:underline">Open advanced matching</Link>.
-            </p>
-          ) : null}
         </>
       )}
     </div>

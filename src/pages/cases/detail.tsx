@@ -486,7 +486,7 @@ const CaseDetail = () => {
 
         <aside className="space-y-3">
           <section className="panel p-4" aria-labelledby="deal-investors-heading">
-            <h2 id="deal-investors-heading" className="text-[21px] font-semibold tracking-tight">Investors on This Deal</h2>
+            <h2 id="deal-investors-heading" className="text-[21px] font-semibold tracking-tight">Associated Investors</h2>
             {manualRows.length > 0 ? (
               <ul className="mt-2 space-y-2">
                 {manualRows.map(({ association, investor, contact, lastActivity }) => (
@@ -540,7 +540,7 @@ const CaseDetail = () => {
 
           <section className="panel p-4" aria-labelledby="checklist-heading">
             <h2 id="checklist-heading" className="text-[21px] font-semibold tracking-tight">Evidence Status</h2>
-            <p className="mt-1 text-[14px] text-muted-foreground">Availability, not verification or investment quality.</p>
+            <p className="mt-1 text-[14px] text-muted-foreground">Availability, not verification.</p>
             <ul className="mt-2 space-y-1.5">
               {checklist.map((item) => {
                 const Icon = CHECK_ICON[item.status];

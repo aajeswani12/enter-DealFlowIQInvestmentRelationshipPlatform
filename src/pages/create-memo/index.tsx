@@ -179,7 +179,6 @@ const CreateMemo = () => {
     <div className="mx-auto w-full max-w-[1440px] space-y-7">
       <PageHeader
         title="Create Memo"
-        description="Build a source-linked draft from information already on file."
         backTo={{ to: "/", label: "Home" }}
       />
 
@@ -199,7 +198,6 @@ const CreateMemo = () => {
       {!isLoading && step === 1 ? (
         <section className="panel p-6 sm:p-8" aria-labelledby="choose-deal-heading">
           <h2 id="choose-deal-heading" className="text-[21px] font-semibold tracking-tight">Choose a deal</h2>
-          <p className="mt-1 text-[17px] text-muted-foreground">Use an existing deal folder, or bring documents in through Import Files first.</p>
           {deals.length === 0 ? (
             <div className="mt-5">
               <Button asChild className="text-[16px]"><Link to="/imports">Import Files</Link></Button>
@@ -231,7 +229,6 @@ const CreateMemo = () => {
       {!isLoading && step === 2 ? (
         <section className="panel p-6 sm:p-8" aria-labelledby="memo-type-heading">
           <h2 id="memo-type-heading" className="text-[21px] font-semibold tracking-tight">Choose memo type</h2>
-          <p className="mt-1 text-[17px] text-muted-foreground">The type controls disclosure and the sections the draft follows.</p>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {MEMO_TYPES.map((type) => (
               <button key={type.id} type="button" onClick={() => { setMemoType(type.id); setTemplateId(type.id === "custom" ? templateId : null); setMemoRequestId(crypto.randomUUID()); }} className={`rounded-lg border p-4 text-left ${memoType === type.id ? "border-brand/40 bg-brand-soft/40" : "border-border bg-card"}`}>
@@ -300,7 +297,6 @@ const CreateMemo = () => {
       {!isLoading && step === 3 ? (
         <section className="panel p-6 sm:p-8" aria-labelledby="generate-heading">
           <h2 id="generate-heading" className="text-[21px] font-semibold tracking-tight">Generate draft</h2>
-          <p className="mt-1 text-[17px] text-muted-foreground">The draft uses stored case facts and linked sources. Missing evidence stays visible.</p>
           {selectedDeal ? (
             <div className="mt-5 space-y-2 rounded-lg border border-border bg-secondary/20 p-4 text-[16px]">
               <p><span className="text-muted-foreground">Deal:</span> {selectedDeal.companyName}</p>
@@ -330,7 +326,6 @@ const CreateMemo = () => {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 id="review-heading" className="text-[21px] font-semibold tracking-tight">Review &amp; Approve</h2>
-              <p className="mt-1 text-[14px] text-muted-foreground">Edit the draft, inspect sources, then approve as the authorized reviewer.</p>
             </div>
             <Button variant="outline" className="text-[16px]" onClick={() => setStep(3)}>Back to generation</Button>
           </div>

@@ -311,7 +311,6 @@ const InvestorDetail = () => {
             {suggestions.length > 0 ? (
               <details className="panel p-6 sm:p-8">
                 <summary className="cursor-pointer text-[16px] font-medium text-muted-foreground">Suggested deals (not associated)</summary>
-                <p className="mt-2 text-[14px] text-muted-foreground">Saved suggestions only. They are distinct from associated deals.</p>
                 <ul className="mt-3 divide-y divide-border">
                   {suggestions.slice(0, 8).map(({ deal }) => (
                     <li key={deal.id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
