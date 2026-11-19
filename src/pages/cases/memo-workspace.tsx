@@ -1,7 +1,8 @@
-import { AlertTriangle, ArrowUpRight, Check, ChevronDown, Download, FileText, Loader2, Lock, Plus, RefreshCw, Sparkles, Upload, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, ChevronDown, Download, Eye, FileText, Loader2, Lock, Pencil, Plus, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pill } from "@/components/common/status-pill";
+import { MemoDocument } from "@/components/memo/memo-document";
 import { Field } from "@/components/forms/form-field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -111,6 +112,7 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
   const [loadedMemoId, setLoadedMemoId] = useState<string | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editingDocument, setEditingDocument] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [approvalOpen, setApprovalOpen] = useState<"approved" | "revision_requested" | null>(null);
@@ -479,6 +481,7 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="memo-workspace-heading" className="text-[21px] font-semibold tracking-tight">{wizardMode ? "Review & Approve" : "Memo"}</h2>
             <Pill tone={STATUS_TONE[displayStatus]} className="text-[14px]">{statusLabel(displayStatus)}</Pill>
+            {deal.isSynthetic ? <Pill tone="neutral" className="text-[14px]">Synthetic test case</Pill> : null}
             {currentMemo?.humanEdited ? <Pill tone="warning" className="text-[14px]">Human-edited</Pill> : null}
             {dirty ? <Pill tone="warning" className="text-[14px]">Unsaved edits</Pill> : null}
             {pendingChanges.length > 0 ? <Pill tone="warning" className="text-[14px]">What Changed? · {pendingChanges.length}</Pill> : null}
@@ -572,25 +575,35 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
             className="h-10 border-0 bg-transparent px-0 text-[21px] font-semibold shadow-none focus-visible:ring-0"
             aria-label="Memo title"
           />
-          <p className="mt-0.5 text-[9px] text-muted-foreground">
+          <p className="mt-0.5 text-[14px] leading-[1.5] text-muted-foreground">
             {currentTemplateLabel} · {dirty ? "Unsaved edits" : "Saved version"} · AI output starts as Draft; human assessment is not generated.
             {currentMemo?.humanEdited ? " Human edits are not source-verified; review the evidence rail before approval." : ""}
           </p>
-          {viewingLatest ? (
+          <div className="mt-2 flex items-center justify-between gap-2 border-b border-border pb-2">
+            <span className="text-[14px] font-medium text-muted-foreground">{editingDocument && viewingLatest ? "Editing document" : "Document preview"}</span>
+            {viewingLatest && canWrite ? (
+              <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5 text-[16px]" onClick={() => setEditingDocument((current) => !current)}>
+                {editingDocument ? <Eye className="h-4 w-4" aria-hidden="true" /> : <Pencil className="h-4 w-4" aria-hidden="true" />}
+                {editingDocument ? "Preview" : "Edit"}
+              </Button>
+            ) : null}
+          </div>
+          {viewingLatest && editingDocument && canWrite ? (
             <Textarea
               value={content}
               onChange={(event) => setContent(event.target.value)}
-              readOnly={!canWrite}
               rows={22}
               className="mt-2 min-h-[440px] resize-y border-0 bg-transparent px-0 text-[17px] leading-[1.5] shadow-none focus-visible:ring-0"
               aria-label="Memo content"
               placeholder="No memo yet. Choose a template, set focus areas, and generate a source-grounded draft."
             />
           ) : (
-            <pre className="mt-2 max-h-[520px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-secondary/20 p-3 font-mono text-[10px] leading-relaxed">{selectedContent}</pre>
+            <div className="mt-3 max-h-[560px] overflow-y-auto pr-1">
+              <MemoDocument content={selectedContent} />
+            </div>
           )}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
-            <p className="text-[9px] text-muted-foreground">Approved only export. External sharing always requires a separate final confirmation.</p>
+            <p className="text-[14px] leading-[1.5] text-muted-foreground">Approved only export. External sharing always requires a separate final confirmation.</p>
             <div className="flex gap-1.5">
               {canApprove ? (
                 <>
