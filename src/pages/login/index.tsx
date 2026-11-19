@@ -1,4 +1,5 @@
 import { ArrowRight, Briefcase, Mic, ShieldCheck, Waypoints } from "lucide-react";
+import { DealflowIQWordmark } from "@/components/branding/dealflowiq-wordmark";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,7 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-[#FAFBFC] dark:bg-background">
       <aside className="relative hidden w-[46%] flex-col justify-between overflow-hidden bg-sidebar px-10 py-10 lg:flex">
         <div className="absolute inset-0 grain opacity-60" aria-hidden="true" />
         <div
@@ -86,17 +87,7 @@ const Login = () => {
           aria-hidden="true"
         />
         <div className="relative">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-sidebar-primary text-sidebar-primary-foreground">
-              <span className="font-display text-lg leading-none">T</span>
-            </span>
-            <div>
-              <p className="text-[15px] font-semibold tracking-tight text-sidebar-accent-foreground">DealFlow IQ</p>
-              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/60">
-                Talok Capital
-              </p>
-            </div>
-          </div>
+          <DealflowIQWordmark variant="dark" size={26} />
         </div>
 
         <div className="relative max-w-md space-y-6">
@@ -123,20 +114,14 @@ const Login = () => {
 
         <div className="relative flex items-center gap-2 text-[10.5px] uppercase tracking-[0.14em] text-sidebar-foreground/50">
           <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-          Internal workspace · authorised partners only
+          Talok Capital workspace · authorised partners only
         </div>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
+      <main className="dealflowiq-surface flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-brand text-brand-foreground">
-              <span className="font-display text-lg leading-none">T</span>
-            </span>
-            <div>
-              <p className="text-[15px] font-semibold tracking-tight">DealFlow IQ</p>
-              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Talok Capital</p>
-            </div>
+          <div className="mb-8 flex items-center lg:hidden">
+            <DealflowIQWordmark size={24} />
           </div>
 
           <p className="label-caps">{mode === "signin" ? "Welcome back" : "New workspace account"}</p>

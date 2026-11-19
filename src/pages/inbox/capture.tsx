@@ -850,7 +850,7 @@ const VoiceCapture = () => {
                   <div>
                     <p className="text-[11.5px] font-semibold text-brand-strong">Recording in the embedded preview</p>
                     <p className="mt-0.5 text-[10.5px] leading-relaxed text-brand-strong/80">
-                      Browsers often block the microphone inside this preview even after you allow it. Open DealFlow IQ in
+                      Browsers often block the microphone inside this preview even after you allow it. Open DealflowIQ in
                       its own tab to record; audio upload and paste work here.
                     </p>
                   </div>
@@ -908,7 +908,7 @@ const VoiceCapture = () => {
                 <Loader2 className="h-6 w-6 animate-spin text-brand" aria-hidden="true" />
                 <p className="text-[13px] font-medium">Waiting for microphone permission…</p>
                 <p className="max-w-sm text-[11.5px] leading-relaxed text-muted-foreground">
-                  Your browser is asking whether DealFlow IQ may use the microphone. Allow it to continue.
+                  Your browser is asking whether DealflowIQ may use the microphone. Allow it to continue.
                 </p>
               </div>
             ) : audio ? (

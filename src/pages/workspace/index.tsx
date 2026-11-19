@@ -222,7 +222,7 @@ const WorkspaceAccess = () => {
                 </Button>
                 <p className="text-[10.5px] leading-relaxed text-muted-foreground">
                   The invited person must sign in with this exact email. Access is applied automatically on their next
-                  load; no email is sent by DealFlow IQ.
+                  load; no email is sent by DealflowIQ.
                 </p>
               </form>
             ) : (

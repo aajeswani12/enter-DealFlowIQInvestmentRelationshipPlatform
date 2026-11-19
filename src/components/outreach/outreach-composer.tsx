@@ -207,7 +207,7 @@ export function OutreachComposer({
           <div className="flex items-start gap-2 rounded-lg border border-brand/20 bg-brand-soft/60 px-3 py-2.5 text-[11px] leading-relaxed text-brand-strong">
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <p>
-              Nothing is emailed from DealFlow IQ. A partner approves the draft, copies it, sends it from their own
+              Nothing is emailed from DealflowIQ. A partner approves the draft, copies it, sends it from their own
               inbox, then records the activity here.
             </p>
           </div>

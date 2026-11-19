@@ -211,3 +211,30 @@
     animation: none !important;
   }
 }
+
+@layer components {
+  /* Scoped DealflowIQ brand tokens. These do not alter application typography or layout. */
+  .dealflowiq-wordmark {
+    --dealflowiq-ink: #101c32;
+  }
+
+  .dealflowiq-wordmark[data-variant="dark"] {
+    --dealflowiq-ink: #ffffff;
+  }
+
+  .dealflowiq-wordmark[data-variant="light"] {
+    --dealflowiq-ink: #101c32;
+  }
+
+  .dark .dealflowiq-wordmark[data-variant="adaptive"] {
+    --dealflowiq-ink: #ffffff;
+  }
+
+  .dealflowiq-surface {
+    background-color: #fafbfc;
+  }
+
+  .dark .dealflowiq-surface {
+    background-color: hsl(var(--background));
+  }
+}

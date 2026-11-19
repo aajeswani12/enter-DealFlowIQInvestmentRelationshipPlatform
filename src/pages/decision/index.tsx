@@ -159,7 +159,7 @@ export default function DecisionCenter() {
       <PageHeader
         eyebrow="Decision intelligence"
         title="Tasks & Outreach"
-        description="A single, persisted view of evidence, unknowns, approvals and next actions across the desk. DealFlow IQ never makes invest or reject decisions for you."
+        description="A single, persisted view of evidence, unknowns, approvals and next actions across the desk. DealflowIQ never makes invest or reject decisions for you."
         actions={
           <>
             <Link

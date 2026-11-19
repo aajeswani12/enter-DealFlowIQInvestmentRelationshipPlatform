@@ -45,7 +45,7 @@ function describeMicrophoneError(
 ): { kind: RecorderErrorKind; message: string } {
   const name = caught instanceof DOMException ? caught.name : "";
   const embeddedHint = context.embedded
-    ? "This embedded preview blocks the microphone. Open DealFlow IQ in its own tab to record; uploading audio or pasting a transcript also works here."
+    ? "This embedded preview blocks the microphone. Open DealflowIQ in its own tab to record; uploading audio or pasting a transcript also works here."
     : "Allow the microphone from the browser's site controls (the microphone icon in the address bar), then tap Try microphone again. If the browser still remembers the block, reload the page.";
 
   if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
@@ -53,7 +53,7 @@ function describeMicrophoneError(
       kind: "permission",
       message:
         context.policyBlocked && !context.embedded
-          ? "This page's permissions policy blocks the microphone. Open DealFlow IQ in its own tab and allow microphone access there."
+          ? "This page's permissions policy blocks the microphone. Open DealflowIQ in its own tab and allow microphone access there."
           : `Microphone access is blocked. ${embeddedHint}`,
     };
   }

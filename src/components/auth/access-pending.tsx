@@ -1,4 +1,5 @@
 import { LogOut, ShieldAlert } from "lucide-react";
+import { DealflowIQWordmark } from "@/components/branding/dealflowiq-wordmark";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 
@@ -9,14 +10,8 @@ export function AccessPending() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">
       <div className="w-full max-w-md">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-brand text-brand-foreground">
-            <span className="font-display text-lg leading-none">T</span>
-          </span>
-          <div>
-            <p className="text-[15px] font-semibold tracking-tight">DealFlow IQ</p>
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Talok Capital</p>
-          </div>
+        <div className="flex items-center">
+          <DealflowIQWordmark size={24} />
         </div>
 
         <div className="panel mt-6 p-6">

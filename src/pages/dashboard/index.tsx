@@ -254,7 +254,7 @@ const Dashboard = () => {
             <p className="label-caps">Start here</p>
             <h2 className="font-display text-2xl tracking-tight">The desk is empty, and that is accurate.</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              DealFlow IQ only shows what your team records. Capture a first update, then promote it into a case and add
+              DealflowIQ only shows what your team records. Capture a first update, then promote it into a case and add
               the investors you would want around the table.
             </p>
           </div>

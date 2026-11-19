@@ -1,4 +1,4 @@
-// Domain model for DealFlow IQ, mapped 1:1 onto the Enter Cloud schema.
+// Domain model for DealflowIQ, mapped 1:1 onto the Enter Cloud schema.
 
 export type CaptureSource = "voice" | "text";
 export type CaptureStatus = "new" | "reviewing" | "promoted" | "archived";

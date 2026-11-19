@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { DealflowIQWordmark } from "@/components/branding/dealflowiq-wordmark";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,33 +35,22 @@ const SECONDARY_NAV = [
   { to: "/matches", label: "Suggested Investors", short: "Matches", icon: Waypoints },
 ];
 
-function Wordmark({ tone = "dark" }: { tone?: "dark" | "light" }) {
+function BrandLink({
+  variant,
+  size,
+  className,
+}: {
+  variant: "light" | "dark" | "adaptive";
+  size: number;
+  className?: string;
+}) {
   return (
-    <Link to="/" className="flex items-center gap-2.5 rounded-md focus-visible:ring-offset-0">
-      <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-brand text-brand-foreground shadow-sm">
-        <span className="font-display text-[17px] leading-none">T</span>
-      </span>
-      <span className="leading-tight">
-        <span
-          className={cn(
-            "block text-[15px] font-semibold tracking-tight",
-            tone === "dark" ? "text-foreground" : "text-sidebar-accent-foreground",
-          )}
-        >
-          DealFlow IQ
-          <span className="ml-2 whitespace-nowrap text-[9px] font-semibold tracking-tight text-brand-strong">
-            DealFlow IQ — UI v3
-          </span>
-        </span>
-        <span
-          className={cn(
-            "block text-[10px] font-medium uppercase tracking-[0.18em]",
-            tone === "dark" ? "text-muted-foreground" : "text-sidebar-foreground/70",
-          )}
-        >
-          Talok Capital
-        </span>
-      </span>
+    <Link
+      to="/"
+      aria-label="DealflowIQ"
+      className={cn("inline-flex items-center rounded-md focus-visible:ring-offset-0", className)}
+    >
+      <DealflowIQWordmark variant={variant} size={size} />
     </Link>
   );
 }
@@ -163,7 +153,7 @@ export function AppShell() {
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[252px] flex-col bg-sidebar px-3 py-5 lg:flex">
         <div className="px-2">
-          <Wordmark tone="light" />
+          <BrandLink variant="dark" size={24} />
         </div>
 
         <div className="mt-6 px-2">
@@ -218,7 +208,7 @@ export function AppShell() {
       <div className="lg:pl-[252px]">
         <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur lg:hidden">
           <div className="flex items-center justify-between px-4 py-3">
-            <Wordmark />
+            <BrandLink variant="adaptive" size={22} />
             <div className="flex items-center gap-1">
               <Button asChild variant="ghost" size="icon" className="h-9 w-9">
                 <Link to="/inbox/capture" aria-label="Record Voice Note">
@@ -270,7 +260,7 @@ export function AppShell() {
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full flex-col px-3 py-5">
             <div className="flex items-center justify-between px-2">
-              <Wordmark tone="light" />
+              <BrandLink variant="dark" size={24} />
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}

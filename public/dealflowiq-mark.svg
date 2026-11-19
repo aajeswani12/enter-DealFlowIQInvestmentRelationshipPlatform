@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DealflowIQ">
+  <rect width="64" height="64" rx="14" fill="#101C32"/>
+  <path d="M17 16h13.5C41.2 16 48 22.7 48 32s-6.8 16-17.5 16H17V16Zm9 8v16h4.5C36 40 40 37 40 32s-4-8-9.5-8H26Z" fill="#FFFFFF"/>
+  <circle cx="49" cy="49" r="6" fill="#18B8AA"/>
+</svg>
