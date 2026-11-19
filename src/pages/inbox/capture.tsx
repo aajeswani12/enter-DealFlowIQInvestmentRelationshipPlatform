@@ -665,13 +665,7 @@ const VoiceCapture = () => {
     return (
       <div className="page-enter space-y-5">
         <PageHeader
-          eyebrow="Deal Inbox · Voice"
           title="Capture saved"
-          description={
-            audio
-              ? "The original audio and the corrected transcript are stored in the workspace."
-              : "The corrected transcript is stored in the workspace."
-          }
           backTo={{ to: "/inbox", label: "Deal Inbox" }}
         />
 
@@ -824,21 +818,18 @@ const VoiceCapture = () => {
   return (
     <div className="page-enter space-y-5">
       <PageHeader
-        eyebrow="Deal Inbox · Voice"
-        title="Voice deal capture"
-        description="Record the takeaway while it is fresh. Review the transcript, attach it to a deal, and save the original audio privately."
+        title="Voice capture"
+        description="Record or paste an update, review the transcript, then attach it to a deal."
         backTo={{ to: "/inbox", label: "Deal Inbox" }}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mx-auto w-full max-w-[880px]">
         <div className="space-y-4">
           <section className="panel p-5 sm:p-6" aria-labelledby="capture-heading">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="label-caps">Step 1</p>
-                <h2 id="capture-heading" className="mt-0.5 text-[17px] font-semibold tracking-tight">
-                  Capture the note
-                </h2>
+                <span className="inline-flex rounded-full bg-brand-soft px-2.5 py-1 text-[14px] font-semibold text-brand-strong">Step 1</span>
+                <h2 id="capture-heading" className="mt-1 text-[21px] font-semibold tracking-tight text-foreground">Capture</h2>
               </div>
               <Pill tone={pill.tone}>{pill.label}</Pill>
             </div>
@@ -1000,10 +991,6 @@ const VoiceCapture = () => {
                     Paste transcript
                   </Button>
                 </div>
-                <p className="max-w-sm text-center text-[10.5px] leading-relaxed text-muted-foreground">
-                  Speech-to-text is provided only when a provider is configured. Your audio and transcript are never
-                  posted publicly.
-                </p>
               </div>
             )}
 
@@ -1114,13 +1101,8 @@ const VoiceCapture = () => {
             <section className="panel p-5 sm:p-6" aria-labelledby="transcript-heading">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="label-caps">Step 2</p>
-                  <h2 id="transcript-heading" className="mt-0.5 text-[17px] font-semibold tracking-tight">
-                    Review the transcript
-                  </h2>
-                  <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                    Correct names, numbers and next steps before saving. The original machine output is kept.
-                  </p>
+                  <span className="inline-flex rounded-full bg-brand-soft px-2.5 py-1 text-[14px] font-semibold text-brand-strong">Step 2</span>
+                  <h2 id="transcript-heading" className="mt-1 text-[21px] font-semibold tracking-tight text-foreground">Transcript</h2>
                 </div>
                 <Pill tone={pill.tone}>{pill.label}</Pill>
               </div>
@@ -1150,7 +1132,7 @@ const VoiceCapture = () => {
                     rows={5}
                     value={pasteDraft}
                     onChange={(event) => setPasteDraft(event.target.value)}
-                    placeholder="Paste the call notes or an export from your recorder…"
+                    placeholder="Paste a transcript or call notes"
                     className="bg-card"
                     aria-label="Pasted transcript"
                   />
@@ -1188,7 +1170,7 @@ const VoiceCapture = () => {
                       ? "Speech-to-text is not configured. Paste or type what was said…"
                       : "The transcript will appear here. You can also type or paste it."
                   }
-                  className="min-h-[190px] bg-card text-[13px] leading-relaxed"
+                  className="min-h-[220px] bg-card text-[17px] leading-[1.5]"
                   aria-label="Corrected transcript"
                 />
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -1217,14 +1199,8 @@ const VoiceCapture = () => {
 
           {showTranscript ? (
             <section className="panel p-5 sm:p-6" aria-labelledby="save-heading">
-              <p className="label-caps">Step 3</p>
-              <h2 id="save-heading" className="mt-0.5 text-[17px] font-semibold tracking-tight">
-                Analyze and save
-              </h2>
-              <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
-                The corrected transcript is sent to AI for structured extraction, then the audio and transcript are
-                stored. If extraction is unavailable, the transcript is still saved.
-              </p>
+              <span className="inline-flex rounded-full bg-brand-soft px-2.5 py-1 text-[14px] font-semibold text-brand-strong">Step 3</span>
+              <h2 id="save-heading" className="mt-1 text-[21px] font-semibold tracking-tight text-foreground">Save</h2>
 
               <div className="mt-4 space-y-4">
                 <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-secondary/50 p-1">
@@ -1283,22 +1259,9 @@ const VoiceCapture = () => {
                   </Field>
                 )}
 
-                <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2.5">
-                  <p className="text-[11px] font-medium">What gets stored</p>
-                  <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">
-                    Original audio in the private bucket, the corrected transcript, the transcription status, and any
-                    extracted fields. Retrying a failed save updates the same capture.
-                  </p>
-                </div>
-
                 {workspace.cases.some((item) => item.companyName.toLowerCase().includes("museflow")) ? (
-                  <div className="rounded-md border border-warning/25 bg-warning-soft/40 px-3 py-2.5">
-                    <p className="text-[10.5px] font-medium text-warning">Synthetic demo · MuseFlow pilot follow-up</p>
-                    <p className="mt-0.5 text-[10px] leading-relaxed text-warning">
-                      Loads a labelled synthetic transcript for the existing MuseFlow case. It reports 12 historical
-                      pilots, then two paying and ten unpaid. Review it before saving; analysis creates drafts, not
-                      approved facts.
-                    </p>
+                  <details className="rounded-md border border-brand/20 bg-brand-soft/30 px-3 py-2.5">
+                    <summary className="cursor-pointer text-[14px] font-medium text-brand-strong">Synthetic demo · MuseFlow pilot follow-up</summary>
                     <Button
                       type="button"
                       size="sm"
@@ -1309,7 +1272,7 @@ const VoiceCapture = () => {
                     >
                       Load synthetic pilot update
                     </Button>
-                  </div>
+                  </details>
                 ) : null}
 
                 {saveError ? (
@@ -1341,40 +1304,7 @@ const VoiceCapture = () => {
           ) : null}
         </div>
 
-        <aside className="space-y-4">
-          <section className="panel p-5">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-brand" aria-hidden="true" />
-              <h2 className="text-[13px] font-semibold tracking-tight">Privacy and access</h2>
-            </div>
-            <ul className="mt-2.5 space-y-2 text-[11px] leading-relaxed text-muted-foreground">
-              <li>Audio is uploaded to a private bucket readable only by active workspace members.</li>
-              <li>The microphone is requested only when you tap Record.</li>
-              <li>Transcription credentials are never sent to the browser.</li>
-              <li>Outreach and investor records are untouched by this workflow.</li>
-            </ul>
-          </section>
-
-          <section className="panel p-5">
-            <h2 className="text-[13px] font-semibold tracking-tight">Limits</h2>
-            <ul className="mt-2.5 space-y-1.5 text-[11px] text-muted-foreground">
-              <li>Maximum recording: {Math.floor(MAX_RECORDING_SECONDS / 60)} minutes</li>
-              <li>Maximum file size: 25 MB</li>
-              <li>Accepted: WebM, M4A, MP3, WAV, OGG</li>
-            </ul>
-          </section>
-
-          <section className="panel p-5">
-            <h2 className="text-[13px] font-semibold tracking-tight">If something fails</h2>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              You can always upload an existing audio file or paste a transcript. Audio is uploaded before transcription,
-              so a provider outage never discards the recording.
-            </p>
-            <Button asChild variant="link" className="mt-1 h-auto justify-start px-0 text-[11.5px]">
-              <Link to="/inbox">Back to Deal Inbox</Link>
-            </Button>
-          </section>
-        </aside>
+        <p className="mt-4 text-center text-[14px] text-muted-foreground">Private to workspace members · maximum 5 minutes / 25 MB.</p>
       </div>
     </div>
   );
