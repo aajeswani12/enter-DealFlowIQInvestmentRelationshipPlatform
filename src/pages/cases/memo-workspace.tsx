@@ -129,6 +129,7 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
   const [templateLength, setTemplateLength] = useState("");
   const [templateError, setTemplateError] = useState("");
   const [templateBusy, setTemplateBusy] = useState(false);
+  const [showSourceReview, setShowSourceReview] = useState(false);
   const [revisionError, setRevisionError] = useState<{ proposal: CaseFactProposal; message: string } | null>(null);
   const [revisionBusy, setRevisionBusy] = useState(false);
   const pendingChanges = proposals.filter((proposal) => proposal.dealId === deal.id && proposal.status === "pending");
@@ -484,7 +485,6 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
             {deal.isSynthetic ? <Pill tone="neutral" className="text-[14px]">Synthetic test case</Pill> : null}
             {currentMemo?.humanEdited ? <Pill tone="warning" className="text-[14px]">Human-edited</Pill> : null}
             {dirty ? <Pill tone="warning" className="text-[14px]">Unsaved edits</Pill> : null}
-            {pendingChanges.length > 0 ? <Pill tone="warning" className="text-[14px]">What Changed? · {pendingChanges.length}</Pill> : null}
             {!canApprove ? <span className="inline-flex items-center gap-1 text-[9px] text-muted-foreground"><Lock className="h-3 w-3" aria-hidden="true" />Approval: owner or partner</span> : null}
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -616,107 +616,131 @@ export function MemoWorkspace({ deal, wizardMode = false }: MemoWorkspaceProps) 
         </div>
 
         <aside>
-          <details open className="panel p-3">
-            <summary className="flex cursor-pointer items-center justify-between gap-2 text-[11.5px] font-semibold">
+          <details open className="panel p-4">
+            <summary className="flex cursor-pointer items-center justify-between gap-2 text-[16px] font-semibold">
               <span>Evidence &amp; review</span>
-              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
             </summary>
-            <div className="mt-2 space-y-2">
-              <div className="flex flex-wrap gap-1.5">
-                <Pill tone={STATUS_TONE[displayStatus]} className="text-[14px]">{statusLabel(displayStatus)}</Pill>
-                {dirty ? <Pill tone="warning">Save before approval</Pill> : null}
-                <span className="text-[9px] text-muted-foreground">{includedClaims.length} evidence item{includedClaims.length === 1 ? "" : "s"}</span>
+            <div className="mt-3 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[16px] font-medium">Evidence</span>
+                <span className="text-[14px] text-muted-foreground">{includedClaims.length} item{includedClaims.length === 1 ? "" : "s"}</span>
               </div>
-              {sameApprovalAudit(selectedVersion?.id, approvals, workspace.members).length > 0 ? (
-                <div className="rounded-md border border-border bg-secondary/20 p-2">
-                  <p className="label-caps">Approval audit</p>
-                  <ul className="mt-1 space-y-1">
-                    {sameApprovalAudit(selectedVersion?.id, approvals, workspace.members).map((approval) => (
-                      <li key={approval.id} className="text-[9px] leading-relaxed text-muted-foreground">
-                        {approval.decision === "approved" ? "Approved" : "Returned for revision"} · {approval.reviewerName} · {formatShortDate(approval.createdAt)}{approval.note ? ` · ${approval.note}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+
+              {includedClaims.length === 0 ? (
+                <p className="text-[16px] text-warning">No approved evidence is available for this template.</p>
               ) : (
-                <p className="text-[9px] text-muted-foreground">No human approval recorded for this version.</p>
-              )}
-
-              <details open className="rounded-md border border-brand/20 bg-brand-soft/10 p-2">
-                <summary className="cursor-pointer text-[10.5px] font-semibold text-brand-strong">
-                  What Changed? · {pendingChanges.length} pending
-                </summary>
-                <div className="mt-1">
-                  <MemoDelta
-                    deal={deal}
-                    claims={claims}
-                    sources={captures}
-                    documents={documents}
-                    versions={versions}
-                    proposals={proposals}
-                    reviews={reviews}
-                    gaps={gaps}
-                    members={workspace.members}
-                    currentMemo={currentMemo}
-                    onMemoCreated={() => undefined}
-                    onAccepted={handleAcceptedProposal}
-                    reviewOnly
-                  />
-                </div>
-              </details>
-
-              <details open>
-                <summary className="cursor-pointer text-[10px] font-medium">Evidence · source links and labels</summary>
-                <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">AI text is analysis until supported by a stored claim. Approval is not fact verification.</p>
-                {includedClaims.length === 0 ? <p className="mt-1 text-[9.5px] text-warning">Not Available: no approved claim is available for this template.</p> : (
-                  <ul className="mt-1 max-h-60 space-y-1.5 overflow-y-auto">
-                    {includedClaims.map((claim) => (
-                      <li key={claim.id} className="rounded-md border border-border bg-card p-2">
-                        <div className="flex flex-wrap items-center gap-1">
-                          <span className="text-[10px] font-semibold">{claim.label}</span>
-                          <Pill tone={evidenceLabel(claim) === "Verified" ? "success" : evidenceLabel(claim) === "Needs Review" ? "warning" : "neutral"}>{evidenceLabel(claim)}</Pill>
-                        </div>
-                        <p className="mt-0.5 text-[9.5px] text-muted-foreground">{claim.valueText} {claim.reportingPeriod ? `· ${claim.reportingPeriod}` : ""}</p>
-                        {claim.supportingExcerpt ? <p className="mt-0.5 line-clamp-2 text-[9px] text-muted-foreground">“{claim.supportingExcerpt}”</p> : null}
-                        <div className="mt-1 flex items-center justify-between gap-1">
-                          <span className="text-[8.5px] text-muted-foreground">
-                            {claim.documentId ? documents.find((document) => document.id === claim.documentId)?.documentType?.toUpperCase() ?? "Source document" : claim.sourceId ? captures.find((capture) => capture.id === claim.sourceId)?.source === "voice" ? "Voice source" : "Text source" : "No source"}
-                            {" · "}
-                            {claim.documentId ? (documents.find((document) => document.id === claim.documentId)?.sourceDate ? formatShortDate(documents.find((document) => document.id === claim.documentId)!.sourceDate) : "Unknown source date") : claim.sourceId ? (captures.find((capture) => capture.id === claim.sourceId)?.sourceDate ? formatShortDate(captures.find((capture) => capture.id === claim.sourceId)!.sourceDate) : "Unknown source date") : "No source date"}
-                            {" · "}{claim.reviewedAt ? `reviewed ${formatShortDate(claim.reviewedAt)}` : "no review date"}
-                          </span>
-                          {claim.documentId || claim.sourceId ? <button type="button" onClick={() => void openSource(claim)} className="inline-flex items-center gap-0.5 text-[8.5px] font-medium text-brand-strong hover:underline">Open evidence <ArrowUpRight className="h-2.5 w-2.5" aria-hidden="true" /></button> : <span className="text-[8.5px] text-warning">Not Available</span>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {gaps.filter((gap) => gap.status === "open" || gap.status === "needs_review").length > 0 ? (
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-[9px] text-warning">Missing evidence · {gaps.filter((gap) => gap.status === "open" || gap.status === "needs_review").length}</summary>
-                    <ul className="mt-1 space-y-0.5">{gaps.filter((gap) => gap.status === "open" || gap.status === "needs_review").slice(0, 6).map((gap) => <li key={gap.id} className="text-[9px] leading-relaxed text-muted-foreground">{gap.question}</li>)}</ul>
-                  </details>
-                ) : null}
-              </details>
-
-              <details>
-                <summary className="cursor-pointer text-[10px] font-medium">Versions &amp; approval</summary>
-                <ul className="mt-1 max-h-48 space-y-1 overflow-y-auto">
-                  {versions.filter((version) => version.dealId === deal.id).map((version) => {
-                    const versionApproval = approvals.filter((approval) => approval.versionId === version.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-                    const versionStatus = versionApproval?.decision === "approved" ? "approved" : versionApproval?.decision === "revision_requested" ? "needs_review" : version.id === latestVersion?.id && currentMemo?.status === "needs_review" ? "needs_review" : "draft";
+                <ul className="divide-y divide-border">
+                  {includedClaims.map((claim) => {
+                    const document = claim.documentId ? documents.find((item) => item.id === claim.documentId) : null;
+                    const capture = claim.sourceId ? captures.find((item) => item.id === claim.sourceId) : null;
+                    const sourceLabel = document?.documentType?.toUpperCase() ?? (capture ? (capture.source === "voice" ? "Voice source" : "Text source") : "No source");
+                    const sourceDate = document?.sourceDate ?? capture?.sourceDate;
+                    const label = evidenceLabel(claim);
                     return (
-                      <li key={version.id}>
-                        <button type="button" onClick={() => setSelectedVersionId(version.id)} className={`w-full rounded-md border px-2 py-1 text-left ${selectedVersion?.id === version.id ? "border-brand/30 bg-brand-soft/30" : "border-border"} `}>
-                          <span className="flex items-center justify-between gap-1"><span className="text-[9.5px] font-semibold">v{version.versionNumber}</span><span className="text-[8.5px] text-muted-foreground">{statusLabel(versionStatus as DealMemo["status"])}</span></span>
-                          <span className="block text-[8.5px] text-muted-foreground">{formatShortDate(version.createdAt)} · {version.templateKind} {version.humanEdited ? "· human-edited" : ""}</span>
-                        </button>
+                      <li key={claim.id} className="py-3 first:pt-0 last:pb-0">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[16px] font-medium">{claim.label}</p>
+                            <p className="mt-0.5 text-[16px] text-muted-foreground">
+                              {claim.valueText}{claim.reportingPeriod ? ` · ${claim.reportingPeriod}` : ""}
+                            </p>
+                          </div>
+                          <Pill tone={label === "Verified" ? "success" : label === "Needs Review" ? "warning" : "neutral"} className="text-[14px]">{label}</Pill>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[14px] text-muted-foreground">
+                          <span>
+                            {sourceLabel} · {sourceDate ? formatShortDate(sourceDate) : "Unknown date"}
+                            {claim.reviewedAt ? ` · reviewed ${formatShortDate(claim.reviewedAt)}` : ""}
+                          </span>
+                          {document || capture ? (
+                            <button type="button" onClick={() => void openSource(claim)} className="inline-flex items-center gap-1 font-medium text-brand-strong hover:underline">
+                              Open evidence <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                          ) : <span className="text-warning">Source unavailable</span>}
+                        </div>
+                        {claim.supportingExcerpt && claim.supportingExcerpt !== claim.valueText ? (
+                          <details className="mt-1">
+                            <summary className="cursor-pointer text-[14px] text-muted-foreground">Excerpt</summary>
+                            <blockquote className="mt-1 border-l-2 border-brand/30 pl-3 text-[14px] leading-[1.5] text-muted-foreground">“{claim.supportingExcerpt}”</blockquote>
+                          </details>
+                        ) : null}
                       </li>
                     );
                   })}
                 </ul>
-              </details>
+              )}
 
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+                <div>
+                  <p className="text-[16px] font-medium">Source changes</p>
+                  {pendingChanges.length > 0 ? <p className="text-[14px] text-warning">{pendingChanges.length} awaiting review</p> : null}
+                </div>
+                <Button type="button" variant="outline" size="sm" className="h-9 text-[16px]" onClick={() => setShowSourceReview((current) => !current)}>
+                  {showSourceReview ? "Close" : pendingChanges.length > 0 ? `Review ${pendingChanges.length}` : "Review new source"}
+                </Button>
+              </div>
+              {showSourceReview ? (
+                <MemoDelta
+                  deal={deal}
+                  claims={claims}
+                  sources={captures}
+                  documents={documents}
+                  versions={versions}
+                  proposals={proposals}
+                  reviews={reviews}
+                  gaps={gaps}
+                  members={workspace.members}
+                  currentMemo={currentMemo}
+                  onMemoCreated={() => undefined}
+                  onAccepted={handleAcceptedProposal}
+                  reviewOnly
+                />
+              ) : null}
+
+              {gaps.filter((gap) => gap.status === "open" || gap.status === "needs_review").length > 0 ? (
+                <details className="border-t border-border pt-3">
+                  <summary className="cursor-pointer text-[16px] font-medium text-warning">
+                    Missing evidence · {gaps.filter((gap) => gap.status === "open" || gap.status === "needs_review").length}
+                  </summary>
+                  <ul className="mt-2 space-y-1">
+                    {gaps.filter((gap) => gap.status === "open" || gap.status === "needs_review").slice(0, 6).map((gap) => (
+                      <li key={gap.id} className="text-[14px] leading-[1.5] text-muted-foreground">{gap.question}</li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+
+              <details className="border-t border-border pt-3">
+                <summary className="cursor-pointer text-[16px] font-medium">Versions &amp; approval</summary>
+                <div className="mt-2">
+                  {sameApprovalAudit(selectedVersion?.id, approvals, workspace.members).length > 0 ? (
+                    <ul className="mb-2 space-y-1">
+                      {sameApprovalAudit(selectedVersion?.id, approvals, workspace.members).map((approval) => (
+                        <li key={approval.id} className="text-[14px] leading-[1.5] text-muted-foreground">
+                          {approval.decision === "approved" ? "Approved" : "Returned for revision"} · {approval.reviewerName} · {formatShortDate(approval.createdAt)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mb-2 text-[14px] text-muted-foreground">No approval recorded for this version.</p>
+                  )}
+                  <ul className="max-h-48 space-y-1 overflow-y-auto">
+                    {versions.filter((version) => version.dealId === deal.id).map((version) => {
+                      const versionApproval = approvals.filter((approval) => approval.versionId === version.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+                      const versionStatus = versionApproval?.decision === "approved" ? "approved" : versionApproval?.decision === "revision_requested" ? "needs_review" : version.id === latestVersion?.id && currentMemo?.status === "needs_review" ? "needs_review" : "draft";
+                      return (
+                        <li key={version.id}>
+                          <button type="button" onClick={() => setSelectedVersionId(version.id)} className={`w-full rounded-md border px-2 py-1.5 text-left ${selectedVersion?.id === version.id ? "border-brand/30 bg-brand-soft/30" : "border-border"}`}>
+                            <span className="flex items-center justify-between gap-1"><span className="text-[16px] font-semibold">v{version.versionNumber}</span><span className="text-[14px] text-muted-foreground">{statusLabel(versionStatus as DealMemo["status"])}</span></span>
+                            <span className="block text-[14px] text-muted-foreground">{formatShortDate(version.createdAt)} · {version.templateKind}{version.humanEdited ? " · human-edited" : ""}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </details>
             </div>
           </details>
         </aside>

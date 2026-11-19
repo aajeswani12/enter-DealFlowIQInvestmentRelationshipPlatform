@@ -366,18 +366,20 @@ export function MemoDelta({
 
   return (
     <div className="space-y-3">
-      <section className="panel p-4" aria-labelledby="delta-heading">
+      <section className={reviewOnly ? "rounded-lg border border-border bg-card p-3" : "panel p-4"} aria-labelledby="delta-heading">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="label-caps">{reviewOnly ? "What Changed?" : "Living memo"}</p>
-            <h2 id="delta-heading" className="mt-0.5 text-[13.5px] font-semibold tracking-tight">
-              {reviewOnly ? "Review source changes" : "Review new evidence"}
+            {!reviewOnly ? <p className="label-caps">Living memo</p> : null}
+            <h2 id="delta-heading" className="mt-0.5 text-[16px] font-semibold tracking-tight">
+              {reviewOnly ? "Review new source" : "Review new evidence"}
             </h2>
-            <p className="mt-0.5 max-w-2xl text-[10.5px] leading-relaxed text-muted-foreground">
-              AI proposes facts only from an associated source. Every proposal needs human approval; rejected or edited proposals never silently change canonical facts.
-            </p>
+            {!reviewOnly ? (
+              <p className="mt-0.5 max-w-2xl text-[14px] leading-[1.5] text-muted-foreground">
+                AI proposes facts only from an associated source. Every proposal needs human approval.
+              </p>
+            ) : null}
           </div>
-          <Pill tone={pending.length > 0 ? "warning" : "neutral"}>{pending.length} pending</Pill>
+          {pending.length > 0 ? <Pill tone="warning" className="text-[14px]">{pending.length} pending</Pill> : null}
         </div>
 
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -387,7 +389,7 @@ export function MemoDelta({
                 id="delta-source"
                 value={sourceChoice}
                 onChange={(event) => setSourceChoice(event.target.value)}
-                className="h-8 w-full rounded-md border border-input bg-card px-2 text-[11px]"
+                className="h-10 w-full rounded-md border border-input bg-card px-3 text-[16px]"
               >
                 <option value="">Choose an associated source</option>
                 {sourceOptions.map((option) => (
@@ -398,7 +400,7 @@ export function MemoDelta({
           </div>
           <Button
             size="sm"
-            className="h-8 gap-1.5 text-[10.5px]"
+            className="h-10 gap-1.5 text-[16px]"
             onClick={() => void analyze()}
             disabled={!sourceChoice || actions.extractCaseDelta.isPending}
           >
@@ -406,9 +408,10 @@ export function MemoDelta({
             {actions.extractCaseDelta.isPending ? "Analyzing…" : "Propose changes"}
           </Button>
         </div>
-        <p className="mt-1.5 text-[9px] leading-relaxed text-muted-foreground">
-          Source text is read by the configured AI. No proposals are created when AI is unavailable; no success is simulated.
-          Different reporting dates, definitions, currencies or units remain clarifications for review rather than automatic contradictions.
+        <p className="mt-2 text-[14px] leading-[1.5] text-muted-foreground">
+          {reviewOnly
+            ? "AI extraction; human approval is required. Different periods or definitions remain clarifications."
+            : "Source text is read by the configured AI. No proposals are created when AI is unavailable. Different periods or definitions remain clarifications."}
         </p>
         {analysisError ? (
           <p role="alert" className="mt-2 flex items-start gap-1.5 rounded-md border border-destructive/20 bg-danger-soft px-2.5 py-1.5 text-[10.5px] leading-relaxed text-destructive">
@@ -533,11 +536,11 @@ export function MemoDelta({
             </ul>
           </div>
         ) : (
-          <p className="mt-3 rounded-md border border-dashed border-border px-3 py-4 text-center text-[10.5px] text-muted-foreground">
-            No proposed changes are waiting. Choose an associated source above to run a review.
-          </p>
+          <p className="mt-3 text-[14px] text-muted-foreground">No proposed changes.</p>
         )}
 
+        {!reviewOnly ? (
+          <>
         {gaps.filter((gap) => gap.dealId === deal.id && (gap.status === "open" || gap.status === "needs_review")).length > 0 ? (
           <details className="mt-3 border-t border-border pt-2">
             <summary className="cursor-pointer text-[10px] font-medium text-muted-foreground">
@@ -564,6 +567,9 @@ export function MemoDelta({
               ))}
             </ul>
           </details>
+        ) : null}
+
+          </>
         ) : null}
 
         {!reviewOnly ? (
