@@ -695,6 +695,117 @@ function csvExtraction(rows: Record<string, string>[], sourceDate: string): Extr
   return { document_date: documentDate || sourceDate, companies, investors, claims, interactions, followups, gaps };
 }
 
+function collectAiText(value: unknown, depth = 0): string {
+  if (value === null || value === undefined || depth > 7) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => collectAiText(item, depth + 1)).filter(Boolean).join("\n").trim();
+  }
+  if (typeof value !== "object") return "";
+  const object = value as Record<string, unknown>;
+  for (const key of ["text", "output_text", "content", "reasoning_content", "response", "message"]) {
+    const text = collectAiText(object[key], depth + 1);
+    if (text) return text;
+  }
+  return "";
+}
+
+/** Accepts chat-completions, nested content parts, responses-style and SSE envelopes. */
+function extractAiText(raw: string): { content: string; error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { content: "", error: "AI extraction returned an empty response." };
+
+  const candidates: unknown[] = [];
+  let fromSse = false;
+  try {
+    candidates.push(JSON.parse(trimmed));
+  } catch {
+    fromSse = true;
+    const dataLines = trimmed
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim())
+      .filter((line) => line && line !== "[DONE]");
+    for (const line of dataLines) {
+      try { candidates.push(JSON.parse(line)); } catch { /* ignore malformed event */ }
+    }
+  }
+  if (candidates.length === 0) {
+    return {
+      content: "",
+      error: `AI extraction returned an unreadable response (${trimmed.slice(0, 80).replace(/\s+/g, " ")}).`,
+    };
+  }
+
+  const finishReasons: string[] = [];
+  const keys = new Set<string>();
+
+  const readObject = (value: unknown, depth = 0): string => {
+    if (value === null || value === undefined || depth > 7) return "";
+    if (typeof value === "string") return value.trim();
+    if (Array.isArray(value)) {
+      return value.map((item) => readObject(item, depth + 1)).filter(Boolean).join("\n").trim();
+    }
+    if (typeof value !== "object") return "";
+    const object = value as Record<string, unknown>;
+    if (depth === 0) Object.keys(object).forEach((key) => keys.add(key));
+
+    if (object.error) {
+      const errorObject = typeof object.error === "object" && object.error !== null
+        ? object.error as Record<string, unknown>
+        : null;
+      const message = errorObject ? String(errorObject.message ?? "") : String(object.error);
+      if (message.trim()) return `__ERROR__:${message.trim()}`;
+    }
+
+    for (const key of ["output_text", "response", "content", "text", "message", "result", "data", "output"]) {
+      const text = readObject(object[key], depth + 1);
+      if (text) return text;
+    }
+
+    const choices = Array.isArray(object.choices) ? object.choices : [];
+    for (const choice of choices) {
+      if (!choice || typeof choice !== "object") continue;
+      const choiceObject = choice as Record<string, unknown>;
+      const finish = String(choiceObject.finish_reason ?? "");
+      if (finish) finishReasons.push(finish);
+      const message = choiceObject.message && typeof choiceObject.message === "object"
+        ? choiceObject.message as Record<string, unknown>
+        : null;
+      const delta = choiceObject.delta && typeof choiceObject.delta === "object"
+        ? choiceObject.delta as Record<string, unknown>
+        : null;
+      const text = collectAiText(message?.content) ||
+        collectAiText(message?.reasoning_content) ||
+        collectAiText(delta?.content) ||
+        collectAiText(choiceObject.text);
+      if (text) return text;
+    }
+
+    const output = Array.isArray(object.output) ? object.output : [];
+    for (const item of output) {
+      const text = readObject(item, depth + 1);
+      if (text) return text;
+    }
+    return "";
+  };
+
+  const texts: string[] = [];
+  for (const candidate of candidates) {
+    const text = readObject(candidate);
+    if (text.startsWith("__ERROR__:")) return { content: "", error: text.slice("__ERROR__:".length) };
+    if (text) texts.push(text);
+  }
+
+  const content = texts.join(fromSse ? "" : "\n").trim();
+  if (content) return { content };
+  const finish = finishReasons.length > 0 ? ` Finish reason: ${[...new Set(finishReasons)].join(", ")}.` : "";
+  return {
+    content: "",
+    error: `AI extraction returned no readable text (keys: ${[...keys].join(", ") || "none"}).${finish}`,
+  };
+}
+
 function parseJsonObject(content: string): JsonRecord | null {
   const cleaned = content.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/i, "").trim();
   const start = cleaned.indexOf("{");
@@ -764,7 +875,7 @@ async function aiExtract(
       ],
       stream: false,
       temperature: 0.1,
-      max_tokens: 5000,
+      max_tokens: 8000,
     }),
   });
   if (!upstream.ok) {
@@ -780,15 +891,18 @@ async function aiExtract(
     throw new Error(message);
   }
   const raw = await upstream.text();
-  let content = "";
-  try {
-    const parsed = JSON.parse(raw) as { choices?: { message?: { content?: string } }[] };
-    content = parsed.choices?.[0]?.message?.content ?? "";
-  } catch {
-    // handled below
+  const extracted = extractAiText(raw);
+  if (!extracted.content) {
+    console.error("importHub: unreadable AI response", extracted.error ?? "no content");
+    throw new Error(extracted.error ?? "AI extraction returned an unreadable response.");
   }
-  const object = content ? parseJsonObject(content) : null;
-  if (!object) throw new Error("AI extraction returned an unreadable response.");
+  const object = parseJsonObject(extracted.content);
+  if (!object) {
+    console.error("importHub: AI response was not a JSON object", extracted.content.slice(0, 200));
+    throw new Error(
+      `AI extraction returned an unreadable response (${extracted.content.slice(0, 120).replace(/\s+/g, " ")}).`,
+    );
+  }
   const investors = Array.isArray(object.investors) ? (object.investors as InvestorExtract[]) : [];
   const topContacts = Array.isArray(object.contacts) ? (object.contacts as ContactExtract[]) : [];
   for (const investor of investors) {
@@ -1739,6 +1853,11 @@ async function processFile(ctx: AuthContext, fileId: string): Promise<Response> 
       extraction = csvExtraction(parsed.rows, file.source_date);
     } else {
       const aiToken = Deno.env.get("AI_API_TOKEN_6f92e2693b09");
+      if (!parsed.text.trim()) {
+        throw new Error(
+          "No extractable text was found in this file. The original is stored, but there was nothing to read for extraction.",
+        );
+      }
       if (!aiToken) {
         throw new Error("AI extraction is not configured for this project. Upload CSV records or configure the AI capability; no extraction was simulated.");
       }
