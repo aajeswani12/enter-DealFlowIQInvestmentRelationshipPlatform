@@ -62,30 +62,16 @@ export function MatchResultCard({
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="font-display text-[30px] leading-none text-foreground">{Math.round(match.fitScore)}</p>
-          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">of 100</p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">{MATCH_TIER_LABEL[tier]}</p>
+          <p className="text-[21px] font-semibold leading-none text-foreground">{Math.round(match.fitScore)}</p>
+          <p className="mt-0.5 text-[14px] text-muted-foreground">{MATCH_TIER_LABEL[tier]}</p>
         </div>
       </div>
 
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-        <div
-          className={cn(
-            "h-full rounded-full",
-            tier === "strong" ? "bg-brand" : tier === "considered" ? "bg-brand/60" : "bg-muted-foreground/40",
-          )}
-          style={{ width: `${match.fitScore}%` }}
-          role="img"
-          aria-label={`Match score ${Math.round(match.fitScore)} out of 100`}
-        />
-      </div>
+      <p className="mt-3 line-clamp-2 text-[16px] leading-[1.5] text-foreground/90">{match.fitExplanation}</p>
 
-      <p className="mt-3 text-[11.5px] leading-relaxed text-foreground/90">{match.fitExplanation}</p>
-
-      <div className="mt-3 space-y-1.5 rounded-lg border border-border bg-secondary/30 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Matching criteria · recorded inputs only
-        </p>
+      <details className="mt-3 rounded-lg border border-border bg-secondary/30 p-3">
+        <summary className="cursor-pointer text-[14px] font-medium text-muted-foreground">Why this fit</summary>
+        <div className="mt-2 space-y-1.5">
         {match.scoreBreakdown.map((rule) => {
           const Icon = TONE_ICON[rule.outcome] ?? CircleAlert;
           return (
@@ -104,13 +90,11 @@ export function MatchResultCard({
             </div>
           );
         })}
-        <p className="pt-1 text-[10px] text-muted-foreground">
-          {passing}/{match.scoreBreakdown.length} criteria fully met. Weights:{" "}
-          {Object.entries(match.weights ?? {})
-            .map(([key, value]) => `${key} ${value}`)
-            .join(" · ")}
+        <p className="pt-1 text-[14px] text-muted-foreground">
+          {passing}/{match.scoreBreakdown.length} criteria fully met.
         </p>
-      </div>
+        </div>
+      </details>
 
       {match.missingInformation.length > 0 ? (
         <div className="mt-3 rounded-md border border-warning/25 bg-warning-soft/50 px-3 py-2">
@@ -134,12 +118,10 @@ export function MatchResultCard({
         </div>
       ) : null}
 
-      <div className="mt-3 rounded-md border border-brand/20 bg-brand-soft/40 px-3 py-2">
-        <p className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-brand-strong">
-          Recommended introduction strategy
-        </p>
-        <p className="mt-1 text-[11.5px] leading-relaxed text-brand-strong">{match.introductionStrategy}</p>
-      </div>
+      <details className="mt-3 rounded-md border border-brand/20 bg-brand-soft/40 px-3 py-2">
+        <summary className="cursor-pointer text-[14px] font-medium text-brand-strong">Suggested introduction</summary>
+        <p className="mt-1 text-[16px] leading-[1.5] text-brand-strong">{match.introductionStrategy}</p>
+      </details>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
         {canWrite ? (
@@ -185,10 +167,6 @@ export function MatchResultCard({
         <Button asChild size="sm" variant="ghost" className="h-7 text-[11px]">
           <Link to={`/investors/${investor.id}`}>Investor record</Link>
         </Button>
-        <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-          <Sparkles className="h-3 w-3" aria-hidden="true" />
-          Preference fit, not interest
-        </span>
       </div>
     </article>
   );

@@ -224,11 +224,7 @@ const Matches = () => {
 
   return (
     <div className="page-enter space-y-5">
-      <PageHeader
-        eyebrow="Investor relationship intelligence"
-        title="Matches & Outreach"
-        description="Deterministic preference fit across Talok's manually maintained investor database. Scores never imply investor interest, and every owner decision is preserved."
-      />
+      <PageHeader title="Investor Matching" />
 
       {isLoading ? (
         <LoadingPanel rows={4} />
@@ -236,7 +232,7 @@ const Matches = () => {
         <EmptyState
           icon={Waypoints}
           title="No deals to match yet"
-          description="Matching starts from a deal. Open one, record its sector, stage, geography and cheque sought, then run matching."
+          description="Open a deal and add its stage, sector and cheque size first."
           action={
             <Button asChild size="sm" className="gap-1.5">
               <Link to="/cases">
@@ -250,7 +246,7 @@ const Matches = () => {
         <EmptyState
           icon={Users}
           title="No investor preferences recorded"
-          description="Add the funds, angels and family offices you know, with stages, sectors, geographies and cheque ranges. Matching only uses those recorded fields."
+          description="Add investor preferences first."
           action={
             <Button asChild size="sm" className="gap-1.5">
               <Link to="/investors">Open Investor Network</Link>
@@ -280,10 +276,6 @@ const Matches = () => {
                 </button>
               ))}
             </div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              No automatic sending · decisions are server-authorized
-            </span>
           </div>
 
           {tab === "matches" ? (
@@ -336,11 +328,6 @@ const Matches = () => {
                       )}
                       {actions.runInvestorMatching.isPending ? "Running matching…" : "Run matching"}
                     </Button>
-                    <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-                      {canWrite
-                        ? "Saves ranked results. Existing accept, dismiss or defer decisions are preserved."
-                        : "Read-only: your role cannot run matching or record decisions."}
-                    </span>
                   </div>
 
                   {runError ? (
@@ -373,11 +360,6 @@ const Matches = () => {
                     </div>
                   ) : null}
 
-                  <p className="mt-3 flex items-start gap-1.5 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
-                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    Missing inputs are shown separately from mismatches. A missing sector, stage, geography, cheque or
-                    investor preference is not treated as a negative preference, but the match is marked Needs Research.
-                  </p>
                 </section>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -399,7 +381,7 @@ const Matches = () => {
                   <EmptyState
                     icon={Waypoints}
                     title="No saved matches for this deal"
-                    description="Run matching to rank the manually maintained investor database against this deal. Nothing is inferred beyond the recorded fields."
+                    description="No matches saved yet."
                     action={
                       canWrite ? (
                         <Button size="sm" onClick={() => void runMatching()} disabled={actions.runInvestorMatching.isPending}>
@@ -541,43 +523,6 @@ const Matches = () => {
                   ) : null}
                 </section>
 
-                <section className="panel p-5" aria-labelledby="rules-heading">
-                  <h2 id="rules-heading" className="text-[14px] font-semibold tracking-tight">
-                    How matching works
-                  </h2>
-                  <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
-                    Deterministic rules over manually recorded fields only.
-                  </p>
-                  <ul className="mt-2.5 space-y-1.5 text-[10.5px] leading-relaxed text-muted-foreground">
-                    <li><span className="font-medium text-foreground">Sector & thesis:</span> exact sector earns the full weight. If sector is missing or mismatched, thematic overlap earns up to 60% (two or more shared words) or 30% (one).</li>
-                    <li><span className="font-medium text-foreground">Stage:</span> exact stage earns the full weight; adjacent stages earn 40%.</li>
-                    <li><span className="font-medium text-foreground">Cheque size:</span> inside the recorded range earns full; within 25% of the range earns half.</li>
-                    <li><span className="font-medium text-foreground">Geography:</span> exact or global earns full.</li>
-                    <li><span className="font-medium text-foreground">Relationship:</span> the stronger of the investor rollup and named contact strength.</li>
-                    <li><span className="font-medium text-foreground">Recent interest:</span> explicit interest in a recorded interaction within 180 days earns full; a recent interaction without explicit interest earns half.</li>
-                  </ul>
-                  <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
-                    <p><span className="font-medium text-foreground">Exclusions:</span> restricted or inactive investors, and a primary contact marked do not contact.</p>
-                    <p><span className="font-medium text-foreground">Needs Research:</span> any missing deal or investor input. Missing is not a mismatch.</p>
-                    <p><span className="font-medium text-foreground">Decisions:</span> accept, dismiss or defer is checked in the backend against the relationship owner or a workspace admin; rescoring preserves the decision.</p>
-                    <p>Score is preference fit only. It does not indicate or guarantee investor interest.</p>
-                  </div>
-                </section>
-
-                <section className="panel p-5">
-                  <h2 className="text-[13px] font-semibold tracking-tight">Decided matches</h2>
-                  <div className="mt-2 space-y-1.5">
-                    {(["accepted", "dismissed", "deferred"] as const).map((status) => {
-                      const count = savedMatches.filter((match) => match.matchStatus === status).length;
-                      return (
-                        <div key={status} className="flex items-center justify-between text-[11px]">
-                          <Pill tone={MATCH_STATUS_META[status].tone}>{MATCH_STATUS_META[status].label}</Pill>
-                          <span className="font-semibold tabular-nums text-muted-foreground">{count}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
               </aside>
             </div>
           ) : (

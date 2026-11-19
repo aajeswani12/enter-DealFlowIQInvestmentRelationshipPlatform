@@ -185,9 +185,7 @@ const Analytics = () => {
   return (
     <div className="page-enter space-y-6">
       <PageHeader
-        eyebrow="Workspace"
-        title="Deal desk overview"
-        description={`${today} · Every figure below is counted from records your team entered.`}
+        title="Pipeline & Analytics"
         actions={
           <>
             <Button asChild className="gap-1.5">
@@ -203,48 +201,6 @@ const Analytics = () => {
           </>
         }
       />
-
-      {isLoading ? (
-        <StatGridSkeleton />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          <StatCard
-            label="Active cases"
-            value={activeCases.length}
-            hint="Sourcing, diligence, IC review and term sheet."
-            icon={Briefcase}
-            to="/cases"
-          />
-          <StatCard
-            label="Open decision gaps"
-            value={openGaps.length}
-            hint="Unresolved gaps recorded across every deal file."
-            icon={CircleHelp}
-            to="/cases"
-          />
-          <StatCard
-            label="Investor records"
-            value={workspace.investors.length}
-            hint="Manually maintained network with recorded preferences."
-            icon={Users}
-            to="/investors"
-          />
-          <StatCard
-            label="Awaiting approval"
-            value={pendingOutreach.length}
-            hint="Outreach drafts a human still has to approve."
-            icon={Send}
-            to="/matches?tab=outreach"
-          />
-          <StatCard
-            label="Follow-ups due"
-            value={followUpBuckets.overdue + followUpBuckets.dueSoon}
-            hint="Saved follow-up tasks overdue or due in the next 7 days."
-            icon={CalendarClock}
-            to="/matches?tab=outreach"
-          />
-        </div>
-      )}
 
       {isLoading ? (
         <LoadingPanel rows={2} className="grid gap-4 lg:grid-cols-3" />
@@ -288,11 +244,6 @@ const Analytics = () => {
                 <h2 id="pipeline-heading" className="text-[15px] font-semibold tracking-tight">
                   Cases by funding stage
                 </h2>
-                <p className="text-[11.5px] text-muted-foreground">
-                  {workspace.cases.length === 0
-                    ? "No investment cases yet."
-                    : `${pluralize(workspace.cases.length, "case")} on file · ${activeCases.length} active`}
-                </p>
               </div>
               <Link
                 to="/cases"
@@ -338,68 +289,7 @@ const Analytics = () => {
                 <h2 id="attention-heading" className="text-[15px] font-semibold tracking-tight">
                   Needs attention
                 </h2>
-                <p className="text-[11.5px] text-muted-foreground">Saved follow-up tasks and dated next steps.</p>
               </div>
-            </div>
-
-            <div className="mt-3 border-b border-border pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="label-caps">Follow-up tasks</p>
-                <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
-                  {followUpBuckets.overdue + followUpBuckets.dueSoon} due
-                </span>
-              </div>
-              {isLoading ? (
-                <p className="mt-2 text-[10.5px] text-muted-foreground">Loading follow-ups.</p>
-              ) : isError ? (
-                <p className="mt-2 text-[10.5px] text-destructive">Follow-ups unavailable.</p>
-              ) : workspace.followUpTasks.length === 0 ? (
-                <p className="mt-2 text-[10.5px] text-muted-foreground">No saved follow-up tasks.</p>
-              ) : followUpChartTotal === 0 ? (
-                <p className="mt-2 text-[10.5px] text-muted-foreground">No overdue, due-soon or completed tasks.</p>
-              ) : (
-                <>
-                  <div className="mt-2 h-[124px] w-full" role="img" aria-label={`Follow-up task chart. ${followUpSummary}.`}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={followUpChart} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                        <XAxis type="number" hide allowDecimals={false} />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          width={64}
-                          tickLine={false}
-                          axisLine={false}
-                          tick={{ fontSize: 10 }}
-                        />
-                        <Tooltip
-                          cursor={{ fill: "hsl(var(--secondary))" }}
-                          contentStyle={{
-                            borderRadius: 8,
-                            border: "1px solid hsl(var(--border))",
-                            background: "hsl(var(--card))",
-                            color: "hsl(var(--foreground))",
-                            fontSize: 11,
-                          }}
-                          formatter={(value: number | string) => [`${value} task${Number(value) === 1 ? "" : "s"}`, "Count"]}
-                        />
-                        <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={14}>
-                          {followUpChart.map((entry) => (
-                            <Cell key={entry.name} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <p className="mt-1 text-[9.5px] text-muted-foreground">{followUpSummary}.</p>
-                </>
-              )}
-              <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">
-                Overdue: open before now. Due soon: open now through 7 days. Completed: done regardless of due date. Device local time.
-                {followUpBuckets.undated > 0 ? ` ${followUpBuckets.undated} undated open excluded.` : ""}
-                {followUpBuckets.later > 0 ? ` ${followUpBuckets.later} later-dated excluded.` : ""}
-                {followUpBuckets.dismissed > 0 ? ` ${followUpBuckets.dismissed} dismissed excluded.` : ""}
-                {" "}Saved follow-up tasks only; outreach stage dates excluded.
-              </p>
             </div>
 
             {nextSteps.length === 0 ? (
@@ -464,96 +354,6 @@ const Analytics = () => {
           </section>
         </div>
       )}
-
-      {!isLoading && !emptyWorkspace ? (
-        <div className="grid gap-4 xl:grid-cols-3">
-          <section className="panel p-4" aria-labelledby="readiness-summary-heading">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 id="readiness-summary-heading" className="text-[14px] font-semibold tracking-tight">Case readiness</h2>
-                <p className="text-[10.5px] text-muted-foreground">Completeness, not an investment prediction.</p>
-              </div>
-              <Link to="/cases" className="text-[10.5px] font-medium text-brand-strong hover:underline">All deals</Link>
-            </div>
-            {readinessRows.length > 0 ? (
-              <ul className="mt-3 space-y-2">
-                {readinessRows.map(({ item, approvedClaims, draftClaims, caseGaps, sourceCount, status }) => (
-                  <li key={item.id}>
-                    <Link to={`/cases/${item.id}`} className="block rounded-md border border-border bg-card px-3 py-2 hover:border-brand/40">
-                      <div className="flex flex-wrap items-center justify-between gap-1.5">
-                        <span className="text-[11.5px] font-medium">{item.companyName}</span>
-                        <Pill tone={status === "Available" ? "success" : status === "Needs Review" ? "warning" : "neutral"}>{status}</Pill>
-                      </div>
-                      <p className="mt-0.5 text-[9.5px] text-muted-foreground">
-                        {approvedClaims} reviewed claims · {caseGaps} open gaps · {draftClaims} drafts · {sourceCount} sources
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 rounded-md border border-dashed border-border px-3 py-5 text-center text-[10.5px] text-muted-foreground">No cases to assess.</p>
-            )}
-          </section>
-
-          <section className="panel p-4" aria-labelledby="compatibility-heading">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 id="compatibility-heading" className="text-[14px] font-semibold tracking-tight">Investor compatibility</h2>
-                <p className="text-[10.5px] text-muted-foreground">Weighted criteria from {workspace.matches.length} saved match{workspace.matches.length === 1 ? "" : "es"}. Scores are unchanged.</p>
-              </div>
-              <Link to="/matches" className="text-[10.5px] font-medium text-brand-strong hover:underline">Suggested investors</Link>
-            </div>
-            {criteria.length > 0 ? (
-              <ul className="mt-3 space-y-2" aria-label="Investor compatibility criteria from saved matches">
-                {criteria.map((criterion) => {
-                  const percent = criterion.maxPoints > 0 ? Math.round((criterion.points / criterion.maxPoints) * 100) : 0;
-                  return (
-                    <li key={criterion.label} aria-label={`${criterion.label}: ${criterion.points} of ${criterion.maxPoints} recorded weighted points across ${criterion.count} matches`}>
-                      <div className="flex items-baseline justify-between gap-2 text-[10px]">
-                        <span className="font-medium">{criterion.label}</span>
-                        <span className="text-muted-foreground">{criterion.points}/{criterion.maxPoints} pts</span>
-                      </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary" role="img" aria-label={`${criterion.label} ${percent}% of recorded points`}>
-                        <div className="h-full rounded-full bg-brand" style={{ width: `${percent}%` }} />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="mt-3 rounded-md border border-dashed border-border px-3 py-5 text-center text-[10.5px] text-muted-foreground">No saved matching data yet. Nothing is inferred.</p>
-            )}
-          </section>
-
-          <section className="panel p-4" aria-labelledby="sources-summary-heading">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 id="sources-summary-heading" className="text-[14px] font-semibold tracking-tight">Recent sources</h2>
-                <p className="text-[10.5px] text-muted-foreground">Documents, notes and interactions already recorded.</p>
-              </div>
-              <Link to="/inbox" className="text-[10.5px] font-medium text-brand-strong hover:underline">Deal Inbox</Link>
-            </div>
-            {sourceTimeline.length > 0 ? (
-              <ul className="mt-3 space-y-2">
-                {sourceTimeline.map((entry) => (
-                  <li key={entry.id}>
-                    <Link to={entry.to} className="block border-b border-border/60 pb-2 last:border-0 last:pb-0">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="line-clamp-1 text-[11px] font-medium">{entry.title}</span>
-                        <span className="shrink-0 text-[9.5px] text-muted-foreground">{formatShortDate(entry.date)}</span>
-                      </div>
-                      <p className="mt-0.5 text-[9.5px] text-muted-foreground">{entry.detail}{entry.caseId ? "" : " · no linked case"}</p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 rounded-md border border-dashed border-border px-3 py-5 text-center text-[10.5px] text-muted-foreground">No source activity recorded.</p>
-            )}
-          </section>
-        </div>
-      ) : null}
 
       <CaseForm open={caseFormOpen} onOpenChange={setCaseFormOpen} />
     </div>
