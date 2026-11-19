@@ -58,6 +58,7 @@ const CreateMemo = () => {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [memoRequestId, setMemoRequestId] = useState(() => crypto.randomUUID());
 
   const deals = useMemo(
     () => [...workspace.cases].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
@@ -69,6 +70,7 @@ const CreateMemo = () => {
 
   const chooseDeal = (deal: InvestmentCase) => {
     setDealId(deal.id);
+    setMemoRequestId(crypto.randomUUID());
     const next = new URLSearchParams(searchParams);
     next.set("deal", deal.id);
     setSearchParams(next, { replace: true });
@@ -76,6 +78,7 @@ const CreateMemo = () => {
 
   const toggleFocus = (focus: MemoFocus) => {
     setFocusAreas((current) => (current.includes(focus) ? current.filter((item) => item !== focus) : [...current, focus]));
+    setMemoRequestId(crypto.randomUUID());
   };
 
   const continueTo = (next: number) => {
@@ -129,6 +132,7 @@ const CreateMemo = () => {
       });
       setMemoType("custom");
       setTemplateId(templateDraft.id);
+      setMemoRequestId(crypto.randomUUID());
       setNotice("Custom template saved. Only structure and style are reused.");
     } catch (caught) {
       setTemplateError(caught instanceof Error ? caught.message : "Could not save this template.");
@@ -149,7 +153,7 @@ const CreateMemo = () => {
     try {
       const result = await actions.generateCaseMemo.mutateAsync({
         dealId: selectedDeal.id,
-        requestId: crypto.randomUUID(),
+        requestId: memoRequestId,
         proposalIds: workspace.factProposals
           .filter((proposal) => proposal.dealId === selectedDeal.id && proposal.status === "accepted")
           .map((proposal) => proposal.id),
@@ -162,6 +166,7 @@ const CreateMemo = () => {
         return;
       }
       setNotice("Draft created. Review the editor and sources before approval.");
+      setMemoRequestId(crypto.randomUUID());
       setStep(4);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The draft was not created.");
@@ -229,7 +234,7 @@ const CreateMemo = () => {
           <p className="mt-1 text-[17px] text-muted-foreground">The type controls disclosure and the sections the draft follows.</p>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {MEMO_TYPES.map((type) => (
-              <button key={type.id} type="button" onClick={() => { setMemoType(type.id); setTemplateId(type.id === "custom" ? templateId : null); }} className={`rounded-lg border p-4 text-left ${memoType === type.id ? "border-brand/40 bg-brand-soft/40" : "border-border bg-card"}`}>
+              <button key={type.id} type="button" onClick={() => { setMemoType(type.id); setTemplateId(type.id === "custom" ? templateId : null); setMemoRequestId(crypto.randomUUID()); }} className={`rounded-lg border p-4 text-left ${memoType === type.id ? "border-brand/40 bg-brand-soft/40" : "border-border bg-card"}`}>
                 <span className="flex items-center justify-between gap-2 text-[17px] font-semibold">{type.label}{memoType === type.id ? <Check className="h-4 w-4 text-brand" aria-hidden="true" /> : null}</span>
                 <span className="mt-1 block text-[14px] leading-[1.5] text-muted-foreground">{type.description}</span>
               </button>
@@ -247,7 +252,7 @@ const CreateMemo = () => {
               <p className="text-[17px] font-medium">Precedent template</p>
               <p className="mt-1 text-[14px] text-muted-foreground">Structure and style only. Precedent company facts and narrative are never carried into a new deal.</p>
               {templates.length > 0 ? (
-                <select value={templateId ?? ""} onChange={(event) => setTemplateId(event.target.value || null)} className="mt-3 h-10 w-full rounded-md border border-input bg-card px-3 text-[16px]">
+                <select value={templateId ?? ""} onChange={(event) => { setTemplateId(event.target.value || null); setMemoRequestId(crypto.randomUUID()); }} className="mt-3 h-10 w-full rounded-md border border-input bg-card px-3 text-[16px]">
                   <option value="">Choose a saved template</option>
                   {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
                 </select>
@@ -303,7 +308,12 @@ const CreateMemo = () => {
               <p><span className="text-muted-foreground">Emphasis:</span> {focusAreas.length > 0 ? focusAreas.join(", ") : "Even coverage"}</p>
             </div>
           ) : null}
-          {error ? <p role="alert" className="mt-3 rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[14px] text-destructive">{error}</p> : null}
+          {error ? (
+            <div role="alert" className="mt-3 rounded-md border border-destructive/20 bg-danger-soft px-3 py-2 text-[14px] text-destructive">
+              <p>{error}</p>
+              {/not configured|API|model|gateway/i.test(error) ? <p className="mt-1">The memo backend could not use its configured text model. Ask a workspace owner to verify the AI capability and model configuration; no memo was saved.</p> : null}
+            </div>
+          ) : null}
           <div className="mt-6 flex flex-wrap justify-between gap-2 border-t border-border pt-4">
             <Button variant="ghost" className="text-[16px]" onClick={() => setStep(2)}><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back</Button>
             <Button className="gap-2 text-[16px]" onClick={() => void generate()} disabled={busy || !canWrite || !selectedDeal}>
