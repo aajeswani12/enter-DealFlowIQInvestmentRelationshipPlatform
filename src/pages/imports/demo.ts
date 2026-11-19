@@ -73,3 +73,20 @@ export async function fetchDemoFile(definition: DemoImportFile): Promise<File> {
   const blob = await response.blob();
   return new File([blob], definition.name, { type: definition.mime });
 }
+
+
+/** Two clearly synthetic files for the human company-linking test. */
+export const STORYHARBOR_DEMO_FILES: DemoImportFile[] = [
+  {
+    name: "storyharbor-founder-email.eml",
+    path: "/import-samples/storyharbor-founder-email.eml",
+    type: "email",
+    mime: "message/rfc822",
+  },
+  {
+    name: "storyharbor-meeting-note.txt",
+    path: "/import-samples/storyharbor-meeting-note.txt",
+    type: "txt",
+    mime: "text/plain",
+  },
+];

@@ -1664,47 +1664,27 @@ async function addDealPeople(
 async function applyCompanyExtract(apply: ApplyContext, company: CompanyExtract): Promise<void> {
   const resolution = resolveCompany(company, apply.directory);
   const related = company.related ?? { claims: [], interactions: [], followups: [], gaps: [] };
-  if (resolution.kind === "proposed" || resolution.kind === "ambiguous") {
-    await saveCandidate(apply, {
-      entity_type: "deal",
-      status: "needs_review",
-      proposed_deal_id: resolution.proposedDealId ?? null,
-      match_confidence: resolution.confidence,
-      match_basis: resolution.basis,
-      payload: { ...company, related },
-      excerpt: company.excerpt,
-      source_date: apply.file.source_date,
-      fingerprint: fingerprint(["deal", normalizeName(company.name), domainFromWebsite(company.website)]),
-    });
-    apply.records += 1;
-    return;
-  }
-
-  let deal: DealRef;
-  if (resolution.kind === "exact" && resolution.deal) {
-    deal = resolution.deal;
-    await updateDealBlanks(apply, deal, company);
-  } else {
-    deal = await createDeal(apply, company);
-  }
-  const docId = await ensureDocument(apply, deal.id, company.excerpt, isoDate(apply.file.source_date));
-  await addDealPeople(apply, deal.id, docId, company);
-  const candidate = await saveCandidate(apply, {
+  // Never create or link a company automatically. The original file is staged and a
+  // human must explicitly choose an existing deal or create a new one.
+  const proposedDealId = resolution.kind === "exact"
+    ? resolution.deal?.id ?? null
+    : resolution.proposedDealId ?? null;
+  const basis = resolution.kind === "exact"
+    ? `exact company match (${resolution.basis})`
+    : resolution.kind === "new"
+      ? "no existing company match"
+      : resolution.basis;
+  await saveCandidate(apply, {
     entity_type: "deal",
-    status: "applied",
-    deal_id: deal.id,
+    status: "needs_review",
+    proposed_deal_id: proposedDealId,
     match_confidence: resolution.confidence,
-    match_basis: resolution.basis,
+    match_basis: basis,
     payload: { ...company, related },
     excerpt: company.excerpt,
     source_date: apply.file.source_date,
     fingerprint: fingerprint(["deal", normalizeName(company.name), domainFromWebsite(company.website)]),
-    applied_record_id: deal.id,
   });
-  await addClaimCandidates(apply, deal.id, docId, candidate.id, related.claims, company.name);
-  await addInteractions(apply, company.name, deal.id, docId, related.interactions);
-  await addFollowups(apply, company.name, deal.id, docId, related.followups);
-  await addGaps(apply, company.name, deal.id, docId, related.gaps);
   apply.records += 1;
 }
 
@@ -1893,6 +1873,7 @@ async function reviewCandidate(ctx: AuthContext, input: JsonRecord): Promise<Res
 
   const note = text(input.note);
   const patch = (input.patch && typeof input.patch === "object" ? input.patch : {}) as JsonRecord;
+  const targetDealId = text(input.target_deal_id);
   const entityType = text(candidate.entity_type);
   const currentPayload = (candidate.payload ?? {}) as JsonRecord;
 
@@ -2033,10 +2014,10 @@ async function reviewCandidate(ctx: AuthContext, input: JsonRecord): Promise<Res
     const related = (currentPayload.related ?? { claims: [], interactions: [], followups: [], gaps: [] }) as NonNullable<CompanyExtract["related"]>;
     let deal: DealRef | null = null;
     if (action === "approve") {
-      const proposed = text(candidate.proposed_deal_id);
-      if (!proposed) return json({ error: "This candidate has no proposed existing company. Use keep separate." }, 409);
+      const proposed = targetDealId || text(candidate.proposed_deal_id);
+      if (!proposed) return json({ error: "Choose an existing deal or create a new one." }, 409);
       deal = directory.deals.find((item) => item.id === proposed) ?? null;
-      if (!deal) return json({ error: "The proposed company no longer exists." }, 409);
+      if (!deal) return json({ error: "The selected deal no longer exists." }, 409);
       await updateDealBlanks(apply, deal, extracted);
     } else if (action === "keep_separate") {
       deal = await createDeal(apply, extracted);

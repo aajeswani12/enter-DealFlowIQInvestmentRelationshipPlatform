@@ -168,6 +168,8 @@ export function ImportReview({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [choosingDealId, setChoosingDealId] = useState<string | null>(null);
+  const [targetDealId, setTargetDealId] = useState("");
 
   useEffect(() => {
     if (!editing) return;
@@ -203,6 +205,7 @@ export function ImportReview({
     candidate: ImportCandidate,
     action: "approve" | "reject" | "keep_separate",
     note = "",
+    selectedDealId?: string,
   ) => {
     setBusyId(candidate.id);
     try {
@@ -210,6 +213,7 @@ export function ImportReview({
         candidateId: candidate.id,
         reviewAction: action,
         note,
+        targetDealId: selectedDealId,
       });
       toast.success(
         result.status === "rejected"
@@ -220,6 +224,8 @@ export function ImportReview({
       );
       setRejectingId(null);
       setRejectNote("");
+      setChoosingDealId(null);
+      setTargetDealId("");
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Could not review this candidate.");
     } finally {
@@ -296,6 +302,9 @@ export function ImportReview({
     const proposedInvestor = investors.find((item) => item.id === candidate.proposedInvestorId);
     const claimDeal = dealFor(candidate);
     const history = reviewsFor(candidate.id);
+    const companyName = candidateName(candidate);
+    const ambiguousDeal = candidate.entityType === "deal" && /uncertain|ambiguous|multiple/i.test(candidate.matchBasis || "");
+    const choosingDeal = choosingDealId === candidate.id;
 
     return (
       <li key={candidate.id} className="panel p-4">
@@ -326,46 +335,77 @@ export function ImportReview({
           </div>
           {isPending && canWrite ? (
             <div className="flex flex-wrap gap-1.5">
-              <Button
-                size="sm"
-                className="h-9 gap-1 text-[16px]"
-                disabled={busyId === candidate.id || (candidate.entityType !== "claim" && !candidate.proposedDealId && !candidate.proposedInvestorId)}
-                onClick={() => void act(candidate, "approve", "")}
-              >
-                <Check className="h-3 w-3" aria-hidden="true" />
-                {candidate.entityType === "claim" ? "Approve claim" : "Approve & link"}
-              </Button>
-              {candidate.entityType !== "claim" ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9 text-[16px]"
-                  disabled={busyId === candidate.id}
-                  onClick={() => void act(candidate, "keep_separate", "Kept separate by a human reviewer.")}
-                >
-                  <Split className="h-3 w-3" aria-hidden="true" />
-                  Keep separate
+              {candidate.entityType === "deal" ? (
+                <>
+                  {proposedDeal ? (
+                    <Button size="sm" className="h-9 gap-1 text-[16px]" disabled={busyId === candidate.id} onClick={() => void act(candidate, "approve", "")}>
+                      <Check className="h-3 w-3" aria-hidden="true" />Link to Deal
+                    </Button>
+                  ) : (
+                    <Button size="sm" className="h-9 gap-1 text-[16px]" disabled={busyId === candidate.id} onClick={() => void act(candidate, "keep_separate", "Created as a new deal by a human reviewer.")}>
+                      <Check className="h-3 w-3" aria-hidden="true" />Create Deal
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" className="h-9 text-[16px]" disabled={busyId === candidate.id} onClick={() => { setChoosingDealId(candidate.id); setTargetDealId(""); }}>
+                    {proposedDeal ? "Choose Another" : "Choose Existing Deal"}
+                  </Button>
+                </>
+              ) : candidate.entityType === "claim" ? (
+                <Button size="sm" className="h-9 gap-1 text-[16px]" disabled={busyId === candidate.id} onClick={() => void act(candidate, "approve", "")}>
+                  <Check className="h-3 w-3" aria-hidden="true" />Approve claim
                 </Button>
-              ) : null}
+              ) : (
+                <>
+                  <Button size="sm" className="h-9 gap-1 text-[16px]" disabled={busyId === candidate.id || !candidate.proposedInvestorId} onClick={() => void act(candidate, "approve", "")}>
+                    <Check className="h-3 w-3" aria-hidden="true" />Approve & link
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-9 text-[16px]" disabled={busyId === candidate.id} onClick={() => void act(candidate, "keep_separate", "Kept separate by a human reviewer.")}>
+                    <Split className="h-3 w-3" aria-hidden="true" />Keep separate
+                  </Button>
+                </>
+              )}
               <Button size="sm" variant="ghost" className="h-9 text-[16px]" onClick={() => setEditing(candidate)}>
-                <Pencil className="h-3 w-3" aria-hidden="true" />
-                Edit
+                <Pencil className="h-3 w-3" aria-hidden="true" />Edit
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-9 text-[16px] text-muted-foreground"
-                onClick={() => {
-                  setRejectingId(candidate.id);
-                  setRejectNote("");
-                }}
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-                Reject
+              <Button size="sm" variant="ghost" className="h-9 text-[16px] text-muted-foreground" onClick={() => { setRejectingId(candidate.id); setRejectNote(""); }}>
+                <X className="h-3 w-3" aria-hidden="true" />Reject
               </Button>
             </div>
           ) : null}
         </div>
+
+        {candidate.entityType === "deal" && isPending ? (
+          <div className={ambiguousDeal ? "mt-3 rounded-md border border-warning/30 bg-warning-soft/40 px-3 py-2.5" : "mt-3 rounded-md border border-brand/20 bg-brand-soft/30 px-3 py-2.5"}>
+            <p className={ambiguousDeal ? "text-[16px] font-semibold text-warning" : "text-[16px] font-semibold text-brand-strong"}>
+              {ambiguousDeal
+                ? `Company match needs review: ${companyName}`
+                : proposedDeal
+                  ? `We found an existing deal: ${proposedDeal.companyName}`
+                  : `Create a new deal for ${companyName}?`}
+            </p>
+            <p className={ambiguousDeal ? "mt-0.5 text-[14px] text-warning/90" : "mt-0.5 text-[14px] text-brand-strong/80"}>
+              {candidate.matchBasis || "Manual decision required"}
+            </p>
+          </div>
+        ) : null}
+        {choosingDeal && candidate.entityType === "deal" ? (
+          <div className="mt-2 flex flex-col gap-2 rounded-md border border-border bg-secondary/30 p-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label htmlFor={`target-deal-${candidate.id}`} className="text-[14px] font-medium text-muted-foreground">Choose existing deal</label>
+              <select
+                id={`target-deal-${candidate.id}`}
+                value={targetDealId}
+                onChange={(event) => setTargetDealId(event.target.value)}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-card px-3 text-[16px]"
+              >
+                <option value="">Select a deal</option>
+                {cases.map((item) => <option key={item.id} value={item.id}>{item.companyName}</option>)}
+              </select>
+            </div>
+            <Button size="sm" className="h-10 text-[16px]" disabled={!targetDealId || busyId === candidate.id} onClick={() => void act(candidate, "approve", "", targetDealId)}>Link selected deal</Button>
+            <Button size="sm" variant="ghost" className="h-10 text-[16px]" onClick={() => { setChoosingDealId(null); setTargetDealId(""); }}>Cancel</Button>
+          </div>
+        ) : null}
 
         <details className="mt-3">
           <summary className="cursor-pointer text-[14px] font-medium text-muted-foreground">Extracted details</summary>

@@ -1,0 +1,24 @@
+SYNTHETIC DEMO MEETING NOTE — STORYHARBOR AI IS FICTIONAL
+
+StoryHarbor AI — founder meeting
+Date: 12 February 2026
+Attendees: Mira Chen (founder and CEO, StoryHarbor AI), Alex Tan (Talok Capital)
+Company website: https://storyharbor.example
+Sector: Media technology / Enterprise SaaS
+Stage: Seed
+Geography: New York, USA
+
+Mira described StoryHarbor AI as a rights-aware discovery platform for
+publishers' long-form archives. The company sells annual licenses to media
+companies and educational publishers.
+
+Mira reported January 2026 ARR of USD 410,000, gross margin of 68%, and
+8 active pilot customers. She expects three pilots to convert to paid annual
+contracts in April 2026. The team includes Mira and co-founder/CTO Jonah Park.
+
+The company is raising a USD 2.8M seed round. Next step: send the pilot
+conversion plan and the standard customer license agreement to Alex by
+28 February 2026.
+
+This meeting note is synthetic test data. StoryHarbor AI and all people named
+here are fictional.

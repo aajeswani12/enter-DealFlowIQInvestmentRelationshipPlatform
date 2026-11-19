@@ -33,6 +33,7 @@ import {
   MUSEFLOW_DEMO_FILES,
   MUSEFLOW_FOLLOWUP_FILE,
   MUSEFLOW_PILOT_UPDATE_FILE,
+  STORYHARBOR_DEMO_FILES,
 } from "./demo";
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -93,10 +94,6 @@ const ImportsPage = () => {
     { name: "Processing", count: jobBuckets.processing, color: "hsl(var(--brand))" },
   ];
   const processingBatches = batches.filter((batch) => batch.status === "processing" || batch.status === "uploading");
-
-  useEffect(() => {
-    if (!selectedBatchId && batches[0]) setSelectedBatchId(batches[0].id);
-  }, [batches, selectedBatchId]);
 
   const addFiles = (incoming: File[]) => {
     const accepted: File[] = [];
@@ -273,16 +270,29 @@ const ImportsPage = () => {
     }
   };
 
+  const loadStoryHarborDemo = async () => {
+    setProcessing(true);
+    try {
+      const loaded: File[] = [];
+      for (const definition of STORYHARBOR_DEMO_FILES) loaded.push(await fetchDemoFile(definition));
+      setProcessing(false);
+      await runBatch("StoryHarbor AI synthetic company test", true, loaded);
+    } catch (caught) {
+      setProcessing(false);
+      toast.error(caught instanceof Error ? caught.message : "Could not load the StoryHarbor test files.");
+    }
+  };
+
   const selectedBatch = batches.find((batch) => batch.id === selectedBatchId) ?? null;
-  const selectedFiles = workspace.importFiles.filter(
-    (file) => !selectedBatchId || file.batchId === selectedBatchId,
-  );
-  const selectedCandidates = workspace.importCandidates.filter(
-    (candidate) => !selectedBatchId || candidate.batchId === selectedBatchId,
-  );
-  const selectedDocuments = workspace.caseDocuments.filter(
-    (document) => !selectedBatchId || document.batchId === selectedBatchId,
-  );
+  const selectedFiles = selectedBatchId
+    ? workspace.importFiles.filter((file) => file.batchId === selectedBatchId)
+    : [];
+  const selectedCandidates = selectedBatchId
+    ? workspace.importCandidates.filter((candidate) => candidate.batchId === selectedBatchId)
+    : [];
+  const selectedDocuments = selectedBatchId
+    ? workspace.caseDocuments.filter((document) => document.batchId === selectedBatchId)
+    : [];
   const pendingCount = selectedCandidates.filter(
     (candidate) =>
       candidate.status === "needs_review" ||
@@ -312,13 +322,21 @@ const ImportsPage = () => {
         title="Import Files"
         description="Bring your deal information together."
         actions={
-          <Button variant="outline" className="gap-1.5" onClick={scrollToReview}>
-            <FolderInput className="h-4 w-4" aria-hidden="true" />
-            Review queue
-            {pendingCount > 0 ? (
-              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[14px] font-semibold text-warning">{pendingCount}</span>
+          <>
+            <Button className="gap-1.5" onClick={() => fileInputRef.current?.click()} disabled={!canWrite || processing}>
+              <UploadCloud className="h-4 w-4" aria-hidden="true" />
+              Upload Files
+            </Button>
+            {selectedBatchId ? (
+              <Button variant="outline" className="gap-1.5" onClick={scrollToReview}>
+                <FolderInput className="h-4 w-4" aria-hidden="true" />
+                Review queue
+                {pendingCount > 0 ? (
+                  <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[14px] font-semibold text-warning">{pendingCount}</span>
+                ) : null}
+              </Button>
             ) : null}
-          </Button>
+          </>
         }
       />
 
@@ -482,27 +500,28 @@ const ImportsPage = () => {
             </Button>
           </div>
 
-          <div className="mt-4 rounded-lg border border-brand/20 bg-brand-soft/40 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+          <details className="mt-4 rounded-lg border border-brand/20 bg-brand-soft/40">
+            <summary className="cursor-pointer px-3 py-2.5 text-[16px] font-semibold text-brand-strong">Synthetic test data</summary>
+            <div className="flex flex-wrap items-start justify-between gap-2 border-t border-brand/15 p-3">
               <div>
-                <p className="inline-flex items-center gap-1.5 text-[16px] font-semibold text-brand-strong">
-                  <Sparkles className="h-4 w-4" aria-hidden="true" />
-                  Synthetic MuseFlow demo
-                </p>
+                <p className="text-[14px] text-brand-strong/80">Clearly labelled test imports; nothing is linked automatically.</p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <Button size="sm" variant="outline" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadDemoPack()}>
-                  Load 7 demo files
+                <Button size="sm" variant="outline" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadStoryHarborDemo()}>
+                  StoryHarbor test files
+                </Button>
+                <Button size="sm" variant="ghost" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadDemoPack()}>
+                  MuseFlow pack
                 </Button>
                 <Button size="sm" variant="ghost" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadFollowup()}>
-                  Import ARR follow-up transcript
+                  ARR follow-up
                 </Button>
                 <Button size="sm" variant="ghost" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadPilotClarification()}>
-                  Import pilot clarification
+                  Pilot clarification
                 </Button>
               </div>
             </div>
-          </div>
+          </details>
 
           {logs.length > 0 ? (
             <div className="mt-3 max-h-44 overflow-y-auto rounded-md border border-border bg-secondary/25 p-2.5">
@@ -588,20 +607,22 @@ const ImportsPage = () => {
         </section>
       </div>
 
-      <div ref={reviewRef} className="scroll-mt-24">
-        <ImportReview
-          candidates={selectedCandidates}
-          reviews={workspace.importReviews.filter((review) => !selectedBatchId || review.batchId === selectedBatchId)}
-          files={selectedFiles}
-          batches={workspace.importBatches}
-          cases={workspace.cases}
-          investors={workspace.investors}
-          batchId={selectedBatchId}
-          canWrite={canWrite}
-          showAll={showAll}
-          onShowAllChange={setShowAll}
-        />
-      </div>
+      {selectedBatchId ? (
+        <div ref={reviewRef} className="scroll-mt-24">
+          <ImportReview
+            candidates={selectedCandidates}
+            reviews={workspace.importReviews.filter((review) => review.batchId === selectedBatchId)}
+            files={selectedFiles}
+            batches={workspace.importBatches}
+            cases={workspace.cases}
+            investors={workspace.investors}
+            batchId={selectedBatchId}
+            canWrite={canWrite}
+            showAll={showAll}
+            onShowAllChange={setShowAll}
+          />
+        </div>
+      ) : null}
     </div>
   );
 };

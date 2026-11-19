@@ -1192,6 +1192,7 @@ export const api = {
     reviewAction: "approve" | "edit" | "reject" | "keep_separate";
     patch?: Record<string, unknown>;
     note?: string;
+    targetDealId?: string;
   }): Promise<{ status: string; [key: string]: unknown }> {
     const { data, error } = await supabase.functions.invoke("importHub", {
       body: {
@@ -1200,6 +1201,7 @@ export const api = {
         review_action: input.reviewAction,
         patch: input.patch ?? {},
         note: input.note ?? "",
+        target_deal_id: input.targetDealId ?? "",
       },
     });
     if (error) throw new Error(await readFunctionError(error));
