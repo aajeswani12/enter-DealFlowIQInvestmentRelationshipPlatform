@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/layout/page-header";
 import { Field } from "@/components/forms/form-field";
 import { SelectField } from "@/components/forms/select-field";
@@ -22,7 +21,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { useWorkspaceActions } from "@/hooks/use-workspace-actions";
 import { api } from "@/lib/api";
-import { buildImportJobBuckets } from "@/lib/insights";
 import { EMPTY_WORKSPACE } from "@/lib/workspace";
 import type { ImportFileType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -61,6 +59,25 @@ interface QueuedLog {
   tone: "info" | "success" | "error";
 }
 
+const SESSION_BATCH_KEY = "dealflowiq.import-session-batches";
+
+function readSessionBatches(): string[] {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(SESSION_BATCH_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSessionBatches(ids: string[]) {
+  try {
+    sessionStorage.setItem(SESSION_BATCH_KEY, JSON.stringify(ids));
+  } catch {
+    // Session storage unavailable; the current-session list resets on reload.
+  }
+}
+
 const ImportsPage = () => {
   const { data, isLoading: workspaceLoading, isError: workspaceError } = useWorkspace();
   const workspace = data ?? EMPTY_WORKSPACE;
@@ -78,6 +95,8 @@ const ImportsPage = () => {
   const [logs, setLogs] = useState<QueuedLog[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [sessionBatchIds, setSessionBatchIds] = useState<string[]>(readSessionBatches);
+  const [scope, setScope] = useState<"session" | "history">("session");
   const [retryingFileId, setRetryingFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reviewRef = useRef<HTMLDivElement>(null);
@@ -86,13 +105,35 @@ const ImportsPage = () => {
     () => [...workspace.importBatches].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [workspace.importBatches],
   );
-  const jobBuckets = buildImportJobBuckets(batches);
-  const jobChart = [
-    { name: "Successfully processed", count: jobBuckets.completed, color: "hsl(var(--success))" },
-    { name: "Need review", count: jobBuckets.review, color: "hsl(var(--warning))" },
-    { name: "Failed", count: jobBuckets.failed, color: "hsl(var(--destructive))" },
-    { name: "Processing", count: jobBuckets.processing, color: "hsl(var(--brand))" },
-  ];
+  const sessionBatchSet = useMemo(() => new Set(sessionBatchIds), [sessionBatchIds]);
+  const { sessionBatches, historyBatches } = useMemo(() => {
+    const current: typeof batches = [];
+    const earlier: typeof batches = [];
+    for (const batch of batches) (sessionBatchSet.has(batch.id) ? current : earlier).push(batch);
+    return { sessionBatches: current, historyBatches: earlier };
+  }, [batches, sessionBatchSet]);
+
+  useEffect(() => {
+    if (sessionBatchIds.length > 0 || batches.length === 0) return;
+    const newest = batches[0];
+    if (!newest) return;
+    persistSessionBatches([newest.id]);
+    setSessionBatchIds([newest.id]);
+  }, [batches, sessionBatchIds.length]);
+
+  const visibleBatches = useMemo(
+    () => (scope === "session" ? sessionBatches : historyBatches),
+    [scope, sessionBatches, historyBatches],
+  );
+  const visibleBatchIds = useMemo(() => new Set(visibleBatches.map((batch) => batch.id)), [visibleBatches]);
+  const visibleFiles = workspace.importFiles.filter((file) => visibleBatchIds.has(file.batchId));
+  const visibleCandidates = workspace.importCandidates.filter((candidate) => visibleBatchIds.has(candidate.batchId));
+
+  const switchScope = (next: "session" | "history") => {
+    setScope(next);
+    const nextIds = new Set((next === "session" ? sessionBatches : historyBatches).map((batch) => batch.id));
+    if (selectedBatchId && !nextIds.has(selectedBatchId)) setSelectedBatchId(null);
+  };
   const processingBatches = batches.filter((batch) => batch.status === "processing" || batch.status === "uploading");
 
   const addFiles = (incoming: File[]) => {
@@ -165,6 +206,13 @@ const ImportsPage = () => {
         isSynthetic: batchSynthetic,
       });
       setSelectedBatchId(batch.id);
+      setScope("session");
+      setSessionBatchIds((current) => {
+        if (current.includes(batch.id)) return current;
+        const next = [batch.id, ...current];
+        persistSessionBatches(next);
+        return next;
+      });
 
       for (const file of batchFiles) {
         const fileType = fileTypeForName(file.name);
@@ -298,17 +346,17 @@ const ImportsPage = () => {
       candidate.status === "needs_review" ||
       (candidate.entityType === "claim" && candidate.status === "pending"),
   ).length;
-  const reviewQueueCount = workspace.importCandidates.filter(
+  const reviewQueueCount = visibleCandidates.filter(
     (candidate) =>
       candidate.status === "needs_review" ||
       (candidate.entityType === "claim" && candidate.status === "pending"),
   ).length;
   const dealsFound = new Set(
-    workspace.importCandidates
+    visibleCandidates
       .filter((candidate) => candidate.entityType === "deal" && ["applied", "kept_separate"].includes(candidate.status))
       .map((candidate) => candidate.appliedRecordId ?? candidate.proposedDealId ?? candidate.id),
   ).size;
-  const failedFiles = workspace.importFiles
+  const failedFiles = visibleFiles
     .filter((file) => file.processingStatus === "failed" && file.errorMessage)
     .slice(0, 4);
 
@@ -341,9 +389,27 @@ const ImportsPage = () => {
       />
 
       <section className="panel grid gap-4 p-5 sm:grid-cols-3" aria-label="Import summary">
+        <div className="flex flex-wrap items-center gap-1 sm:col-span-3">
+          <Button
+            size="sm"
+            variant={scope === "session" ? "default" : "ghost"}
+            className="h-8 px-2.5 text-[14px]"
+            onClick={() => switchScope("session")}
+          >
+            This session{sessionBatches.length ? ` · ${sessionBatches.length}` : ""}
+          </Button>
+          <Button
+            size="sm"
+            variant={scope === "history" ? "default" : "ghost"}
+            className="h-8 px-2.5 text-[14px]"
+            onClick={() => switchScope("history")}
+          >
+            History{historyBatches.length ? ` · ${historyBatches.length}` : ""}
+          </Button>
+        </div>
         <div>
           <p className="text-[14px] text-muted-foreground">Files imported</p>
-          <p className="mt-1 text-[24px] font-semibold tabular-nums">{workspaceLoading ? "…" : workspaceError ? "—" : workspace.importFiles.length}</p>
+          <p className="mt-1 text-[24px] font-semibold tabular-nums">{workspaceLoading ? "…" : workspaceError ? "—" : visibleFiles.length}</p>
         </div>
         <div>
           <p className="text-[14px] text-muted-foreground">Deals found</p>
@@ -553,14 +619,16 @@ const ImportsPage = () => {
         <section className="space-y-3" aria-labelledby="batches-heading">
           <div className="flex items-end justify-between gap-2">
             <div>
-              <h2 id="batches-heading" className="text-[21px] font-semibold tracking-tight">Import batches</h2>
+              <h2 id="batches-heading" className="text-[21px] font-semibold tracking-tight">
+                {scope === "session" ? "This session" : "History"}
+              </h2>
             </div>
-            <span className="text-[14px] text-muted-foreground">{batches.length} batch{batches.length === 1 ? "" : "es"}</span>
+            <span className="text-[14px] text-muted-foreground">{visibleBatches.length} batch{visibleBatches.length === 1 ? "" : "es"}</span>
           </div>
 
-          {batches.length > 0 ? (
+          {visibleBatches.length > 0 ? (
             <div className="space-y-3">
-              {batches.map((batch) => (
+              {visibleBatches.map((batch) => (
                 <ImportBatchCard
                   key={batch.id}
                   batch={batch}
@@ -603,7 +671,13 @@ const ImportsPage = () => {
                 />
               ))}
             </div>
-          ) : null}
+          ) : (
+            <p className="rounded-lg border border-dashed border-border bg-secondary/20 px-4 py-6 text-center text-[14px] text-muted-foreground">
+              {scope === "session"
+                ? "No batches in this session yet. Upload files to start one."
+                : "No earlier imports."}
+            </p>
+          )}
         </section>
       </div>
 
