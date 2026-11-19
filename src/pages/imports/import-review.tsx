@@ -305,7 +305,7 @@ export function ImportReview({
               <Pill tone={candidate.entityType === "claim" ? "warning" : candidate.entityType === "deal" ? "brand" : "neutral"}>
                 {candidate.entityType}
               </Pill>
-              <h3 className="truncate text-[13.5px] font-semibold tracking-tight">{candidateName(candidate)}</h3>
+              <h3 className="truncate text-[17px] font-semibold tracking-tight">{candidateName(candidate)}</h3>
               <Pill
                 tone={
                   candidate.status === "applied"
@@ -320,15 +320,15 @@ export function ImportReview({
                 {CANDIDATE_STATUS_LABEL[candidate.status] ?? candidate.status}
               </Pill>
             </div>
-            <p className="mt-0.5 text-[10.5px] text-muted-foreground">
-              {batch?.label ?? "Import"} · <SourceLabel file={file} /> · {candidate.matchBasis || "no automatic match"}
+            <p className="mt-1 text-[14px] text-muted-foreground">
+              {batch?.label ?? "Import"} · <SourceLabel file={file} /> · {candidate.matchBasis || "No automatic match"}
             </p>
           </div>
           {isPending && canWrite ? (
             <div className="flex flex-wrap gap-1.5">
               <Button
                 size="sm"
-                className="h-7 gap-1 text-[11px]"
+                className="h-9 gap-1 text-[16px]"
                 disabled={busyId === candidate.id || (candidate.entityType !== "claim" && !candidate.proposedDealId && !candidate.proposedInvestorId)}
                 onClick={() => void act(candidate, "approve", "")}
               >
@@ -339,7 +339,7 @@ export function ImportReview({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-[11px]"
+                  className="h-9 text-[16px]"
                   disabled={busyId === candidate.id}
                   onClick={() => void act(candidate, "keep_separate", "Kept separate by a human reviewer.")}
                 >
@@ -347,14 +347,14 @@ export function ImportReview({
                   Keep separate
                 </Button>
               ) : null}
-              <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setEditing(candidate)}>
+              <Button size="sm" variant="ghost" className="h-9 text-[16px]" onClick={() => setEditing(candidate)}>
                 <Pencil className="h-3 w-3" aria-hidden="true" />
                 Edit
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 text-[11px] text-muted-foreground"
+                className="h-9 text-[16px] text-muted-foreground"
                 onClick={() => {
                   setRejectingId(candidate.id);
                   setRejectNote("");
@@ -367,7 +367,9 @@ export function ImportReview({
           ) : null}
         </div>
 
-        <div className="mt-3 grid gap-2 text-[11px] leading-relaxed sm:grid-cols-2">
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[14px] font-medium text-muted-foreground">Extracted details</summary>
+        <div className="mt-2 grid gap-2 text-[14px] leading-[1.5] sm:grid-cols-2">
           {candidate.entityType === "deal" ? (
             <>
               <div>
@@ -432,7 +434,7 @@ export function ImportReview({
             “{candidate.excerpt}”
           </blockquote>
         ) : null}
-
+        </details>
         {candidate.conflictSummary ? (
           <p className="mt-2 flex items-start gap-1.5 rounded-md border border-warning/25 bg-warning-soft px-2.5 py-1.5 text-[10.5px] leading-relaxed text-warning">
             <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -493,14 +495,11 @@ export function ImportReview({
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-[16px] font-semibold tracking-tight">Human review</h2>
-          <p className="text-[11.5px] text-muted-foreground">
-            Approve, edit, reject or keep separate. Ambiguous records are never merged automatically.
-            {batchLabel ? ` Viewing ${batchLabel}.` : ""}
-          </p>
+          <h2 className="text-[21px] font-semibold tracking-tight">Human review</h2>
+          {batchLabel ? <p className="text-[14px] text-muted-foreground">{batchLabel}</p> : null}
         </div>
         <div className="flex items-center gap-2">
-          <Pill tone={pending.length > 0 ? "warning" : "success"}>{pending.length} awaiting review</Pill>
+          <Pill tone={pending.length > 0 ? "warning" : "success"} className="text-[14px]">{pending.length} awaiting review</Pill>
           {pending.length > 40 ? (
             <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => onShowAllChange(!showAll)}>
               {showAll ? "Show first 40" : "Show all"}
@@ -511,11 +510,7 @@ export function ImportReview({
 
       {visiblePending.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card/60 px-5 py-8 text-center">
-          <p className="text-[13px] font-semibold">No records are waiting for review</p>
-          <p className="mx-auto mt-1 max-w-lg text-[11.5px] leading-relaxed text-muted-foreground">
-            Automatic exact/new links are applied immediately. Extracted claims and uncertain merges wait here for a
-            human decision.
-          </p>
+          <p className="text-[17px] font-semibold">No records are waiting for review</p>
         </div>
       ) : (
         <ul className="space-y-3">{visiblePending.map((candidate) => card(candidate, true))}</ul>
@@ -523,9 +518,9 @@ export function ImportReview({
 
       {processed.length > 0 || applied.length > 0 ? (
         <details className="panel p-4">
-          <summary className="flex cursor-pointer items-center gap-1.5 text-[12px] font-semibold">
-            <History className="h-3.5 w-3.5" aria-hidden="true" />
-            Processed records & audit trail · {processed.length + applied.length}
+          <summary className="flex cursor-pointer items-center gap-1.5 text-[16px] font-semibold">
+            <History className="h-4 w-4" aria-hidden="true" />
+            Processed records · {processed.length + applied.length}
           </summary>
           <ul className="mt-3 space-y-2">
             {[...processed, ...applied].slice(0, 50).map((candidate) => (

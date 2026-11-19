@@ -309,7 +309,6 @@ const ImportsPage = () => {
   return (
     <div className="page-enter space-y-5">
       <PageHeader
-        eyebrow="Historical data import & organization"
         title="Import Files"
         description="Bring your deal information together."
         actions={
@@ -317,7 +316,7 @@ const ImportsPage = () => {
             <FolderInput className="h-4 w-4" aria-hidden="true" />
             Review queue
             {pendingCount > 0 ? (
-              <span className="rounded-full bg-warning-soft px-1.5 text-[10px] font-semibold text-warning">{pendingCount}</span>
+              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[14px] font-semibold text-warning">{pendingCount}</span>
             ) : null}
           </Button>
         }
@@ -350,21 +349,14 @@ const ImportsPage = () => {
         ) : null}
       </section>
 
-      <div className="flex items-start gap-2 rounded-lg border border-brand/20 bg-brand-soft/50 px-3.5 py-2.5 text-[11px] leading-relaxed text-brand-strong">
-        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        <p>Uncertain matches wait for human review. Existing reviewed facts are never overwritten.</p>
-      </div>
-
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
         <section className="panel p-4 sm:p-5" aria-labelledby="new-import-heading">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h2 id="new-import-heading" className="text-[15px] font-semibold tracking-tight">
-                New import batch
+              <h2 id="new-import-heading" className="text-[21px] font-semibold tracking-tight">
+                New import
               </h2>
-              <p className="text-[11.5px] text-muted-foreground">
-                Multiple files per batch. CSV, text PDF, DOCX, TXT and pasted email/transcript.
-              </p>
+              <p className="text-[14px] text-muted-foreground">PDF, DOCX, CSV, TXT, EML or pasted text.</p>
             </div>
             {!canWrite ? <span className="text-[10.5px] text-warning">Read-only access</span> : null}
           </div>
@@ -397,11 +389,8 @@ const ImportsPage = () => {
             }}
           >
             <UploadCloud className="h-7 w-7 text-brand" aria-hidden="true" />
-            <p className="mt-2 text-[12.5px] font-semibold">Drop historical files here</p>
-            <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">
-              CSV · PDF with embedded text · DOCX · TXT · EML. Max 20 MB each. XLSX is not enabled; export it as CSV.
-              Scanned PDFs and image-only DOCX are rejected because OCR is not configured.
-            </p>
+            <p className="mt-2 text-[16px] font-semibold">Drop files here</p>
+            <p className="mt-0.5 text-[14px] text-muted-foreground">Up to 20 MB each. Scanned files and XLSX are unsupported.</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -418,7 +407,7 @@ const ImportsPage = () => {
               type="button"
               size="sm"
               variant="outline"
-              className="mt-3 h-7 text-[11px]"
+              className="mt-3 h-9 text-[16px]"
               disabled={!canWrite || processing}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -449,8 +438,7 @@ const ImportsPage = () => {
 
           <div className="mt-4 rounded-lg border border-border bg-card p-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11.5px] font-semibold">Paste a historical email or transcript</p>
-              <span className="text-[9.5px] uppercase tracking-[0.12em] text-muted-foreground">Optional</span>
+              <p className="text-[16px] font-semibold">Paste email or text</p>
             </div>
             <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_140px_145px]">
               <Input
@@ -481,44 +469,35 @@ const ImportsPage = () => {
               rows={5}
               value={pasteContent}
               onChange={(event) => setPasteContent(event.target.value)}
-              placeholder="Paste the email or meeting transcript. Nothing is sent; it is stored privately and parsed for source-linked records."
+              placeholder="Paste email or notes"
               className="mt-2 bg-background text-[12px] leading-relaxed"
               aria-label="Pasted email or transcript"
             />
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[10px] leading-relaxed text-muted-foreground">
-              Supported extraction: CSV rows, TXT/email text, DOCX body text and PDFs with a text layer. No OCR or XLSX;
-              export spreadsheets as CSV.
-            </p>
             <Button onClick={() => void startImport()} disabled={!canWrite || processing} className="gap-1.5">
               {processing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <UploadCloud className="h-4 w-4" aria-hidden="true" />}
               {processing ? "Importing…" : "Start import"}
             </Button>
           </div>
 
-          <div className="mt-4 rounded-lg border border-warning/25 bg-warning-soft/40 p-3">
+          <div className="mt-4 rounded-lg border border-brand/20 bg-brand-soft/40 p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-warning">
-                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                <p className="inline-flex items-center gap-1.5 text-[16px] font-semibold text-brand-strong">
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
                   Synthetic MuseFlow demo
-                </p>
-                <p className="mt-0.5 max-w-lg text-[10.5px] leading-relaxed text-warning">
-                  Load seven clearly labelled synthetic files (founder introduction, parseable pitch deck, historical deal
-                  memo, funding CSV, investor CSV, meeting notes DOCX and EML) through the real pipeline, then import a
-                  pilot clarification transcript. Both use private storage, extraction and persistence; no success is simulated.
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <Button size="sm" variant="outline" className="h-7 text-[10.5px]" disabled={!canWrite || processing} onClick={() => void loadDemoPack()}>
+                <Button size="sm" variant="outline" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadDemoPack()}>
                   Load 7 demo files
                 </Button>
-                <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" disabled={!canWrite || processing} onClick={() => void loadFollowup()}>
+                <Button size="sm" variant="ghost" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadFollowup()}>
                   Import ARR follow-up transcript
                 </Button>
-                <Button size="sm" variant="ghost" className="h-7 text-[10.5px]" disabled={!canWrite || processing} onClick={() => void loadPilotClarification()}>
+                <Button size="sm" variant="ghost" className="h-9 text-[14px]" disabled={!canWrite || processing} onClick={() => void loadPilotClarification()}>
                   Import pilot clarification
                 </Button>
               </div>
@@ -555,66 +534,10 @@ const ImportsPage = () => {
         <section className="space-y-3" aria-labelledby="batches-heading">
           <div className="flex items-end justify-between gap-2">
             <div>
-              <h2 id="batches-heading" className="text-[15px] font-semibold tracking-tight">
-                Import batches
-              </h2>
-              <p className="text-[11.5px] text-muted-foreground">
-                Job IDs, file statuses, record counts and explicit errors.
-              </p>
+              <h2 id="batches-heading" className="text-[21px] font-semibold tracking-tight">Import batches</h2>
             </div>
-            <span className="text-[10px] text-muted-foreground">{batches.length} batch{batches.length === 1 ? "" : "es"}</span>
+            <span className="text-[14px] text-muted-foreground">{batches.length} batch{batches.length === 1 ? "" : "es"}</span>
           </div>
-
-          <section className="panel p-3.5" aria-labelledby="job-processing-heading">
-            <div className="flex items-center justify-between gap-2">
-              <h3 id="job-processing-heading" className="text-[12px] font-semibold tracking-tight">Import job processing</h3>
-              <span className="text-[9.5px] text-muted-foreground">{batches.length} job{batches.length === 1 ? "" : "s"}</span>
-            </div>
-            {workspaceLoading ? (
-              <p className="mt-2 text-[10.5px] text-muted-foreground">Loading import jobs.</p>
-            ) : workspaceError ? (
-              <p className="mt-2 text-[10.5px] text-destructive">Import jobs could not be loaded.</p>
-            ) : batches.length === 0 ? (
-              <p className="mt-2 text-[10.5px] text-muted-foreground">No import jobs.</p>
-            ) : (
-              <>
-                <div className="mt-2 h-[128px] w-full" role="img" aria-label={`Import batch jobs: ${jobBuckets.completed} successfully processed, ${jobBuckets.review} need review, ${jobBuckets.failed} failed, ${jobBuckets.processing} processing.`}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={jobChart} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                      <XAxis type="number" hide allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" width={116} tickLine={false} axisLine={false} tick={{ fontSize: 9 }} />
-                      <Tooltip
-                        cursor={{ fill: "hsl(var(--secondary))" }}
-                        contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", color: "hsl(var(--foreground))", fontSize: 11 }}
-                        formatter={(value: number | string) => [`${value} job${Number(value) === 1 ? "" : "s"}`, "Count"]}
-                      />
-                      <Bar dataKey="count" radius={[0, 3, 3, 0]} barSize={12}>
-                        {jobChart.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="mt-1 text-[9.5px] text-muted-foreground">
-                  Successfully processed {jobBuckets.completed} · Need review {jobBuckets.review} · Failed {jobBuckets.failed} · Processing {jobBuckets.processing}.
-                </p>
-                <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">
-                  Import batches (jobs), not files or records. Each batch is counted once by stored status. A review job may contain completed files and pending records.
-                </p>
-                <p className="text-[9px] leading-relaxed text-muted-foreground">
-                  Processing is shown by status only; no fabricated percentage. File-level progress is shown below.
-                </p>
-                {processingBatches.length > 0 ? (
-                  <ul className="mt-1.5 space-y-1">
-                    {processingBatches.map((batch) => (
-                      <li key={batch.id} className="text-[9.5px] text-muted-foreground">
-                        {batch.label}: {batch.totalFiles > 0 ? `${batch.filesProcessed}/${batch.totalFiles} files` : "Processing"}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </>
-            )}
-          </section>
 
           {batches.length > 0 ? (
             <div className="space-y-3">
